@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aquarium</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#ui {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+}
+
+label.btn, button {
+  background: #2a2a2a;
+  color: #ccc;
+  border: 1px solid #3a3a3a;
+  padding: 5px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.6;
+}
+label.btn:hover, button:hover { background: #333; }
+
+#count {
+  font-size: 13px;
+  color: #555;
+}
+
+canvas { flex: 1; display: block; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <label class="btn">+ Add images
+    <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+  </label>
+  <button onclick="clearAll()">Clear</button>
+  <button onclick="exportHTML()">Export</button>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Speed
+    <input type="range" id="speed" min="0.2" max="3" step="0.1" value="1"
+      oninput="speedScale=+this.value; document.getElementById('speedVal').textContent=this.value"
+      style="width:90px;accent-color:#666;">
+    <span id="speedVal" style="min-width:2ch;">1</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Cohesion
+    <input type="range" id="cohesion" min="0" max="15" step="0.5" value="5"
+      oninput="cohesionScale=+this.value; document.getElementById('cohesionVal').textContent=this.value"
+      style="width:90px;accent-color:#666;">
+    <span id="cohesionVal" style="min-width:2ch;">5</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Wander
+    <input type="range" id="wander" min="0" max="3" step="0.1" value="1"
+      oninput="wanderScale=+this.value; document.getElementById('wanderVal').textContent=this.value"
+      style="width:90px;accent-color:#666;">
+    <span id="wanderVal" style="min-width:2ch;">1</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Depth
+    <input type="range" id="depth" min="0.3" max="2.5" step="0.1" value="1"
+      oninput="depthFactor=+this.value; document.getElementById('depthVal').textContent=this.value; resize();"
+      style="width:90px;accent-color:#666;">
+    <span id="depthVal" style="min-width:2ch;">1</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Wiggle
+    <input type="range" id="wiggle" min="0" max="4" step="0.1" value="1"
+      oninput="wiggleScale=+this.value; document.getElementById('wiggleVal').textContent=this.value"
+      style="width:90px;accent-color:#666;">
+    <span id="wiggleVal" style="min-width:2ch;">1</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Near
+    <input type="range" id="near" min="5" max="60" step="1" value="25"
+      oninput="nearDist=+this.value; document.getElementById('nearVal').textContent=this.value"
+      style="width:90px;accent-color:#666;">
+    <span id="nearVal" style="min-width:2ch;">25</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Flip
+    <input type="range" id="flip" min="0" max="2" step="0.1" value="0"
+      oninput="flipRate=+this.value; document.getElementById('flipVal').textContent=this.value"
+      style="width:90px;accent-color:#666;">
+    <span id="flipVal" style="min-width:2ch;">0</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Life
+    <input type="range" id="life" min="0" max="120" step="5" value="0"
+      oninput="lifespanScale=+this.value; document.getElementById('lifeVal').textContent=this.value===0||this.value==='0'?'off':this.value+'s'; applyLifespan()"
+      style="width:90px;accent-color:#666;">
+    <span id="lifeVal" style="min-width:4ch;">off</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    Max
+    <input type="range" id="max" min="1" max="20" step="1" value="5"
+      oninput="maxAlive=+this.value; document.getElementById('maxVal').textContent=this.value; spawnFromQueue()"
+      style="width:90px;accent-color:#666;">
+    <span id="maxVal" style="min-width:2ch;">5</span>
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#999;">
+    BG
+    <input type="color" id="bgColor" value="#000000"
+      oninput="scene.background.set(this.value)"
+      style="width:36px;height:24px;border:none;background:none;cursor:pointer;padding:0;">
+  </label>
+  <button id="followBtn" onclick="cursorAttract=!cursorAttract; this.textContent=cursorAttract?'Follow: on':'Follow: off'; this.style.color=cursorAttract?'#ccc':'#555';"
+    style="color:#555;">Follow: off</button>
+  <span id="count"></span>
+</div>
+<canvas id="c"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+// ── renderer ──────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 500);
+camera.position.z = 70;
+
+// ── behaviour scales (controlled by sliders) ─────────────────────────────────
+let speedScale = 1.0, cohesionScale = 5.0, wanderScale = 1.0, depthFactor = 1.0, wiggleScale = 1.0, flipRate = 0, nearDist = 25, lifespanScale = 0, maxAlive = 5;
+
+// ── aquarium bounds (half-extents) — updated in resize() ─────────────────────
+let BX = 38, BY = 26, BZ = 22;
+
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  // bounds match the visible frustum at z=0, with a small inset
+  const vFov = camera.fov * Math.PI / 180;
+  BY = Math.tan(vFov / 2) * camera.position.z * 0.92;
+  BX = BY * camera.aspect;
+  BZ = Math.min(BY * depthFactor, camera.position.z - 5);
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+// ── cursor tracking ───────────────────────────────────────────────────────────
+let cursorInCanvas = false, cursorAttract = false;
+const cursorRayDir = new THREE.Vector3();
+const _unproj = new THREE.Vector3();
+
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  const ndcX =  ((e.clientX - r.left) / r.width)  * 2 - 1;
+  const ndcY = -((e.clientY - r.top)  / r.height) * 2 + 1;
+  _unproj.set(ndcX, ndcY, 0.5).unproject(camera);
+  cursorRayDir.copy(_unproj).sub(camera.position).normalize();
+  cursorInCanvas = true;
+});
+canvas.addEventListener('mouseleave', () => { cursorInCanvas = false; });
+
+// ── pictures ──────────────────────────────────────────────────────────────────
+const pictures = [];
+const allDataURLs  = [];   // every loaded dataURL — used for export
+const waitingQueue = [];   // dataURLs waiting to be born
+
+class Picture {
+  constructor(texture, aspect) {
+    const h = 9;                         // world-unit height
+    const w = h * aspect;
+    this.mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide })
+    );
+    this.radius = Math.sqrt(w * w + h * h) / 2;  // bounding sphere
+
+    // random start position
+    this.mesh.position.set(
+      (Math.random() - 0.5) * BX * 1.6,
+      (Math.random() - 0.5) * BY * 1.6,
+      (Math.random() - 0.5) * BZ * 1.6
+    );
+
+    // gentle random initial velocity
+    this.vx = (Math.random() - 0.5) * 4;
+    this.vy = (Math.random() - 0.5) * 4;
+    this.vz = (Math.random() - 0.5) * 2;
+
+    // wander: staggered so pictures don't all turn at once
+    this.wanderTimer = Math.random() * 2;
+
+    // wiggle: independent phase and frequency per picture
+    this.wigglePhase = Math.random() * Math.PI * 2;
+    this.wiggleFreq  = 0.5 + Math.random() * 0.5;   // cycles/sec
+
+    // coin flip
+    this.spinning   = false;
+    this.spinAngle  = 0;
+    this.spinSpeed  = 0;
+    this.flipTimer  = 2 + Math.random() * 4;         // initial delay before first flip
+
+    // lifespan
+    this.age      = 0;
+    this.lifespan = lifespanScale > 0
+      ? lifespanScale * (0.7 + Math.random() * 0.6)  // ±30% jitter
+      : Infinity;
+
+    scene.add(this.mesh);
+  }
+
+  update(dt, others) {
+    const p = this.mesh.position;
+
+    // ── wander impulse ─────────────────────────────────────────────────────────
+    // every 2-4 seconds, nudge in a new random direction
+    this.wanderTimer -= dt;
+    if (this.wanderTimer <= 0) {
+      this.wanderTimer = 1 + Math.random() * 1.5;
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = (Math.random() - 0.5) * Math.PI * 0.45;
+      const imp   = (5 + Math.random() * 4) * speedScale * wanderScale;
+      this.vx += Math.cos(theta) * Math.cos(phi) * imp;
+      this.vy += Math.sin(phi) * imp;
+      this.vz += Math.sin(theta) * Math.cos(phi) * imp;
+    }
+
+    // ── cursor attraction ─────────────────────────────────────────────────────
+    if (cursorAttract && cursorInCanvas && cursorRayDir.z !== 0) {
+      // intersect ray with the plane at this picture's Z depth
+      const t = (p.z - camera.position.z) / cursorRayDir.z;
+      const cx = camera.position.x + cursorRayDir.x * t;
+      const cy = camera.position.y + cursorRayDir.y * t;
+      const attraction = 5.0;
+      this.vx += (cx - p.x) * attraction * dt;
+      this.vy += (cy - p.y) * attraction * dt;
+    }
+
+    // ── cohesion: constant-strength pull toward flock center ─────────────────
+    // Normalized direction so force is distance-independent (no violent collapse)
+    if (others.length > 1) {
+      let cx = 0, cy = 0, cz = 0;
+      for (const o of others) { cx += o.mesh.position.x; cy += o.mesh.position.y; cz += o.mesh.position.z; }
+      cx /= others.length; cy /= others.length; cz /= others.length;
+      const dx = cx - p.x, dy = cy - p.y, dz = cz - p.z;
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      if (dist > 1) {
+        const str = cohesionScale * dt;
+        this.vx += (dx/dist) * str;
+        this.vy += (dy/dist) * str;
+        this.vz += (dz/dist) * str;
+      }
+    }
+
+    // ── frustum walls: boundaries match the visible area at each picture's depth ─
+    const camDist = camera.position.z - p.z;
+    if (camDist > 1) {
+      const fovR = camera.fov * Math.PI / 180;
+      const hH   = Math.tan(fovR / 2) * camDist * 0.90;  // 90% inset
+      const hW   = hH * camera.aspect;
+      const mH   = hH * 0.2, mW = hW * 0.2;              // 20% soft zone
+      const wF   = 40;
+      if (p.x >  hW - mW) this.vx -= wF * Math.max(0, (p.x  - (hW - mW)) / mW) * dt;
+      if (p.x < -hW + mW) this.vx += wF * Math.max(0, (-hW + mW - p.x)   / mW) * dt;
+      if (p.y >  hH - mH) this.vy -= wF * Math.max(0, (p.y  - (hH - mH)) / mH) * dt;
+      if (p.y < -hH + mH) this.vy += wF * Math.max(0, (-hH + mH - p.y)   / mH) * dt;
+      // hard clamp
+      if (p.x >  hW) { p.x =  hW; if (this.vx > 0) this.vx *= -0.6; }
+      if (p.x < -hW) { p.x = -hW; if (this.vx < 0) this.vx *= -0.6; }
+      if (p.y >  hH) { p.y =  hH; if (this.vy > 0) this.vy *= -0.6; }
+      if (p.y < -hH) { p.y = -hH; if (this.vy < 0) this.vy *= -0.6; }
+    }
+
+    // ── Z bounds: near plane (not too close to camera) and far plane (depth slider) ─
+    const nearZ = camera.position.z - nearDist, farZ = -BZ, mZ = 4;
+    if (p.z > nearZ - mZ) this.vz -= 40 * Math.max(0, (p.z - (nearZ - mZ)) / mZ) * dt;
+    if (p.z < farZ  + mZ) this.vz += 40 * Math.max(0, (farZ + mZ - p.z)    / mZ) * dt;
+    if (p.z > nearZ) { p.z = nearZ; if (this.vz > 0) this.vz *= -0.6; }
+    if (p.z < farZ)  { p.z = farZ;  if (this.vz < 0) this.vz *= -0.6; }
+
+    // ── separation + collision with other pictures ─────────────────────────────
+    for (const other of others) {
+      if (other === this) continue;
+      const dx = p.x - other.mesh.position.x;
+      const dy = p.y - other.mesh.position.y;
+      const dz = p.z - other.mesh.position.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const minDist = this.radius + other.radius;
+      if (dist < minDist && dist > 0.001) {
+        const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+        // relative velocity along normal
+        const relV = (this.vx - other.vx) * nx
+                   + (this.vy - other.vy) * ny
+                   + (this.vz - other.vz) * nz;
+        if (relV < 0) {   // only when approaching
+          this.vx -= relV * nx;
+          this.vy -= relV * ny;
+          this.vz -= relV * nz;
+        }
+      }
+    }
+
+    // ── damping ────────────────────────────────────────────────────────────────
+    const damp = Math.pow(0.997, dt * 60);
+    this.vx *= damp;
+    this.vy *= damp;
+    this.vz *= damp;
+
+    // speed cap
+    const spd = Math.sqrt(this.vx * this.vx + this.vy * this.vy + this.vz * this.vz);
+    if (spd > 16 * speedScale) { const s = 16 * speedScale / spd; this.vx *= s; this.vy *= s; this.vz *= s; }
+
+    // ── move & face camera ─────────────────────────────────────────────────────
+    p.x += this.vx * dt;
+    p.y += this.vy * dt;
+    p.z += this.vz * dt;
+    this.mesh.lookAt(camera.position);
+
+    // ── wiggle: rock around local axes (lookAt resets each frame, so these are absolute) ──
+    this.wigglePhase += dt * this.wiggleFreq * wiggleScale;
+    this.mesh.rotateZ(Math.sin(this.wigglePhase)        * 0.20);  // in-plane rock
+    this.mesh.rotateX(Math.cos(this.wigglePhase * 0.71) * 0.15);  // depth tilt
+
+    // ── coin flip: full Y-axis rotation triggered periodically ────────────────
+    if (this.spinning) {
+      this.spinAngle += this.spinSpeed * dt;
+      if (this.spinAngle >= Math.PI * 2) {
+        this.spinAngle = 0;
+        this.spinning  = false;
+        this.flipTimer = flipRate > 0 ? (2 + Math.random() * 4) / flipRate : Infinity;
+      }
+      this.mesh.rotateY(this.spinAngle);
+    } else if (flipRate > 0) {
+      this.flipTimer -= dt;
+      if (this.flipTimer <= 0) {
+        this.spinning  = true;
+        this.spinAngle = 0;
+        this.spinSpeed = Math.PI * 2 / (0.4 + Math.random() * 0.4); // 0.4–0.8s flip
+      }
+    }
+
+    // ── lifespan: fade in at birth, fade out at death ─────────────────────────
+    if (isFinite(this.lifespan)) {
+      this.age += dt;
+      const fadeDur = Math.min(2, this.lifespan * 0.3);
+      this.mesh.material.opacity = Math.min(1,
+        this.age / fadeDur,
+        (this.lifespan - this.age) / fadeDur
+      );
+    }
+  }
+
+  remove() {
+    scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    this.mesh.material.map?.dispose();
+    this.mesh.material.dispose();
+  }
+}
+
+// ── file input ────────────────────────────────────────────────────────────────
+let inFlight = 0;  // spawns started but image not yet loaded
+
+function spawnOne(dataURL) {
+  inFlight++;
+  const img = new Image();
+  img.onload = () => {
+    inFlight--;
+    const tex = new THREE.Texture(img);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    const pic = new Picture(tex, img.width / img.height);
+    pic.dataURL = dataURL;
+    pictures.push(pic);
+    updateCount();
+  };
+  img.src = dataURL;
+}
+
+function spawnFromQueue() {
+  while (pictures.length + inFlight < maxAlive && waitingQueue.length > 0) {
+    spawnOne(waitingQueue.shift());
+  }
+  updateCount();
+}
+
+function loadDataURL(dataURL) {
+  allDataURLs.push(dataURL);
+  waitingQueue.push(dataURL);
+  spawnFromQueue();
+}
+
+document.getElementById('fileInput')?.addEventListener('change', e => {
+  for (const file of e.target.files) {
+    const reader = new FileReader();
+    reader.onload = ev => loadDataURL(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+  e.target.value = '';
+});
+
+function clearAll() {
+  for (const p of pictures) p.remove();
+  pictures.length = 0;
+  allDataURLs.length = 0;
+  waitingQueue.length = 0;
+  inFlight = 0;
+  updateCount();
+}
+
+function applyLifespan() {
+  for (const p of pictures) {
+    p.age = 0;
+    p.lifespan = lifespanScale > 0
+      ? lifespanScale * (0.7 + Math.random() * 0.6)
+      : Infinity;
+    if (!isFinite(p.lifespan)) p.mesh.material.opacity = 1;
+  }
+}
+
+function updateCount() {
+  const el = document.getElementById('count');
+  if (!el) return;
+  const alive = pictures.length, waiting = waitingQueue.length;
+  el.textContent = alive
+    ? waiting ? `${alive} alive, ${waiting} waiting` : `${alive} alive`
+    : waiting ? `${waiting} waiting` : '';
+}
+
+// ── export ────────────────────────────────────────────────────────────────────
+function exportHTML() {
+  if (!allDataURLs.length) return;
+  const css = document.querySelector('style').textContent;
+  const js  = document.querySelector('script:not([src])').textContent;
+  const bgHex = '#' + scene.background.getHexString();
+  const preload = 'scene.background.set(' + JSON.stringify(bgHex) + ');\n'
+    + 'speedScale = ' + speedScale + ';\n'
+    + 'cohesionScale = ' + cohesionScale + ';\n'
+    + 'wanderScale = ' + wanderScale + ';\n'
+    + 'wiggleScale = ' + wiggleScale + ';\n'
+    + 'nearDist = ' + nearDist + ';\n'
+    + 'flipRate = ' + flipRate + ';\n'
+    + 'lifespanScale = ' + lifespanScale + ';\n'
+    + 'maxAlive = ' + maxAlive + ';\n'
+    + 'depthFactor = ' + depthFactor + '; resize();\n'
+    + allDataURLs.map(url => 'loadDataURL(' + JSON.stringify(url) + ');').join('\n');
+  const sc = 'script';
+  const html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
+    + '<meta charset="UTF-8"><title>Aquarium</title>\n'
+    + '<style>' + css + '</style>\n'
+    + '</head>\n<body>\n'
+    + '<canvas id="c" style="display:block;width:100%;height:100vh;"></canvas>\n'
+    + '<' + sc + ' src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></' + sc + '>\n'
+    + '<' + sc + '>\n' + js + '\n' + preload + '\n</' + sc + '>\n'
+    + '</body>\n</html>';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  a.download = 'aquarium.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── animation loop ────────────────────────────────────────────────────────────
+let last = performance.now();
+function animate(ts) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((ts - last) / 1000, 0.05);
+  last = ts;
+  for (const p of pictures) p.update(dt, pictures);
+
+  // remove expired boids, return their dataURL to the waiting queue
+  let died = false;
+  for (let i = pictures.length - 1; i >= 0; i--) {
+    if (pictures[i].age >= pictures[i].lifespan) {
+      const url = pictures[i].dataURL;
+      pictures[i].remove();
+      pictures.splice(i, 1);
+      waitingQueue.push(url);
+      died = true;
+    }
+  }
+  if (died) spawnFromQueue();
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

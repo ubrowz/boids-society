@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Boids Aquarium</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#ffffff; }
+body {
+display:flex; flex-direction:column;
+justify-content:center; align-items:center;
+min-height:100vh; overflow:hidden;
+font-family:'Courier New',monospace;
+gap:4px;
+}
+canvas {
+display:block;
+}
+#controls { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.ctrl-row {
+display:flex; align-items:center; gap:6px;
+color:#000; font-size:10px; letter-spacing:0.5px;
+text-transform:uppercase; user-select:none;
+}
+.ctrl-row label { min-width:82px; text-align:right; }
+.ctrl-val { min-width:40px; text-align:left; font-size:10px; font-weight:700; color:#000; }
+input[type=range] {
+-webkit-appearance:none; appearance:none;
+width:120px; height:3px; border-radius:2px;
+background:linear-gradient(to right,#1a3a5c,#54a0ff);
+outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+-webkit-appearance:none; appearance:none;
+width:16px; height:16px; border-radius:50%;
+background:#54a0ff; box-shadow:0 0 6px rgba(84,160,255,0.8);
+cursor:pointer; border:2px solid #fff;
+}
+input[type=range]::-moz-range-thumb {
+width:16px; height:16px; border-radius:50%;
+background:#54a0ff; box-shadow:0 0 6px rgba(84,160,255,0.8);
+cursor:pointer; border:2px solid #fff;
+}
+#bondSlider { background:linear-gradient(to right,#2a1f00,#ffd32a); }
+#bondSlider::-webkit-slider-thumb { background:#ffd32a; box-shadow:0 0 8px rgba(255,211,42,0.8); }
+#bondSlider::-moz-range-thumb { background:#ffd32a; }
+#bondVal { color:#000; }
+#lifeSlider { background:linear-gradient(to right,#2a0a00,#ff6b6b); }
+#lifeSlider::-webkit-slider-thumb { background:#ff6b6b; box-shadow:0 0 8px rgba(255,107,107,0.8); }
+#lifeSlider::-moz-range-thumb { background:#ff6b6b; }
+#lifeVal { color:#000; }
+#childSlider { background:linear-gradient(to right,#002a10,#0be881); }
+#childSlider::-webkit-slider-thumb { background:#0be881; box-shadow:0 0 8px rgba(11,232,129,0.8); }
+#childSlider::-moz-range-thumb { background:#0be881; }
+#childVal { color:#000; }
+#targetSlider { background:linear-gradient(to right,#002a2a,#00d2d3); }
+#targetSlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
+#targetSlider::-moz-range-thumb { background:#00d2d3; }
+#targetVal { color:#000; }
+#speedSlider { background:linear-gradient(to right,#1a0a2a,#a29bfe); }
+#speedSlider::-webkit-slider-thumb { background:#a29bfe; box-shadow:0 0 8px rgba(162,155,254,0.8); }
+#speedSlider::-moz-range-thumb { background:#a29bfe; }
+#speedVal { color:#000; }
+#singleSlider { background:linear-gradient(to right,#1a1a1a,#aaaaaa); }
+#singleSlider::-webkit-slider-thumb { background:#aaaaaa; box-shadow:0 0 8px rgba(180,180,180,0.8); }
+#singleSlider::-moz-range-thumb { background:#aaaaaa; }
+#singleVal { color:#000; }
+#familySlider { background:linear-gradient(to right,#1a0a2a,#fd79a8); }
+#familySlider::-webkit-slider-thumb { background:#fd79a8; box-shadow:0 0 8px rgba(253,121,168,0.8); }
+#familySlider::-moz-range-thumb { background:#fd79a8; }
+#familyVal { color:#000; }
+#divorceSlider { background:linear-gradient(to right,#1a0800,#e17055); }
+#divorceSlider::-webkit-slider-thumb { background:#e17055; box-shadow:0 0 8px rgba(225,112,85,0.8); }
+#divorceSlider::-moz-range-thumb { background:#e17055; }
+#divorceVal { color:#000; }
+#gaySlider { background:linear-gradient(to right,#1a002a,#a855f7); }
+#gaySlider::-webkit-slider-thumb { background:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.8); }
+#gaySlider::-moz-range-thumb { background:#a855f7; }
+#gayVal { color:#000; }
+#diseaseThreshSlider { background:linear-gradient(to right,#0a0a0a,#444); }
+#diseaseThreshSlider::-webkit-slider-thumb { background:#444; box-shadow:0 0 8px rgba(80,80,80,0.8); }
+#diseaseThreshSlider::-moz-range-thumb { background:#444; }
+#diseaseThreshVal { color:#000; }
+#diseaseDurSlider { background:linear-gradient(to right,#0a0a0a,#888); }
+#diseaseDurSlider::-webkit-slider-thumb { background:#888; box-shadow:0 0 8px rgba(140,140,140,0.8); }
+#diseaseDurSlider::-moz-range-thumb { background:#888; }
+#diseaseDurVal { color:#000; }
+#fatalitySlider { background:linear-gradient(to right,#1a0000,#c0392b); }
+#fatalitySlider::-webkit-slider-thumb { background:#c0392b; box-shadow:0 0 8px rgba(192,57,43,0.8); }
+#fatalitySlider::-moz-range-thumb { background:#c0392b; }
+#fatalityVal { color:#000; }
+.ctrl-divider {
+font-size:10px; letter-spacing:2px; color:#000;
+text-transform:uppercase; padding:2px 0 0 0; user-select:none;
+}
+.fb-wrap {
+display:flex; align-items:center; gap:8px;
+color:#000; font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
+}
+.fb-bar { width:120px; height:5px; border-radius:3px; background:rgba(0,0,0,0.1); overflow:hidden; }
+.fb-fill { height:100%; width:50%; border-radius:3px; transition:width 0.35s ease; }
+#nearFill { background:linear-gradient(to right,#1a3a5c,#54a0ff); }
+#lifeFill { background:linear-gradient(to right,#2a0a00,#ff6b6b); }
+#statusBar {
+display:grid; grid-template-columns:150px 120px;
+font-size:11px; letter-spacing:1px; text-transform:uppercase;
+text-align:left;
+}
+#statusBar span { white-space:nowrap; color:#555; font-size:11px; }
+#statusBar span .val { color:#000; font-family:monospace; font-weight:700; }
+.hi { color:#c0392b !important; }
+.lo { color:#27ae60 !important; }
+.ok { color:#000 !important; }
+#playBtn {
+margin-top:2px; align-self:center;
+width:64px; height:64px; border-radius:50%;
+background:rgba(0,210,211,0.12);
+border:2px solid rgba(0,210,211,0.5);
+color:#00d2d3; font-size:26px; line-height:1;
+cursor:pointer; box-shadow:0 0 16px rgba(0,210,211,0.25);
+transition:background 0.2s, box-shadow 0.2s;
+display:flex; align-items:center; justify-content:center;
+}
+#playBtn:hover { background:rgba(0,210,211,0.22); box-shadow:0 0 28px rgba(0,210,211,0.45); }
+#playBtn.running { border-color:rgba(255,107,107,0.6); color:#ff6b6b; background:rgba(255,107,107,0.1); }
+#playBtn.running:hover { background:rgba(255,107,107,0.2); box-shadow:0 0 28px rgba(255,107,107,0.4); }
+#ui { display:flex; flex-direction:row; align-items:flex-start; gap:16px; }
+#rightCol { display:flex; flex-direction:column; align-items:flex-start; gap:7px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+<div id="controls">
+<div class="ctrl-row">
+<label>target pop</label>
+<input type="range" id="targetSlider" min="2" max="100" value="20">
+<span class="ctrl-val" id="targetVal">20</span>
+</div>
+<div class="ctrl-row">
+<label>bond after</label>
+<input type="range" id="bondSlider" min="1" max="20" value="3">
+<span class="ctrl-val" id="bondVal">3 hits</span>
+</div>
+<div class="ctrl-row">
+<label>base lifespan</label>
+<input type="range" id="lifeSlider" min="5" max="80" value="80">
+<span class="ctrl-val" id="lifeVal">80 s</span>
+</div>
+<div class="ctrl-row">
+<label>preg. interval</label>
+<input type="range" id="childSlider" min="1" max="20" value="6">
+<span class="ctrl-val" id="childVal">6 s</span>
+</div>
+<div class="ctrl-row">
+<label>family size</label>
+<input type="range" id="familySlider" min="0" max="6" value="2" step="0.1">
+<span class="ctrl-val" id="familyVal">2.0</span>
+</div>
+<div class="ctrl-row">
+<label>divorce rate</label>
+<input type="range" id="divorceSlider" min="0" max="50" value="5" step="5">
+<span class="ctrl-val" id="divorceVal">5%</span>
+</div>
+<div class="ctrl-row">
+<label>speed</label>
+<input type="range" id="speedSlider" min="1" max="10" value="4" step="1">
+<span class="ctrl-val" id="speedVal">4</span>
+</div>
+<div class="ctrl-row">
+<label>singles</label>
+<input type="range" id="singleSlider" min="0" max="80" value="20" step="5">
+<span class="ctrl-val" id="singleVal">20%</span>
+</div>
+<div class="ctrl-row">
+<label>gay %</label>
+<input type="range" id="gaySlider" min="0" max="50" value="10" step="5">
+<span class="ctrl-val" id="gayVal">10%</span>
+</div>
+<div class="ctrl-row">
+<label>infect. hits</label>
+<input type="range" id="diseaseThreshSlider" min="1" max="10" value="3" step="1">
+<span class="ctrl-val" id="diseaseThreshVal">3</span>
+</div>
+<div class="ctrl-row">
+<label>infect. dur.</label>
+<input type="range" id="diseaseDurSlider" min="5" max="60" value="20" step="5">
+<span class="ctrl-val" id="diseaseDurVal">20 s</span>
+</div>
+<div class="ctrl-row">
+<label>fatality %</label>
+<input type="range" id="fatalitySlider" min="0" max="80" value="20" step="5">
+<span class="ctrl-val" id="fatalityVal">20%</span>
+<span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#c0392b;letter-spacing:0.5px;"></span>
+</div>
+</div>
+
+<div id="rightCol">
+<div style="display:flex;gap:12px;align-items:center;">
+<div class="fb-wrap">
+<span>density</span>
+<div class="fb-bar"><div class="fb-fill" id="nearFill"></div></div>
+</div>
+<div class="fb-wrap">
+<span>lifespan</span>
+<div class="fb-bar"><div class="fb-fill" id="lifeFill"></div></div>
+</div>
+</div>
+
+<div id="statusBar">
+<span>population: <span id="popSpan" class="val">—</span></span>
+<span>lifespan: <span id="lifeSpan" class="val">— s</span></span>
+</div>
+<div id="inbreedingWarn" style="display:none;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#ff6b6b;">
+inbreeding: hazard ×<span id="inbreedMult">—</span> · modal −<span id="inbreedDelta">—</span> s
+</div>
+
+<div id="readout" style="
+display:grid; grid-template-columns:repeat(4,auto); gap:1px 10px;
+font-size:11px; letter-spacing:1px; text-transform:uppercase;
+color:#000; line-height:1.7; align-items:baseline;
+">
+<span style="color:#555;">pairs</span> <span id="rdFertile" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">birth</span> <span id="rdBirth" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">death</span> <span id="rdDeath" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">immig.</span> <span id="rdImmig" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">sick</span> <span id="rdSick" style="font-family:monospace;font-weight:700;">0</span>
+<span style="color:#555;">R</span> <span id="rdR" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">div</span> <span id="rdDiv" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">dis.deaths</span> <span id="rdDied" style="font-family:monospace;font-weight:700;">0</span>
+<span style="color:#555;">eff.br.</span> <span id="rdEffBr" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">50-rule</span> <span id="rdSmallPop" style="font-family:monospace;font-weight:700;">—</span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
+<div style="display:flex;align-items:center;gap:8px;">
+<span id="viabilityDot"   style="font-size:15px;line-height:1;">●</span>
+<span id="viabilityState" style="font-weight:700;min-width:80px;">—</span>
+<span id="viabilityDetail" style="color:#555;font-size:10px;">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;">
+<span id="bondRiskDot"    style="font-size:15px;line-height:1;">●</span>
+<span id="bondRiskState"  style="font-weight:700;min-width:80px;">—</span>
+<span id="bondRiskDetail" style="color:#555;font-size:10px;">—</span>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#000;user-select:none;">
+<span>immigration</span>
+<button id="immigrationBtn" title="Toggle immigration" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#c0392b;position:relative;transition:background 0.2s;outline:none;">
+<span id="immigrationKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="immigrationLabel" style="color:#c0392b;font-weight:700;">off</span>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#000;user-select:none;">
+<span>disease</span>
+<button id="infectBtn" title="Infect a random boid" style="
+padding:2px 10px;border-radius:4px;border:1px solid #333;cursor:pointer;
+background:#1a1a1a;color:#eee;font-size:10px;letter-spacing:1px;
+text-transform:uppercase;font-family:'Courier New',monospace;outline:none;">infect</button>
+<span id="infectStatus" style="color:#555;font-size:10px;"></span>
+</div>
+
+<button id="playBtn" title="Start simulation">▶</button>
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ── slider state ──────────────────────────────────────────────────────────────
+let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
+let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
+let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
+let PREG_INTERVAL = parseInt(document.getElementById('childSlider').value);
+let SINGLE_FRACTION = parseInt(document.getElementById('singleSlider').value) / 100;
+let GAY_FRACTION = parseInt(document.getElementById('gaySlider').value) / 100;
+let FAMILY_SIZE = parseInt(document.getElementById('familySlider').value);
+let DIVORCE_RATE = parseInt(document.getElementById('divorceSlider').value) / 100;
+let immigrationEnabled = false;
+let immigrantEvents = []; // timestamps of actual immigrants spawned
+
+// ── rolling rate tracking (30s window) ───────────────────────────────────────
+const RATE_WINDOW = 30; // seconds
+let birthEvents = []; // timestamps of recent births
+let deathEvents = []; // timestamps of recent deaths
+let simClock = 0; // total sim time in seconds
+
+// ── immigration toggle ────────────────────────────────────────────────────────
+const immigrationBtn = document.getElementById('immigrationBtn');
+const immigrationKnob = document.getElementById('immigrationKnob');
+const immigrationLabel = document.getElementById('immigrationLabel');
+
+immigrationBtn.addEventListener('click',()=>{
+immigrationEnabled = !immigrationEnabled;
+if(immigrationEnabled){
+immigrationBtn.style.background = '#27ae60';
+immigrationKnob.style.left = '25px';
+immigrationLabel.textContent = 'on';
+immigrationLabel.style.color = '#27ae60';
+} else {
+immigrationBtn.style.background = '#c0392b';
+immigrationKnob.style.left = '3px';
+immigrationLabel.textContent = 'off';
+immigrationLabel.style.color = '#c0392b';
+}
+});
+const M_FERTILE_FROM = 0.20; // males fertile from 20% of lifespan
+const M_FERTILE_FOR = 0.70; // males fertile for 70% of lifespan
+const F_FERTILE_FROM = 0.20; // females fertile from 20% of lifespan
+const F_FERTILE_FOR = 0.50; // females fertile for 50% of lifespan
+
+function wire(id, valId, parse, fmt, onSet) {
+const el=document.getElementById(id), vl=document.getElementById(valId);
+el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.value); });
+}
+wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
+wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
+wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
+wire('childSlider', 'childVal', v=>parseInt(v), v=>v+' s', v=>{ PREG_INTERVAL=v; updateViability(); });
+wire('speedSlider', 'speedVal', v=>parseInt(v), v=>v, v=>{ SPEED=v*0.45; });
+wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
+wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
+wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
+wire('divorceSlider',      'divorceVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DIVORCE_RATE=v/100; });
+wire('diseaseThreshSlider','diseaseThreshVal', v=>parseInt(v),   v=>v,      v=>{ DISEASE_THRESHOLD=v; });
+wire('diseaseDurSlider',   'diseaseDurVal',    v=>parseInt(v),   v=>v+' s', v=>{ DISEASE_DURATION=v; });
+wire('fatalitySlider',     'fatalityVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DISEASE_FATALITY=v/100; });
+
+// ── canvas sizing ─────────────────────────────────────────────────────────────
+let SENSING_RADIUS = 130;
+function resize() {
+const ui = document.getElementById('ui');
+const uiH = ui ? ui.offsetHeight + 8 : 0;
+canvas.width = Math.max(window.innerWidth, 60);
+canvas.height = Math.max(window.innerHeight - uiH, 60);
+SENSING_RADIUS = Math.round(Math.min(canvas.width, canvas.height) * 0.3);
+}
+resize();
+window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
+
+// ── constants ─────────────────────────────────────────────────────────────────
+const COLORS=[
+'#ff6b6b','#ff9f43','#ffd32a','#0be881',
+'#00d2d3','#54a0ff','#5f27cd','#ff9ff3',
+'#48dbfb','#ff6348','#a29bfe','#fd79a8',
+'#55efc4','#fdcb6e','#e17055','#74b9ff'
+];
+const RADIUS = 10;
+let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
+const TURN_SPEED = 0.07;
+const WANDER_STR = 0.12;
+const WALL_MARGIN = 40;
+const BOND_DIST = 45;
+const BOND_STRENGTH = 3.0;
+const COOLDOWN_FRAMES = 30;
+const FADE_DURATION = 2.0;
+const BIRTH_DURATION = 1.5;
+const BASE_NEARNESS = 4.0;
+const MIN_NEARNESS = 0.05;
+const LIFESPAN_SCALE_MAX = 1.25; // at base 80s → ceiling of 100s
+const LIFESPAN_SCALE_MIN = 0.4;
+const MAX_LIFESPAN = 100; // hard biological ceiling in seconds
+const WARMUP_DURATION = 15.0;    // seconds to ramp nearness from 0 to full strength
+let DISEASE_DURATION = 20.0;     // seconds a boid stays infectious
+let DISEASE_THRESHOLD = 3;       // exposure hits from infected boids to catch disease
+let DISEASE_FATALITY = parseInt(document.getElementById('fatalitySlider').value) / 100;
+const DISEASE_COOLDOWN = 1.5;    // seconds before same pair can register another hit
+
+let smoothPressure = 0.5;
+let smoothGlobalPressure = 0.0;
+let nextId = 0;
+let _cachedDiversity = 0.3;        // updated each frame in updateStatus; used by disease & hazard
+let _cachedEffectiveBreeders = 0;  // fertile bonded M+F pairs × 2; updated each frame
+
+// ── disease ───────────────────────────────────────────────────────────────────
+const diseaseCooldown = new Map(); // pairKey → expiry simClock time
+let rHistory = [];                 // infectCount of each recovered/dead diseased boid
+let diseaseDeathEvents = [];       // simClock timestamps of disease fatalities
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function gaussianRandom(mean, std){
+const u=1-Math.random(), v=Math.random();
+return mean + std * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+function blendColors(h1,h2){
+const r1=parseInt(h1.slice(1,3),16),g1=parseInt(h1.slice(3,5),16),b1=parseInt(h1.slice(5,7),16);
+const r2=parseInt(h2.slice(1,3),16),g2=parseInt(h2.slice(3,5),16),b2=parseInt(h2.slice(5,7),16);
+return '#'+[Math.round((r1+r2)/2),Math.round((g1+g2)/2),Math.round((b1+b2)/2)]
+.map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function pickColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+
+// ── boid factory ──────────────────────────────────────────────────────────────
+function makeBoid(x,y,color,isChild,parentA,parentB){
+const angle = Math.random()*Math.PI*2;
+const familyKey = (parentA!==undefined && parentB!==undefined)
+? Math.min(parentA.id,parentB.id)+':'+Math.max(parentA.id,parentB.id) : null;
+const parentIds = (parentA!==undefined && parentB!==undefined)
+? new Set([parentA.id, parentB.id]) : new Set();
+// sex: biased toward minority sex
+const males = boids.filter(b=>b.alive&&b.sex==='M').length;
+const females = boids.filter(b=>b.alive&&b.sex==='F').length;
+const total = males + females;
+const pFemale = total > 0 ? males / total : 0.5;
+const sex = Math.random() < pFemale ? 'F' : 'M';
+const chosenColor = color || pickColor();
+const genome = [
+parseInt(chosenColor.slice(1,3),16)/255,
+parseInt(chosenColor.slice(3,5),16)/255,
+parseInt(chosenColor.slice(5,7),16)/255
+];
+// immigrant generation tracking
+let immigrantGeneration = -1;
+if(parentA!==undefined && parentB!==undefined){
+const pa=parentA.immigrantGeneration, pb=parentB.immigrantGeneration;
+if(pa>=0||pb>=0){
+immigrantGeneration = Math.max(pa>=0?pa:-1, pb>=0?pb:-1) + 1;
+}
+}
+// singles never bond — assigned probabilistically at birth
+const isSingle = Math.random() < SINGLE_FRACTION;
+const isGay = !isSingle && Math.random() < GAY_FRACTION;
+return {
+id:nextId++, x: x!==undefined?x:RADIUS+Math.random()*(canvas.width-RADIUS*2),
+y: y!==undefined?y:RADIUS+Math.random()*(canvas.height-RADIUS*2),
+vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED,
+color:chosenColor, wanderAngle:Math.random()*Math.PI*2,
+age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
+partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
+isChild:!!isChild, localPressure:0, globalPressure:0, popPressure:0,
+effectiveLifespan:BASE_LIFESPAN,
+maxLifespan:Math.max(BASE_LIFESPAN*0.3, gaussianRandom(BASE_LIFESPAN, BASE_LIFESPAN*0.2)),
+parentIds, familyKey, sex, genome,
+immigrantGeneration, isSingle, isGay, pairFamilyTarget:0,
+diseased:false, immune:false, diseaseTimer:0, diseaseHits:0, infectCount:0
+};
+}
+
+let boids = [];
+
+// ── pair maps ─────────────────────────────────────────────────────────────────
+const hits=new Map(), cooldown=new Map();
+function pairKey(a,b){ return Math.min(a,b)+'-'+Math.max(a,b); }
+function getHits(a,b) { return hits.get(pairKey(a,b))||0; }
+function getCool(a,b) { return cooldown.get(pairKey(a,b))||0; }
+function setHits(a,b,v) { hits.set(pairKey(a,b),v); }
+function setCool(a,b,v) { cooldown.set(pairKey(a,b),v); }
+function clearPair(a,b) { const k=pairKey(a,b); hits.delete(k); cooldown.delete(k); }
+
+// ── fertility ─────────────────────────────────────────────────────────────────
+function isFertile(boid){
+const life = boid.maxLifespan;
+const from = boid.sex==='M' ? M_FERTILE_FROM : F_FERTILE_FROM;
+const dur = boid.sex==='M' ? M_FERTILE_FOR : F_FERTILE_FOR;
+return boid.age >= life*from && boid.age <= life*(from+dur);
+}
+
+// ── pressure ──────────────────────────────────────────────────────────────────
+// fertile counts are global — compute once per frame before the per-boid loop
+let _fertileMales=0, _fertileFemales=0;
+function updateFertileCounts(){
+_fertileMales = boids.filter(b=>b.alive&&!b.dying&&b.sex==='M'&&isFertile(b)).length;
+_fertileFemales = boids.filter(b=>b.alive&&!b.dying&&b.sex==='F'&&isFertile(b)).length;
+}
+
+// effective breeders: fertile bonded M+F pairs × 2 (the 50/500 rule denominator)
+function updateEffectiveBreeders(){
+const boidMap = new Map(boids.map(b=>[b.id,b]));
+const seen = new Set();
+let eb = 0;
+for(const b of boids){
+if(!b.alive||b.dying||b.partnerId===null||seen.has(b.id)) continue;
+const partner = boidMap.get(b.partnerId);
+if(!partner||!partner.alive) continue;
+if(b.sex!==partner.sex&&isFertile(b)&&isFertile(partner)){
+eb+=2; seen.add(b.id); seen.add(partner.id);
+}
+}
+_cachedEffectiveBreeders = eb;
+}
+
+// below 50 effective breeders: up to 1.2× extra hazard (trajectory risk of genetic drift)
+// stacks with inbreedingHazardMultiplier() which responds to observed diversity
+function smallPopHazardMultiplier(){
+if(_cachedEffectiveBreeders >= 50) return 1;
+const t = 1 - _cachedEffectiveBreeders / 50;
+return 1 + t * 0.2;
+}
+
+function computePressure(boid){
+let n=0;
+for(const o of boids){
+if(!o.alive||o===boid) continue;
+const dx=o.x-boid.x, dy=o.y-boid.y;
+if(dx*dx+dy*dy<SENSING_RADIUS*SENSING_RADIUS) n++;
+}
+boid.localPressure = Math.min(n / Math.max(TARGET_POP * 0.4, 1), 1);
+
+// globalPressure: fertile pair signal — drives lifespan and breeding
+const fertilePairs = Math.min(_fertileMales, _fertileFemales);
+const avgFertileFrac = Math.min(M_FERTILE_FOR, F_FERTILE_FOR);
+const targetPairs = (TARGET_POP/2) * avgFertileFrac;
+const pairRatio = fertilePairs / Math.max(targetPairs,1);
+const rawPressure = Math.min(Math.max(pairRatio-1,-1),1);
+boid.globalPressure = boids.length < 4 ? -1 : rawPressure;
+
+// popPressure: raw headcount signal — drives nearness/dispersion only
+// +1 when 2× over target, 0 at target, -1 when at half target
+boid.popPressure = Math.min(Math.max((boids.length / Math.max(TARGET_POP,1)) - 1, -1), 1);
+}
+
+// ── steering ──────────────────────────────────────────────────────────────────
+function steerToward(boid,tx,ty,strength){
+const dx=tx-boid.x, dy=ty-boid.y;
+const len=Math.sqrt(dx*dx+dy*dy)||1;
+const desired=Math.atan2(dy/len,dx/len);
+const current=Math.atan2(boid.vy,boid.vx);
+let diff=desired-current;
+while(diff> Math.PI) diff-=Math.PI*2;
+while(diff<-Math.PI) diff+=Math.PI*2;
+const turn=Math.max(-TURN_SPEED*strength,Math.min(TURN_SPEED*strength,diff));
+const angle=current+turn;
+boid.vx=Math.cos(angle)*SPEED; boid.vy=Math.sin(angle)*SPEED;
+}
+
+function wander(boid){
+boid.wanderAngle+=(Math.random()-0.5)*WANDER_STR*2*Math.PI;
+const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
+const nx=boid.vx/spd, ny=boid.vy/spd;
+const cx=boid.x+nx*30, cy=boid.y+ny*30;
+steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*20,1);
+}
+
+function nearnessBehavior(boid){
+const thresholdScale = 1.0+(BOND_THRESHOLD-1)*0.24;
+
+// combine local density and raw population overshoot
+// when population > target, popPressure > 0, reducing/reversing attraction
+const combinedPressure = Math.min(boid.localPressure + Math.max(boid.popPressure,0), 1);
+const warmup = Math.min(simClock / WARMUP_DURATION, 1);
+const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
+
+let cx=0,cy=0,count=0;
+for(const o of boids){
+if(!o.alive||o===boid) continue;
+const dx=o.x-boid.x, dy=o.y-boid.y;
+if(dx*dx+dy*dy<SENSING_RADIUS*SENSING_RADIUS){ cx+=o.x; cy+=o.y; count++; }
+}
+if(count===0){
+// no local neighbours — steer weakly toward global centroid so isolated boids find the flock
+let gx=0,gy=0,gc=0;
+for(const o of boids){ if(o.alive&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
+if(gc>0) steerToward(boid,gx/gc,gy/gc,1.0);
+return;
+}
+
+if(strength >= 0){
+steerToward(boid,cx/count,cy/count,strength);
+} else {
+// repulsion: steer away from flock centre
+steerToward(boid,2*boid.x-cx/count,2*boid.y-cy/count,-strength);
+}
+}
+
+function bondAttraction(boid){
+if(boid.partnerId===null) return;
+const partner=boids.find(b=>b.id===boid.partnerId);
+if(!partner||!partner.alive) return;
+const dx=partner.x-boid.x, dy=partner.y-boid.y;
+const dist=Math.sqrt(dx*dx+dy*dy);
+if(dist>BOND_DIST){
+// too far — pull toward partner
+steerToward(boid,partner.x,partner.y,BOND_STRENGTH);
+} else if(dist < BOND_DIST * 0.4){
+// too close — steer away to maintain natural separation
+steerToward(boid,boid.x-dx,boid.y-dy,BOND_STRENGTH*0.8);
+}
+}
+
+function avoidWalls(boid){
+const w=canvas.width,h=canvas.height;
+let px=0,py=0;
+if(boid.x<WALL_MARGIN) px+=(WALL_MARGIN-boid.x)/WALL_MARGIN;
+if(boid.x>w-WALL_MARGIN) px-=(boid.x-(w-WALL_MARGIN))/WALL_MARGIN;
+if(boid.y<WALL_MARGIN) py+=(WALL_MARGIN-boid.y)/WALL_MARGIN;
+if(boid.y>h-WALL_MARGIN) py-=(boid.y-(h-WALL_MARGIN))/WALL_MARGIN;
+if(px===0&&py===0) return;
+steerToward(boid,boid.x+px*100,boid.y+py*100,2.0);
+}
+
+function clampToBounds(boid){
+const w=canvas.width,h=canvas.height;
+if(boid.x<RADIUS) {boid.x=RADIUS; boid.vx= Math.abs(boid.vx);}
+if(boid.x>w-RADIUS) {boid.x=w-RADIUS; boid.vx=-Math.abs(boid.vx);}
+if(boid.y<RADIUS) {boid.y=RADIUS; boid.vy= Math.abs(boid.vy);}
+if(boid.y>h-RADIUS) {boid.y=h-RADIUS; boid.vy=-Math.abs(boid.vy);}
+const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
+boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
+}
+
+// ── lifespan feedback ─────────────────────────────────────────────────────────
+function lifespanScale(globalPressure){
+const t=(globalPressure+1)/2;
+return LIFESPAN_SCALE_MAX+(LIFESPAN_SCALE_MIN-LIFESPAN_SCALE_MAX)*t;
+}
+
+// Gompertz hazard: mode pinned to BASE_LIFESPAN × pressureScale.
+// beta controls spread (SD ≈ 1.28/beta); swap beta here to tune senescence steepness.
+function hazardRate(boid, pressureScale){
+const modalAge = BASE_LIFESPAN * pressureScale;
+const beta = 3 / modalAge;
+const alpha = beta * Math.exp(-beta * modalAge);
+return alpha * Math.exp(beta * boid.age) * inbreedingHazardMultiplier() * smallPopHazardMultiplier();
+}
+
+function effectiveLifespanFor(boid){
+return Math.min(BASE_LIFESPAN * lifespanScale(boid.globalPressure), MAX_LIFESPAN);
+}
+
+function updateLifespan(boid,dt){
+if(!boid.alive) return;
+if(boid.birthTimer>0) boid.birthTimer=Math.max(0,boid.birthTimer-dt);
+if(boid.dying){ boid.fadeTimer+=dt; if(boid.fadeTimer>=FADE_DURATION) killBoid(boid); return; }
+boid.effectiveLifespan=effectiveLifespanFor(boid); // display/fertility only
+boid.age+=dt;
+const scale=lifespanScale(boid.globalPressure);
+if(boid.age>=boid.maxLifespan || Math.random()<hazardRate(boid,scale)*dt) boid.dying=true;
+}
+
+function killBoid(boid){
+boid.alive=false;
+if(boid.diseased){ rHistory.push(boid.infectCount); if(rHistory.length>30) rHistory.shift(); }
+deathEvents.push(simClock);
+if(boid.partnerId!==null){
+const partner=boids.find(b=>b.id===boid.partnerId);
+if(partner&&partner.alive){
+partner.partnerId=null;
+partner.breedTimer=PREG_INTERVAL*(0.5+Math.random());
+for(const o of boids) clearPair(partner.id,o.id);
+}
+clearPairChildren(boid.id,boid.partnerId);
+boid.partnerId=null;
+}
+for(const o of boids) clearPair(boid.id,o.id);
+}
+
+// ── breeding ──────────────────────────────────────────────────────────────────
+const toSpawn=[];
+const pairChildren=new Map();
+const spawnFlashPairs=new Map(); // pairKey → seconds remaining
+function getPairChildren(a,b) { return pairChildren.get(pairKey(a,b))||0; }
+function setPairChildren(a,b,v) { pairChildren.set(pairKey(a,b),v); }
+function clearPairChildren(a,b) { pairChildren.delete(pairKey(a,b)); }
+
+function updateBreeding(boid,dt){
+if(!boid.alive||boid.dying||boid.partnerId===null) return;
+const partner=boids.find(b=>b.id===boid.partnerId);
+if(!partner||!partner.alive||boid.id>partner.id) return;
+if(boid.sex===partner.sex) return;
+if(!isFertile(boid)||!isFertile(partner)) return;
+const female=boid.sex==='F'?boid:partner;
+const gp=(boid.globalPressure+partner.globalPressure)/2;
+const t=(gp+1)/2;
+
+// biological ceiling: how many children fit in the fertile window
+const fertileWindow = female.maxLifespan * F_FERTILE_FOR;
+const bioCeiling = Math.floor(fertileWindow / PREG_INTERVAL);
+
+// family size is the ceiling — pressure can only reduce below it, never exceed it
+// at target (t=0.5): desiredMax = pairFamilyTarget
+// at crisis (t=0): desiredMax = pairFamilyTarget (no bonus)
+// overpop (t=1): desiredMax = 0 (breeding stops)
+const desiredMax = Math.ceil(boid.pairFamilyTarget * (1 - Math.max(t - 0.5, 0) * 2));
+const effectiveMax = Math.min(desiredMax, bioCeiling);
+const born=getPairChildren(boid.id,partner.id);
+if(born>=effectiveMax) return;
+boid.breedTimer-=dt;
+if(boid.breedTimer<=0){
+// birth timing: random between PREG_INTERVAL and 2×PREG_INTERVAL, modulated by pressure
+const intervalScale=Math.pow(3.0,gp);
+boid.breedTimer=PREG_INTERVAL*intervalScale*(0.8+Math.random()*0.8);
+setPairChildren(boid.id,partner.id,born+1);
+spawnFlashPairs.set(pairKey(boid.id,partner.id),2.0);
+birthEvents.push(simClock);
+const mx=(boid.x+partner.x)/2+(Math.random()-0.5)*20;
+const my=(boid.y+partner.y)/2+(Math.random()-0.5)*20;
+const childColor=blendColors(boid.color,partner.color);
+const child=makeBoid(mx,my,childColor,true,boid,partner);
+child.genome=boid.genome.map((g,i)=>
+Math.min(1,Math.max(0,(g+partner.genome[i])/2+(Math.random()-0.5)*0.05))
+);
+toSpawn.push(child);
+}
+}
+
+// ── genetic distance ──────────────────────────────────────────────────────────
+function genomeDiversity(){
+const alive=boids.filter(b=>b.alive&&!b.dying);
+if(alive.length<2) return 0;
+let sum=0,count=0;
+for(let i=0;i<alive.length;i++)
+for(let j=i+1;j<alive.length;j++){
+sum+=geneticDistance(alive[i],alive[j]); count++;
+}
+return sum/count;
+}
+
+function geneticDistance(a,b){
+const dr=a.genome[0]-b.genome[0], dg=a.genome[1]-b.genome[1], db=a.genome[2]-b.genome[2];
+return Math.min(Math.sqrt(dr*dr+dg*dg+db*db)/Math.sqrt(3),1);
+}
+
+// ── collision & bonding ───────────────────────────────────────────────────────
+function updateCollisions(){
+const alive=boids.filter(b=>b.alive&&!b.dying);
+for(let i=0;i<alive.length;i++){
+for(let j=i+1;j<alive.length;j++){
+const a=alive[i],b=alive[j];
+const c=getCool(a.id,b.id);
+if(c>0){setCool(a.id,b.id,c-1);continue;}
+const dx=b.x-a.x,dy=b.y-a.y;
+if(Math.sqrt(dx*dx+dy*dy)<RADIUS*2){
+if(a.partnerId!==null||b.partnerId!==null) continue;
+if(a.isSingle||b.isSingle) continue;
+if(a.isGay!==b.isGay) continue; // gay only bonds with gay, straight with straight
+const compatible = a.isGay ? (a.sex===b.sex) : (a.sex!==b.sex);
+if(!compatible) continue;
+const aIsParentOfB=b.parentIds.has(a.id), bIsParentOfA=a.parentIds.has(b.id);
+const areSiblings=a.familyKey!==null&&a.familyKey===b.familyKey;
+if(aIsParentOfB||bIsParentOfA||areSiblings) continue;
+const h=getHits(a.id,b.id)+1;
+const genDist=geneticDistance(a,b);
+const genScale=2.0-1.5*genDist;
+const coolFrames=Math.max(5,Math.round(COOLDOWN_FRAMES/Math.sqrt(BOND_THRESHOLD)*genScale));
+setHits(a.id,b.id,h); setCool(a.id,b.id,coolFrames);
+if(h>=BOND_THRESHOLD){
+a.partnerId=b.id; b.partnerId=a.id;
+a.breedTimer=PREG_INTERVAL*(0.5+Math.random());
+b.breedTimer=PREG_INTERVAL*(0.5+Math.random());
+// per-pair family target: drawn from Normal(FAMILY_SIZE, 0.8), min 0
+const raw = FAMILY_SIZE + (Math.random()+Math.random()-1)*0.8;
+const target = Math.max(0, Math.round(raw));
+a.pairFamilyTarget = target;
+b.pairFamilyTarget = target;
+}
+}
+}
+}
+}
+
+// ── divorce ───────────────────────────────────────────────────────────────────
+function updateDivorce(dt){
+if(DIVORCE_RATE===0) return;
+const seen=new Set();
+for(const boid of boids){
+if(!boid.alive||boid.dying||boid.partnerId===null||seen.has(boid.id)) continue;
+const partner=boids.find(b=>b.id===boid.partnerId);
+if(!partner||!partner.alive) continue;
+seen.add(boid.id); seen.add(partner.id);
+if(Math.random() < DIVORCE_RATE * dt){
+// split the pair
+clearPairChildren(boid.id, partner.id);
+clearPair(boid.id, partner.id);
+boid.partnerId = null;
+partner.partnerId = null;
+boid.pairFamilyTarget = 0;
+partner.pairFamilyTarget = 0;
+boid.breedTimer = PREG_INTERVAL*(0.5+Math.random());
+partner.breedTimer = PREG_INTERVAL*(0.5+Math.random());
+}
+}
+}
+// ── disease ───────────────────────────────────────────────────────────────────
+// Above HIGH diversity: no penalty on either mechanism.
+// Models two independent pathways of inbreeding depression:
+//   - HLA collapse → weaker immune response → higher disease fatality (up to 3×)
+//   - General fitness reduction → elevated Gompertz hazard → shorter lives (up to 1.5×)
+const DIVERSITY_HIGH = 0.3, DIVERSITY_LOW = 0.05;
+function _diversityT(){
+return 1 - Math.max(0, Math.min(1, (_cachedDiversity - DIVERSITY_LOW) / (DIVERSITY_HIGH - DIVERSITY_LOW)));
+}
+function diversityFatalityMultiplier(){ return 1 + _diversityT() * 2; }
+function inbreedingHazardMultiplier(){  return 1 + _diversityT() * 0.5; }
+
+function infectBoid(boid){
+if(boid.diseased||boid.immune||boid.dying||!boid.alive) return;
+boid.diseased=true;
+boid.diseaseTimer=DISEASE_DURATION;
+boid.infectCount=0;
+}
+
+function updateDisease(dt){
+const effFatality = Math.min(0.9999, DISEASE_FATALITY * diversityFatalityMultiplier());
+const h = effFatality > 0 ? -Math.log(1 - effFatality) / DISEASE_DURATION : 0;
+for(const boid of boids){
+if(!boid.alive||!boid.diseased) continue;
+boid.diseaseTimer-=dt;
+// fatality roll — only while not already dying
+if(h > 0 && !boid.dying && Math.random() < h * dt){
+boid.dying = true;
+diseaseDeathEvents.push(simClock);
+// killBoid will record infectCount to rHistory since boid.diseased is still true
+continue;
+}
+if(boid.diseaseTimer<=0 && !boid.dying){
+boid.diseased=false;
+boid.immune=true;
+rHistory.push(boid.infectCount);
+if(rHistory.length>30) rHistory.shift();
+}
+}
+}
+
+function updateDiseaseCollisions(){
+// collision-based transmission (physical overlap required)
+const alive=boids.filter(b=>b.alive&&!b.dying);
+for(let i=0;i<alive.length;i++){
+for(let j=i+1;j<alive.length;j++){
+const a=alive[i],b=alive[j];
+const aD=a.diseased, bD=b.diseased;
+if(!aD&&!bD) continue;
+if(aD&&bD) continue;
+const infected=aD?a:b, healthy=aD?b:a;
+if(healthy.immune||healthy.diseased) continue;
+const dx=b.x-a.x, dy=b.y-a.y;
+if(dx*dx+dy*dy>=RADIUS*2*RADIUS*2) continue;
+const k=pairKey(infected.id,healthy.id);
+if((diseaseCooldown.get(k)||0)>simClock) continue;
+diseaseCooldown.set(k,simClock+DISEASE_COOLDOWN);
+healthy.diseaseHits++;
+if(healthy.diseaseHits>=DISEASE_THRESHOLD){ infectBoid(healthy); infected.infectCount++; }
+}
+}
+// bonded-partner transmission (slow trickle — no overlap required)
+for(const boid of boids){
+if(!boid.alive||boid.dying||!boid.diseased||boid.partnerId===null) continue;
+const partner=boids.find(b=>b.id===boid.partnerId);
+if(!partner||!partner.alive||partner.dying||partner.immune||partner.diseased) continue;
+const k='b'+pairKey(boid.id,partner.id);
+if((diseaseCooldown.get(k)||0)>simClock) continue;
+diseaseCooldown.set(k,simClock+DISEASE_COOLDOWN*3);
+partner.diseaseHits++;
+if(partner.diseaseHits>=DISEASE_THRESHOLD){ infectBoid(partner); boid.infectCount++; }
+}
+}
+
+let immigrationTimer=10;
+
+function hasValidPairs(){
+const candidates=boids.filter(b=>b.alive&&!b.dying&&b.partnerId===null&&isFertile(b)&&!b.isSingle&&!b.isGay);
+const males=candidates.filter(b=>b.sex==='M');
+const females=candidates.filter(b=>b.sex==='F');
+for(const m of males){
+for(const f of females){
+const aIsParent=f.parentIds.has(m.id)||m.parentIds.has(f.id);
+const siblings=m.familyKey!==null&&m.familyKey===f.familyKey;
+if(!aIsParent&&!siblings) return true;
+}
+}
+return false;
+}
+
+function updateImmigration(dt){
+if(!immigrationEnabled) return;
+if(boids.length>=TARGET_POP*1.2) return;
+
+const deadlocked = !hasValidPairs();
+
+// combine fertile pair deficit (globalPressure) AND raw headcount deficit
+// so immigration continues until BOTH are satisfied
+const popDeficit = Math.max(1 - boids.length / Math.max(TARGET_POP,1), 0); // 0..1
+const fertileDeficit = Math.max(-smoothGlobalPressure, 0); // 0..1
+const pressure = Math.max(popDeficit, fertileDeficit); // worst of the two
+
+if(pressure <= 0 && !deadlocked) return;
+
+immigrationTimer -= dt;
+if(immigrationTimer > 0) return;
+
+const interval = deadlocked && pressure <= 0
+? 10 + Math.random()*5
+: (5 / Math.max(pressure, 0.05)) * (0.8 + Math.random()*0.4);
+immigrationTimer = interval;
+
+const males = boids.filter(b=>b.alive&&b.sex==='M').length;
+const females = boids.filter(b=>b.alive&&b.sex==='F').length;
+const sex = males<=females?'M':'F';
+const imm = makeBoid(undefined,undefined,undefined,false);
+imm.sex = sex;
+imm.isSingle = false;
+imm.isGay = false;
+imm.immigrantGeneration = 0;
+immigrantEvents.push(simClock);
+imm.age = imm.effectiveLifespan * F_FERTILE_FROM;
+imm.birthTimer= 0;
+toSpawn.push(imm);
+}
+
+// ── drawing ───────────────────────────────────────────────────────────────────
+function drawBackground(){
+const w=canvas.width,h=canvas.height;
+const grd=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w*0.7);
+grd.addColorStop(0,'#0d2137'); grd.addColorStop(0.6,'#081828'); grd.addColorStop(1,'#050e18');
+ctx.fillStyle=grd; ctx.fillRect(0,0,w,h);
+}
+
+function drawBondLines(){
+const drawn=new Set();
+for(const boid of boids){
+if(!boid.alive||boid.partnerId===null) continue;
+const partner=boids.find(b=>b.id===boid.partnerId);
+if(!partner||!partner.alive) continue;
+const key=Math.min(boid.id,partner.id)+'-'+Math.max(boid.id,partner.id);
+if(drawn.has(key)) continue; drawn.add(key);
+const alpha=Math.min(
+boid.dying ?1-(boid.fadeTimer/FADE_DURATION):1,
+partner.dying ?1-(partner.fadeTimer/FADE_DURATION):1
+);
+const fertile = isFertile(boid) && isFertile(partner) && boid.sex !== partner.sex;
+const flashTime = spawnFlashPairs.get(key)||0;
+const grd=ctx.createLinearGradient(boid.x,boid.y,partner.x,partner.y);
+if(flashTime>0){
+grd.addColorStop(0, `rgba(255,0,0,${alpha})`);
+grd.addColorStop(0.5, `rgba(255,80,80,${alpha})`);
+grd.addColorStop(1, `rgba(255,0,0,${alpha})`);
+} else if(fertile){
+grd.addColorStop(0, `rgba(255,140,0,${alpha*0.9})`);
+grd.addColorStop(0.5, `rgba(255,200,80,${alpha})`);
+grd.addColorStop(1, `rgba(255,140,0,${alpha*0.9})`);
+} else {
+grd.addColorStop(0, boid.color +Math.round(alpha*0.8*255).toString(16).padStart(2,'0'));
+grd.addColorStop(0.5,'rgba(255,255,255,'+alpha*0.3+')');
+grd.addColorStop(1, partner.color+Math.round(alpha*0.8*255).toString(16).padStart(2,'0'));
+}
+ctx.beginPath(); ctx.moveTo(boid.x,boid.y); ctx.lineTo(partner.x,partner.y);
+ctx.strokeStyle=grd; ctx.lineWidth=flashTime>0?4.5:fertile?3.5:1.5; ctx.stroke();
+}
+}
+
+function drawHitProgress(){
+const alive=boids.filter(b=>b.alive&&!b.dying&&b.partnerId===null);
+for(let i=0;i<alive.length;i++){
+for(let j=i+1;j<alive.length;j++){
+const h=getHits(alive[i].id,alive[j].id);
+if(h===0) continue;
+const progress=Math.min(h/BOND_THRESHOLD,1);
+[alive[i],alive[j]].forEach(boid=>{
+ctx.beginPath();
+ctx.arc(boid.x,boid.y,RADIUS+4,-Math.PI/2,-Math.PI/2+progress*Math.PI*2);
+ctx.strokeStyle=`rgba(255,211,42,${0.4+progress*0.5})`;
+ctx.lineWidth=2; ctx.stroke();
+});
+}
+}
+}
+
+function drawBoid(boid){
+let alpha=1;
+if(boid.birthTimer>0) alpha=1-(boid.birthTimer/BIRTH_DURATION);
+if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
+alpha=Math.max(0,Math.min(1,alpha));
+const isBonded = boid.partnerId!==null;
+const fertile = isFertile(boid);
+const lifeFrac = Math.min(boid.age/Math.max(boid.effectiveLifespan,0.1),1);
+const r = boid.isSingle ? RADIUS*0.7 : RADIUS; // singles are smaller
+
+ctx.save(); ctx.globalAlpha=alpha*(fertile?1.0:0.55);
+
+const glowHex=isBonded?'ffcc44':boid.color.slice(1);
+const grd=ctx.createRadialGradient(boid.x,boid.y,0,boid.x,boid.y,RADIUS*2.8);
+grd.addColorStop(0,'#'+glowHex+'bb');
+grd.addColorStop(0.4,'#'+glowHex+'44');
+grd.addColorStop(1,'#'+glowHex+'00');
+ctx.beginPath(); ctx.arc(boid.x,boid.y,RADIUS*2.8,0,Math.PI*2);
+ctx.fillStyle=grd; ctx.fill();
+
+if(boid.sex==='M'){
+const ang=Math.atan2(boid.vy,boid.vx);
+const cos=Math.cos(ang), sin=Math.sin(ang);
+const px=-sin, py=cos; // perpendicular
+const tailLen=r*2.2, baseW=r*0.38;
+const tbx=boid.x-cos*r*0.65, tby=boid.y-sin*r*0.65; // tail base
+const ttx=boid.x-cos*(r+tailLen), tty=boid.y-sin*(r+tailLen); // tail tip
+const cpx=boid.x-cos*(r+tailLen*0.5), cpy=boid.y-sin*(r+tailLen*0.5); // ctrl pt
+ctx.beginPath();
+ctx.moveTo(tbx+px*baseW, tby+py*baseW);
+ctx.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
+ctx.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
+ctx.closePath();
+ctx.fillStyle=boid.color; ctx.fill();
+ctx.beginPath(); ctx.arc(boid.x,boid.y,r,0,Math.PI*2);
+ctx.fillStyle=boid.color; ctx.fill();
+} else {
+ctx.beginPath(); ctx.arc(boid.x,boid.y,r,0,Math.PI*2);
+ctx.fillStyle=boid.color; ctx.fill();
+}
+
+if(boid.diseased){
+ctx.beginPath(); ctx.arc(boid.x,boid.y,r*0.38,0,Math.PI*2);
+ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.fill();
+}
+
+ctx.restore();
+}
+
+// ── status ────────────────────────────────────────────────────────────────────
+const popSpan = document.getElementById('popSpan');
+const lifeSpan = document.getElementById('lifeSpan');
+const nearFill = document.getElementById('nearFill');
+const lifeFill = document.getElementById('lifeFill');
+
+function updateStatus(){
+const n=boids.length;
+popSpan.textContent = n;
+popSpan.className = 'val' + (n>TARGET_POP*1.3?' hi':n<TARGET_POP*0.7?' lo':'');
+
+const avgLocal = n===0?0.5:boids.reduce((s,b)=>s+b.localPressure,0)/n;
+const avgGlobal = n===0?0.0:boids.reduce((s,b)=>s+b.globalPressure,0)/n;
+smoothPressure += (avgLocal - smoothPressure) * 0.05;
+smoothGlobalPressure+= (avgGlobal - smoothGlobalPressure)* 0.05;
+nearFill.style.width=(smoothPressure*100).toFixed(1)+'%';
+const t=(smoothGlobalPressure+1)/2;
+const effLife=BASE_LIFESPAN*(LIFESPAN_SCALE_MAX+(LIFESPAN_SCALE_MIN-LIFESPAN_SCALE_MAX)*t);
+const lifeRange=BASE_LIFESPAN*(LIFESPAN_SCALE_MAX-LIFESPAN_SCALE_MIN);
+lifeFill.style.width=((effLife-BASE_LIFESPAN*LIFESPAN_SCALE_MIN)/lifeRange*100).toFixed(1)+'%';
+lifeSpan.textContent=effLife.toFixed(1)+' s';
+
+// ── live readout ──
+const cutoff = simClock - RATE_WINDOW;
+birthEvents = birthEvents.filter(ev=>ev>cutoff);
+deathEvents = deathEvents.filter(ev=>ev>cutoff);
+const birthRate = (birthEvents.length / RATE_WINDOW * 60).toFixed(1);
+const deathRate = (deathEvents.length / RATE_WINDOW * 60).toFixed(1);
+
+// count bonded pairs (total) and fertile bonded M+F pairs
+const seen = new Set();
+let totalBondedPairs = 0;
+let fertilePairs = 0;
+for(const b of boids){
+if(!b.alive||b.dying||b.partnerId===null||seen.has(b.id)) continue;
+const partner=boids.find(p=>p.id===b.partnerId);
+if(!partner||!partner.alive) continue;
+seen.add(b.id); seen.add(partner.id);
+totalBondedPairs++;
+if(b.sex!==partner.sex && isFertile(b) && isFertile(partner)) fertilePairs++;
+}
+
+document.getElementById('rdFertile').textContent = totalBondedPairs+':'+fertilePairs;
+document.getElementById('rdBirth').textContent = birthRate +' /min';
+document.getElementById('rdDeath').textContent = deathRate +' /min';
+immigrantEvents = immigrantEvents.filter(ev=>ev>cutoff);
+let immigText;
+if(!immigrationEnabled){
+immigText = 'off';
+} else {
+const popDeficit = Math.max(1 - boids.length / Math.max(TARGET_POP,1), 0);
+const fertileDeficit = Math.max(-smoothGlobalPressure, 0);
+const pressure = Math.max(popDeficit, fertileDeficit);
+const deadlocked = !hasValidPairs();
+if(deadlocked){
+immigText = 'deadlock';
+} else if(pressure <= 0){
+immigText = 'stable';
+} else if(pressure < 0.3){
+immigText = 'slow';
+} else if(pressure < 0.7){
+immigText = 'moderate';
+} else {
+immigText = 'crisis';
+}
+}
+document.getElementById('rdImmig').textContent = immigText;
+
+const sickCount = boids.filter(b=>b.alive&&b.diseased).length;
+document.getElementById('rdSick').textContent = sickCount;
+const rVal = rHistory.length===0 ? '—' : (rHistory.reduce((s,v)=>s+v,0)/rHistory.length).toFixed(2);
+document.getElementById('rdR').textContent = rVal;
+_cachedDiversity = boids.length < 2 ? 0.3 : genomeDiversity();
+document.getElementById('rdDiv').textContent = boids.length < 2 ? '—' : _cachedDiversity.toFixed(2);
+const effFat = Math.min(0.9999, DISEASE_FATALITY * diversityFatalityMultiplier());
+const effFatEl = document.getElementById('fatalityEffVal');
+effFatEl.textContent = effFat > DISEASE_FATALITY + 0.005 ? `→ ${(effFat*100).toFixed(0)}%` : '';
+
+const ihm = inbreedingHazardMultiplier();
+const inbreedWarn = document.getElementById('inbreedingWarn');
+if(ihm > 1.02){
+const scale = lifespanScale(smoothGlobalPressure);
+const modalAge = BASE_LIFESPAN * scale;
+const beta = 3 / modalAge;
+const delta = Math.log(ihm) / beta;
+document.getElementById('inbreedMult').textContent = ihm.toFixed(2);
+document.getElementById('inbreedDelta').textContent = delta.toFixed(1);
+inbreedWarn.style.display = '';
+} else {
+inbreedWarn.style.display = 'none';
+}
+diseaseDeathEvents = diseaseDeathEvents.filter(ev=>ev>cutoff);
+document.getElementById('rdDied').textContent = diseaseDeathEvents.length;
+
+const eb = _cachedEffectiveBreeders;
+const rdEffBr = document.getElementById('rdEffBr');
+rdEffBr.textContent = eb;
+rdEffBr.style.color = eb < 50 ? '#ff6b6b' : eb < 500 ? '#ffd32a' : '#0be881';
+const rdSmallPop = document.getElementById('rdSmallPop');
+if(eb < 50){
+rdSmallPop.textContent = 'critical'; rdSmallPop.style.color = '#ff6b6b';
+} else if(eb < 500){
+rdSmallPop.textContent = 'at risk';  rdSmallPop.style.color = '#ffd32a';
+} else {
+rdSmallPop.textContent = 'ok';       rdSmallPop.style.color = '#0be881';
+}
+}
+
+// ── viability check ───────────────────────────────────────────────────────────
+function updateViability(){
+// ── structural check ──
+const bioCeiling = Math.floor(BASE_LIFESPAN * F_FERTILE_FOR / PREG_INTERVAL);
+const effectiveCap = Math.min(FAMILY_SIZE, bioCeiling);
+const ratio = effectiveCap * (1 - SINGLE_FRACTION) * (1 - GAY_FRACTION);
+
+let color, label;
+if(bioCeiling === 0){
+color='#c0392b'; label='impossible';
+} else if(ratio < 2){
+color='#ff6b6b'; label='not viable';
+} else if(ratio < 2.5){
+color='#ffd32a'; label='marginal';
+} else {
+color='#0be881'; label='viable';
+}
+document.getElementById('viabilityDot').style.color   = color;
+document.getElementById('viabilityState').style.color = color;
+document.getElementById('viabilityState').textContent = label;
+document.getElementById('viabilityDetail').textContent =
+`ratio ${ratio.toFixed(2)} · ceiling ${bioCeiling}`;
+
+// ── bonding timing check ──
+// lower-bound time to bond: BOND_THRESHOLD hits × cooldown per hit (at 60 fps)
+const coolPerHit = Math.max(5, Math.floor(COOLDOWN_FRAMES / Math.sqrt(BOND_THRESHOLD))) / 60;
+const minBondTime = BOND_THRESHOLD * coolPerHit;
+const fertileWindowSec = F_FERTILE_FOR * BASE_LIFESPAN;
+const effFertileWindow = Math.max(0, fertileWindowSec - minBondTime);
+const effBioCeiling = Math.floor(effFertileWindow / PREG_INTERVAL);
+const effCap = Math.min(FAMILY_SIZE, effBioCeiling);
+const effRatio = effCap * (1 - SINGLE_FRACTION) * (1 - GAY_FRACTION);
+
+let bColor, bLabel;
+if(bioCeiling === 0){
+bColor='#555'; bLabel='n/a';
+} else if(effBioCeiling === 0){
+bColor='#c0392b'; bLabel='bond critical';
+} else if(effRatio < 2){
+bColor='#ff6b6b'; bLabel='bond high';
+} else if(effRatio < 2.5){
+bColor='#ffd32a'; bLabel='bond moderate';
+} else {
+bColor='#0be881'; bLabel='bond low';
+}
+document.getElementById('bondRiskDot').style.color    = bColor;
+document.getElementById('bondRiskState').style.color  = bColor;
+document.getElementById('bondRiskState').textContent  = bLabel;
+document.getElementById('bondRiskDetail').textContent = bioCeiling === 0
+? '—'
+: `≥${minBondTime.toFixed(1)} s lost · eff. ceiling ${effBioCeiling}`;
+}
+
+// ── play / pause ──────────────────────────────────────────────────────────────
+let running=false, rafId=null, lastTime=null;
+const playBtn=document.getElementById('playBtn');
+
+function drawIdle(){
+const w=canvas.width,h=canvas.height;
+const grd=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w*0.7);
+grd.addColorStop(0,'#0d2137'); grd.addColorStop(0.6,'#081828'); grd.addColorStop(1,'#050e18');
+ctx.fillStyle=grd; ctx.fillRect(0,0,w,h);
+ctx.save();
+const seed=42;
+for(let i=0;i<40;i++){
+const px=((Math.sin(i*127.1+seed)*43758.5)%1+1)%1*w;
+const py=((Math.sin(i*311.7+seed)*43758.5)%1+1)%1*h;
+const r=0.5+((Math.sin(i*91.3)*43758.5)%1+1)%1*1.5;
+ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2);
+ctx.fillStyle=`rgba(84,160,255,${0.15+((Math.sin(i*53.1)*43758.5)%1+1)%1*0.25})`;
+ctx.fill();
+}
+ctx.fillStyle='rgba(0,210,211,0.45)';
+ctx.font='13px Courier New'; ctx.textAlign='center';
+ctx.fillText('set parameters · press play',w/2,h/2);
+ctx.restore();
+}
+
+function startSim(){
+nextId=0; boids=[];
+hits.clear(); cooldown.clear(); pairChildren.clear(); spawnFlashPairs.clear(); diseaseCooldown.clear();
+smoothPressure=0.5; smoothGlobalPressure=0.0; lastTime=null; immigrationTimer=10;
+birthEvents=[]; deathEvents=[]; immigrantEvents=[]; simClock=0; rHistory=[]; diseaseDeathEvents=[]; _cachedDiversity=0.3; _cachedEffectiveBreeders=0;
+for(let i=0;i<TARGET_POP;i++){
+const b=makeBoid();
+b.age=Math.random()*b.maxLifespan*0.9;
+b.birthTimer=0;
+boids.push(b);
+}
+running=true;
+playBtn.innerHTML='&#9646;&#9646;';
+playBtn.classList.add('running');
+playBtn.title='Pause simulation';
+rafId=requestAnimationFrame(loop);
+}
+
+function pauseSim(){
+running=false;
+if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+playBtn.innerHTML='&#9654;';
+playBtn.classList.remove('running');
+playBtn.title='Resume simulation';
+}
+
+playBtn.addEventListener('click',()=>{ if(!running) startSim(); else pauseSim(); });
+
+document.getElementById('infectBtn').addEventListener('click',()=>{
+const candidates=boids.filter(b=>b.alive&&!b.dying&&!b.diseased&&!b.immune);
+const statusEl=document.getElementById('infectStatus');
+if(!running){ statusEl.textContent='not running'; return; }
+if(candidates.length===0){ statusEl.textContent='no healthy boids'; return; }
+const target=candidates[Math.floor(Math.random()*candidates.length)];
+infectBoid(target);
+statusEl.textContent='';
+});
+
+drawIdle();
+updateViability();
+
+// ── main loop ─────────────────────────────────────────────────────────────────
+function loop(ts){
+if(!running) return;
+const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
+lastTime=ts;
+simClock+=dt;
+for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
+
+updateFertileCounts();
+updateEffectiveBreeders();
+for(const boid of boids) if(boid.alive) computePressure(boid);
+
+drawBackground();
+drawBondLines();
+updateCollisions();
+
+for(const boid of boids){
+if(!boid.alive) continue;
+updateLifespan(boid,dt);
+if(!boid.alive) continue;
+updateBreeding(boid,dt);
+if(!boid.dying){
+avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid);
+boid.x+=boid.vx; boid.y+=boid.vy;
+clampToBounds(boid);
+}
+}
+
+if(toSpawn.length){ boids.push(...toSpawn); toSpawn.length=0; }
+boids=boids.filter(b=>b.alive);
+updateDivorce(dt);
+updateImmigration(dt);
+updateDiseaseCollisions();
+updateDisease(dt);
+
+for(const boid of boids) drawBoid(boid);
+updateStatus();
+rafId=requestAnimationFrame(loop);
+}
+</script>
+
+</body>
+</html>
