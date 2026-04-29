@@ -95,6 +95,18 @@ cursor:pointer; border:2px solid #fff;
 #mutationSlider::-webkit-slider-thumb { background:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.8); }
 #mutationSlider::-moz-range-thumb { background:#a855f7; }
 #mutationVal { color:#000; }
+#familyPullSlider { background:linear-gradient(to right,#0a1a0a,#0be881); }
+#familyPullSlider::-webkit-slider-thumb { background:#0be881; box-shadow:0 0 8px rgba(11,232,129,0.8); }
+#familyPullSlider::-moz-range-thumb { background:#0be881; }
+#familyPullVal { color:#000; }
+#predatorSlider { background:linear-gradient(to right,#0a0000,#cc0000); }
+#predatorSlider::-webkit-slider-thumb { background:#cc0000; box-shadow:0 0 8px rgba(200,0,0,0.8); }
+#predatorSlider::-moz-range-thumb { background:#cc0000; }
+#predatorVal { color:#000; }
+#fullDurSlider { background:linear-gradient(to right,#0a0000,#884400); }
+#fullDurSlider::-webkit-slider-thumb { background:#884400; box-shadow:0 0 8px rgba(136,68,0,0.8); }
+#fullDurSlider::-moz-range-thumb { background:#884400; }
+#fullDurVal { color:#000; }
 #trailOpacitySlider { background:linear-gradient(to right,#0a0a1a,#00d2d3); }
 #trailOpacitySlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
 #trailOpacitySlider::-moz-range-thumb { background:#00d2d3; }
@@ -149,13 +161,13 @@ display:flex; align-items:center; justify-content:center;
 <div id="controls">
 <div class="ctrl-row">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="100" value="20">
-<span class="ctrl-val" id="targetVal">20</span>
+<input type="range" id="targetSlider" min="2" max="100" value="30">
+<span class="ctrl-val" id="targetVal">30</span>
 </div>
 <div class="ctrl-row">
 <label>bond after</label>
-<input type="range" id="bondSlider" min="1" max="20" value="3">
-<span class="ctrl-val" id="bondVal">3 hits</span>
+<input type="range" id="bondSlider" min="1" max="20" value="1">
+<span class="ctrl-val" id="bondVal">1 hits</span>
 </div>
 <div class="ctrl-row">
 <label>base lifespan</label>
@@ -164,13 +176,13 @@ display:flex; align-items:center; justify-content:center;
 </div>
 <div class="ctrl-row">
 <label>preg. interval</label>
-<input type="range" id="childSlider" min="1" max="20" value="6">
-<span class="ctrl-val" id="childVal">6 s</span>
+<input type="range" id="childSlider" min="1" max="20" value="1">
+<span class="ctrl-val" id="childVal">1 s</span>
 </div>
 <div class="ctrl-row">
 <label>family size</label>
-<input type="range" id="familySlider" min="0" max="6" value="2" step="0.1">
-<span class="ctrl-val" id="familyVal">2.0</span>
+<input type="range" id="familySlider" min="0" max="6" value="4" step="0.1">
+<span class="ctrl-val" id="familyVal">4.0</span>
 </div>
 <div class="ctrl-row">
 <label>divorce rate</label>
@@ -179,8 +191,8 @@ display:flex; align-items:center; justify-content:center;
 </div>
 <div class="ctrl-row">
 <label>speed</label>
-<input type="range" id="speedSlider" min="1" max="10" value="4" step="1">
-<span class="ctrl-val" id="speedVal">4</span>
+<input type="range" id="speedSlider" min="1" max="10" value="7" step="1">
+<span class="ctrl-val" id="speedVal">7</span>
 </div>
 <div class="ctrl-row">
 <label>singles</label>
@@ -194,34 +206,50 @@ display:flex; align-items:center; justify-content:center;
 </div>
 <div class="ctrl-row">
 <label>infect. hits</label>
-<input type="range" id="diseaseThreshSlider" min="1" max="10" value="3" step="1">
-<span class="ctrl-val" id="diseaseThreshVal">3</span>
+<input type="range" id="diseaseThreshSlider" min="1" max="10" value="1" step="1">
+<span class="ctrl-val" id="diseaseThreshVal">1</span>
 </div>
 <div class="ctrl-row">
 <label>infect. dur.</label>
-<input type="range" id="diseaseDurSlider" min="5" max="60" value="20" step="5">
-<span class="ctrl-val" id="diseaseDurVal">20 s</span>
+<input type="range" id="diseaseDurSlider" min="5" max="60" value="10" step="5">
+<span class="ctrl-val" id="diseaseDurVal">10 s</span>
 </div>
 <div class="ctrl-row">
 <label>fatality %</label>
-<input type="range" id="fatalitySlider" min="0" max="80" value="20" step="5">
-<span class="ctrl-val" id="fatalityVal">20%</span>
+<input type="range" id="fatalitySlider" min="0" max="80" value="10" step="5">
+<span class="ctrl-val" id="fatalityVal">10%</span>
 <span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#c0392b;letter-spacing:0.5px;"></span>
 </div>
 <div class="ctrl-row">
 <label>mutation %</label>
-<input type="range" id="mutationSlider" min="0" max="50" value="5" step="1">
-<span class="ctrl-val" id="mutationVal">5%</span>
+<input type="range" id="mutationSlider" min="0" max="50" value="50" step="1">
+<span class="ctrl-val" id="mutationVal">50%</span>
+</div>
+<div class="ctrl-row">
+<label>family pull</label>
+<input type="range" id="familyPullSlider" min="0" max="100" value="60" step="5">
+<span class="ctrl-val" id="familyPullVal">60%</span>
+</div>
+<div class="ctrl-divider">predators</div>
+<div class="ctrl-row">
+<label>predators</label>
+<input type="range" id="predatorSlider" min="0" max="5" value="0" step="1">
+<span class="ctrl-val" id="predatorVal">0</span>
+</div>
+<div class="ctrl-row">
+<label>full for (s)</label>
+<input type="range" id="fullDurSlider" min="1" max="30" value="10" step="1">
+<span class="ctrl-val" id="fullDurVal">10 s</span>
 </div>
 <div class="ctrl-row">
 <label>trail opacity</label>
-<input type="range" id="trailOpacitySlider" min="0" max="100" value="100" step="5">
-<span class="ctrl-val" id="trailOpacityVal">100%</span>
+<input type="range" id="trailOpacitySlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="trailOpacityVal">40%</span>
 </div>
 <div class="ctrl-row">
 <label>trail length</label>
-<input type="range" id="trailLengthSlider" min="5" max="150" value="80" step="5">
-<span class="ctrl-val" id="trailLengthVal">80</span>
+<input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
+<span class="ctrl-val" id="trailLengthVal">30</span>
 </div>
 </div>
 
@@ -262,6 +290,15 @@ color:#000; line-height:1.7; align-items:baseline;
 <span style="color:#555;">50-rule</span> <span id="rdSmallPop" style="font-family:monospace;font-weight:700;">—</span>
 </div>
 
+<div style="display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
+<span style="color:#555;">target</span>
+<span id="familyDot" style="font-size:16px;line-height:1;">●</span>
+<span id="familyName" style="font-weight:700;min-width:58px;">—</span>
+<span style="color:#555;font-size:9px;">conv.</span>
+<span id="familyConv" style="font-family:monospace;font-weight:700;min-width:32px;">—</span>
+<span id="familyTimer" style="color:#555;font-size:9px;min-width:28px;"></span>
+</div>
+
 <div style="display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
 <div style="display:flex;align-items:center;gap:8px;">
 <span id="viabilityDot"   style="font-size:15px;line-height:1;">●</span>
@@ -298,6 +335,11 @@ text-transform:uppercase;font-family:'Courier New',monospace;outline:none;">infe
 </div>
 
 <button id="playBtn" title="Start simulation">▶</button>
+<button id="exportBtn" title="Export standalone HTML" style="
+padding:0;width:36px;height:36px;border-radius:6px;font-size:16px;line-height:1;
+background:rgba(11,232,129,0.12);border:2px solid rgba(11,232,129,0.5);
+color:#0be881;cursor:pointer;box-shadow:0 0 16px rgba(11,232,129,0.25);
+font-family:'Courier New',monospace;outline:none;">⬇</button>
 </div>
 </div>
 
@@ -365,6 +407,9 @@ wire('diseaseThreshSlider','diseaseThreshVal', v=>parseInt(v),   v=>v,      v=>{
 wire('diseaseDurSlider',   'diseaseDurVal',    v=>parseInt(v),   v=>v+' s', v=>{ DISEASE_DURATION=v; });
 wire('fatalitySlider',     'fatalityVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DISEASE_FATALITY=v/100; });
 wire('mutationSlider',     'mutationVal',      v=>parseInt(v),   v=>v+'%',  v=>{ MUTATION_RATE=v/100; });
+wire('familyPullSlider',   'familyPullVal',    v=>parseInt(v),   v=>v+'%',  v=>{ FAMILY_PULL=v/100; });
+wire('predatorSlider',     'predatorVal',      v=>parseInt(v),   v=>v,       v=>{ syncPredatorCount(v); });
+wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>{ FULL_DURATION=v; });
 wire('trailOpacitySlider', 'trailOpacityVal',  v=>parseInt(v),   v=>v+'%',  v=>{ TRAIL_OPACITY=v/100; });
 wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
 
@@ -381,14 +426,16 @@ resize();
 window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
 
 // ── constants ─────────────────────────────────────────────────────────────────
-const COLORS=[
-'#ff6b6b','#ff9f43','#ffd32a','#0be881',
-'#00d2d3','#54a0ff','#5f27cd','#ff9ff3',
-'#48dbfb','#ff6348','#a29bfe','#fd79a8',
-'#55efc4','#fdcb6e','#e17055','#74b9ff'
-];
+// ── colour family cycle ───────────────────────────────────────────────────────
+const COLOR_FAMILY_CYCLE = ['red','yellow','green','blue','magenta'];
+const FAMILY_HUE = {red:0, yellow:60, green:120, blue:210, magenta:300};
+const FAMILY_CSS = {red:'#ff4444', yellow:'#ffd32a', green:'#0be881', blue:'#54a0ff', magenta:'#d980fa'};
+let preferredFamilyIdx = 0;
+let preferredFamily    = COLOR_FAMILY_CYCLE[0];
+let familyConvergedTimer = 0;
+const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
 const RADIUS = 10;
-let MAX_TRAIL = 80;
+let MAX_TRAIL = 30;
 let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
 const TURN_SPEED = 0.07;
 const WANDER_STR = 0.12;
@@ -408,6 +455,16 @@ let DISEASE_DURATION = 20.0;     // seconds a boid stays infectious
 let DISEASE_THRESHOLD = 3;       // exposure hits from infected boids to catch disease
 let DISEASE_FATALITY = parseInt(document.getElementById('fatalitySlider').value) / 100;
 let MUTATION_RATE    = parseInt(document.getElementById('mutationSlider').value)  / 100;
+let FAMILY_PULL      = parseInt(document.getElementById('familyPullSlider').value)  / 100;
+let N_PREDATORS      = parseInt(document.getElementById('predatorSlider').value);
+let FULL_DURATION    = parseInt(document.getElementById('fullDurSlider').value);
+let AUTO_DISEASE     = false;
+let _autoDisTimer    = 30 + Math.random()*60;
+const PREDATOR_RADIUS   = 15;
+const PREDATOR_SENSE    = 200; // sensing radius — only pursues boids within this range
+const STARVATION_TIME   = 45; // seconds hungry with no prey before dying
+let predators = [];
+let deathSplashes = [];
 let TRAIL_OPACITY    = parseInt(document.getElementById('trailOpacitySlider').value) / 100;
 const DISEASE_COOLDOWN = 1.5;    // seconds before same pair can register another hit
 
@@ -428,18 +485,58 @@ const u=1-Math.random(), v=Math.random();
 return mean + std * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
 }
 
-function blendColors(h1,h2){
-const r1=parseInt(h1.slice(1,3),16),g1=parseInt(h1.slice(3,5),16),b1=parseInt(h1.slice(5,7),16);
-const r2=parseInt(h2.slice(1,3),16),g2=parseInt(h2.slice(3,5),16),b2=parseInt(h2.slice(5,7),16);
-return '#'+[Math.round((r1+r2)/2),Math.round((g1+g2)/2),Math.round((b1+b2)/2)]
-.map(x=>x.toString(16).padStart(2,'0')).join('');
+// ── colour helpers (hue/sat representation) ───────────────────────────────────
+function hueToFamily(hue){
+if(hue<30||hue>=330) return 'red';
+if(hue<90)  return 'yellow';
+if(hue<150) return 'green';
+if(hue<270) return 'blue';
+return 'magenta';
 }
-function mutateColor(hex){
-if(Math.random() >= MUTATION_RATE) return hex;
-const packed = parseInt(hex.slice(1), 16);
-const bit = Math.floor(Math.random() * 24);
-const mutated = packed ^ (1 << bit);
-return '#' + mutated.toString(16).padStart(6, '0');
+function boidColorStr(b){ return `hsl(${b.hue.toFixed(1)},${Math.round(b.sat*100)}%,50%)`; }
+function boidColorAlpha(b,a){ return `hsla(${b.hue.toFixed(1)},${Math.round(b.sat*100)}%,50%,${a})`; }
+function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
+function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
+function blendHueSat(a,b){
+let dh=b.hue-a.hue;
+if(dh>180) dh-=360; if(dh<-180) dh+=360;
+return {hue:(a.hue+dh/2+360)%360, sat:(a.sat+b.sat)/2};
+}
+function mixHue(h1,h2){
+let d=h2-h1;
+if(Math.abs(d)>180) d-=Math.sign(d)*360;
+return (h1+d*0.5+360)%360;
+}
+function biasedHue(h1,h2,preferredHue){
+let child=mixHue(h1,h2);
+let d=preferredHue-child;
+if(Math.abs(d)>180) d-=Math.sign(d)*360;
+return (child+0.3*d+360)%360;
+}
+function mutateHueSat(hue,sat){
+if(Math.random()>=MUTATION_RATE) return {hue,sat};
+return {hue:(hue+(Math.random()-0.5)*30+360)%360,
+        sat:Math.max(0.2,Math.min(1.0,sat+(Math.random()-0.5)*0.2))};
+}
+function randomColorInFamily(family){
+const segs={red:[[0,30],[330,360]],yellow:[[30,90]],green:[[90,150]],blue:[[150,270]],magenta:[[270,330]]};
+const r=segs[family]||segs.red;
+const seg=r[Math.floor(Math.random()*r.length)];
+return {hue:seg[0]+Math.random()*(seg[1]-seg[0]), sat:0.6+Math.random()*0.3};
+}
+function inheritColor(parentA,parentB){
+const aIn=boidInPreferredFamily(parentA), bIn=boidInPreferredFamily(parentB);
+if(aIn||bIn){
+  const donor=aIn?parentA:parentB;
+  let childHue=(donor.hue+(Math.random()-0.5)*20+360)%360;
+  if(hueToFamily(childHue)!==preferredFamily) childHue=donor.hue;
+  const childSat=Math.max(0.2,Math.min(1.0,(parentA.sat+parentB.sat)/2+(Math.random()-0.5)*0.1));
+  return {hue:childHue, sat:childSat};
+}
+const prefHue=FAMILY_HUE[preferredFamily]??0;
+const childHue=biasedHue(parentA.hue,parentB.hue,prefHue);
+const childSat=(parentA.sat+parentB.sat)/2;
+return mutateHueSat(childHue,childSat);
 }
 // beakGene: 8-bit value → multiplier in [0.2, 3.0]. Default gene≈73 → multiplier≈1.0
 const BEAK_GENE_DEFAULT = 73;
@@ -457,7 +554,38 @@ if(Math.random() >= MUTATION_RATE) return gene;
 const bit = Math.floor(Math.random() * 8);
 return (gene ^ (1 << bit)) & 0xFF;
 }
-function pickColor(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+// ── predator helpers ──────────────────────────────────────────────────────────
+function makePredator(){
+const ang=Math.random()*Math.PI*2;
+const spd=SPEED*1.2;
+return {
+x:PREDATOR_RADIUS+Math.random()*(canvas.width-PREDATOR_RADIUS*2),
+y:PREDATOR_RADIUS+Math.random()*(canvas.height-PREDATOR_RADIUS*2),
+vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+wanderAngle:ang,
+lastEaten:-FULL_DURATION, // hungry from birth
+noPreyTimer:0,
+alive:true,
+trail:[]
+};
+}
+function syncPredatorCount(n){
+N_PREDATORS=n;
+if(!running) return;
+while(predators.filter(p=>p.alive).length < N_PREDATORS) predators.push(makePredator());
+const alive=predators.filter(p=>p.alive);
+while(alive.length > N_PREDATORS){ alive[alive.length-1].alive=false; alive.pop(); }
+}
+function spawnDeathSplash(x,y){
+deathSplashes.push({
+x, y, age:0, duration:0.85,
+particles: Array.from({length:20},()=>({
+ang:Math.random()*Math.PI*2,
+spd:40+Math.random()*100,
+r:3+Math.random()*5
+}))
+});
+}
 
 // ── boid factory ──────────────────────────────────────────────────────────────
 function makeBoid(x,y,color,isChild,parentA,parentB){
@@ -472,12 +600,8 @@ const females = boids.filter(b=>b.alive&&b.sex==='F').length;
 const total = males + females;
 const pFemale = total > 0 ? males / total : 0.5;
 const sex = Math.random() < pFemale ? 'F' : 'M';
-const chosenColor = color || pickColor();
-const genome = [
-parseInt(chosenColor.slice(1,3),16)/255,
-parseInt(chosenColor.slice(3,5),16)/255,
-parseInt(chosenColor.slice(5,7),16)/255
-];
+const chosenColor = color || pickBoidColor();
+const {hue: chosenHue, sat: chosenSat} = chosenColor;
 // immigrant generation tracking
 let immigrantGeneration = -1;
 if(parentA!==undefined && parentB!==undefined){
@@ -493,13 +617,13 @@ return {
 id:nextId++, x: x!==undefined?x:RADIUS+Math.random()*(canvas.width-RADIUS*2),
 y: y!==undefined?y:RADIUS+Math.random()*(canvas.height-RADIUS*2),
 vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED,
-color:chosenColor, wanderAngle:Math.random()*Math.PI*2,
+hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
 age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
 partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
 isChild:!!isChild, localPressure:0, globalPressure:0, popPressure:0,
 effectiveLifespan:BASE_LIFESPAN,
 maxLifespan:Math.max(BASE_LIFESPAN*0.3, gaussianRandom(BASE_LIFESPAN, BASE_LIFESPAN*0.2)),
-parentIds, familyKey, sex, genome,
+parentIds, familyKey, sex,
 beakGene: (parentA!==undefined && parentB!==undefined)
 ? mutateBeakGene(Math.round((parentA.beakGene + parentB.beakGene) / 2))
 : BEAK_GENE_DEFAULT,
@@ -761,12 +885,9 @@ spawnFlashPairs.set(pairKey(boid.id,partner.id),2.0);
 birthEvents.push(simClock);
 const mx=(boid.x+partner.x)/2+(Math.random()-0.5)*20;
 const my=(boid.y+partner.y)/2+(Math.random()-0.5)*20;
-const childColor=mutateColor(blendColors(boid.color,partner.color));
-birthRings.push({x:mx,y:my,color:childColor,age:0,duration:1.2});
+const childColor=inheritColor(boid,partner);
+birthRings.push({x:mx,y:my,hue:childColor.hue,sat:childColor.sat,age:0,duration:1.2});
 const child=makeBoid(mx,my,childColor,true,boid,partner);
-child.genome=boid.genome.map((g,i)=>
-Math.min(1,Math.max(0,(g+partner.genome[i])/2+(Math.random()-0.5)*0.05))
-);
 toSpawn.push(child);
 }
 }
@@ -784,8 +905,9 @@ return sum/count;
 }
 
 function geneticDistance(a,b){
-const dr=a.genome[0]-b.genome[0], dg=a.genome[1]-b.genome[1], db=a.genome[2]-b.genome[2];
-return Math.min(Math.sqrt(dr*dr+dg*dg+db*db)/Math.sqrt(3),1);
+let dh=Math.abs(a.hue-b.hue);
+if(dh>180) dh=360-dh;
+return dh/180; // 0..1, circular hue distance
 }
 
 // ── collision & bonding ───────────────────────────────────────────────────────
@@ -806,6 +928,10 @@ if(!compatible) continue;
 const aIsParentOfB=b.parentIds.has(a.id), bIsParentOfA=a.parentIds.has(b.id);
 const areSiblings=a.familyKey!==null&&a.familyKey===b.familyKey;
 if(aIsParentOfB||bIsParentOfA||areSiblings) continue;
+const aIn=boidInPreferredFamily(a), bIn=boidInPreferredFamily(b);
+const matchScore=(aIn?0.5:0)+(bIn?0.5:0); // 0, 0.5, or 1
+const hitProb=1-(1-matchScore)*FAMILY_PULL*0.85;
+if(Math.random()>hitProb) continue;
 const h=getHits(a.id,b.id)+1;
 const genDist=geneticDistance(a,b);
 const genScale=2.0-1.5*genDist;
@@ -974,6 +1100,202 @@ imm.birthTimer= 0;
 toSpawn.push(imm);
 }
 
+// ── predator update ───────────────────────────────────────────────────────────
+function updatePredators(dt){
+const aliveBoids = boids.filter(b=>b.alive&&!b.dying);
+const predSpd = SPEED*1.2;
+const w=canvas.width, h=canvas.height;
+for(const pred of predators){
+if(!pred.alive) continue;
+// starvation: only when no prey at all
+if(aliveBoids.length===0){
+pred.noPreyTimer+=dt;
+if(pred.noPreyTimer>STARVATION_TIME){ pred.alive=false; continue; }
+} else {
+pred.noPreyTimer=0;
+}
+const isHungry = (simClock-pred.lastEaten)>FULL_DURATION;
+const veryHungry = (simClock-pred.lastEaten)>FULL_DURATION*2;
+// wall avoidance — steer away before hitting
+const margin=WALL_MARGIN*1.5;
+let wx=0, wy=0;
+if(pred.x<margin) wx+=(margin-pred.x)/margin;
+if(pred.x>w-margin) wx-=(pred.x-(w-margin))/margin;
+if(pred.y<margin) wy+=(margin-pred.y)/margin;
+if(pred.y>h-margin) wy-=(pred.y-(h-margin))/margin;
+if(wx!==0||wy!==0){
+const wm=Math.sqrt(wx*wx+wy*wy)||1;
+pred.vx+=(wx/wm)*predSpd*0.18;
+pred.vy+=(wy/wm)*predSpd*0.18;
+pred.wanderAngle=Math.atan2(pred.vy,pred.vx);
+}
+// target seeking or wander
+if(isHungry && aliveBoids.length>0){
+let target=null, bestDist=Infinity;
+for(const b of aliveBoids){
+const dx=b.x-pred.x, dy=b.y-pred.y;
+const dist=Math.sqrt(dx*dx+dy*dy);
+if(dist>PREDATOR_SENSE) continue; // out of sensing range — wander instead
+const edible=!boidInPreferredFamily(b)||veryHungry;
+if(edible && dist<bestDist){ bestDist=dist; target=b; }
+}
+if(target){
+const dx=target.x-pred.x, dy=target.y-pred.y;
+const dist=Math.sqrt(dx*dx+dy*dy)||1;
+pred.vx+=(dx/dist*predSpd-pred.vx)*0.08;
+pred.vy+=(dy/dist*predSpd-pred.vy)*0.08;
+} else {
+pred.wanderAngle+=(Math.random()-0.5)*0.25;
+pred.vx+=(Math.cos(pred.wanderAngle)*predSpd-pred.vx)*0.06;
+pred.vy+=(Math.sin(pred.wanderAngle)*predSpd-pred.vy)*0.06;
+}
+} else {
+pred.wanderAngle+=(Math.random()-0.5)*0.18;
+pred.vx+=(Math.cos(pred.wanderAngle)*predSpd*0.6-pred.vx)*0.05;
+pred.vy+=(Math.sin(pred.wanderAngle)*predSpd*0.6-pred.vy)*0.05;
+}
+// normalise speed
+const spd=Math.sqrt(pred.vx*pred.vx+pred.vy*pred.vy)||1;
+const targetSpd=isHungry?predSpd:predSpd*0.6;
+pred.vx=pred.vx/spd*targetSpd;
+pred.vy=pred.vy/spd*targetSpd;
+pred.x+=pred.vx; pred.y+=pred.vy;
+// hard bounce off edges
+if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.y<PREDATOR_RADIUS){ pred.y=PREDATOR_RADIUS; pred.vy=Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.y>h-PREDATOR_RADIUS){ pred.y=h-PREDATOR_RADIUS; pred.vy=-Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+// trail
+pred.trail.push({x:pred.x,y:pred.y});
+if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
+// eating collision
+if(isHungry){
+for(const b of aliveBoids){
+const dx=b.x-pred.x, dy=b.y-pred.y;
+if(Math.sqrt(dx*dx+dy*dy)<PREDATOR_RADIUS+RADIUS){
+const wrongFamily=!boidInPreferredFamily(b);
+const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
+if(wrongFamily||veryHungry){
+// eat it
+b.alive=false;
+spawnDeathSplash(b.x,b.y);
+pred.lastEaten=simClock;
+break;
+}
+}
+}
+}
+}
+predators=predators.filter(p=>p.alive);
+}
+
+function drawPredators(){
+ctx.save();
+for(const pred of predators){
+if(!pred.alive) continue;
+const ang=Math.atan2(pred.vy,pred.vx);
+const cos=Math.cos(ang), sin=Math.sin(ang);
+const px=-sin, py=cos;
+const r=PREDATOR_RADIUS;
+const isHungry=(simClock-pred.lastEaten)>FULL_DURATION;
+
+// trail — same two-pass render as boids but white
+if(pred.trail.length>=2){
+const n=pred.trail.length;
+for(let i=1;i<n;i++){
+const t=Math.pow(i/(n-1),0.6);
+ctx.globalAlpha=t*0.28*TRAIL_OPACITY;
+ctx.lineWidth=t*18+1; ctx.strokeStyle='#ffffff'; ctx.lineCap='round';
+ctx.beginPath(); ctx.moveTo(pred.trail[i-1].x,pred.trail[i-1].y); ctx.lineTo(pred.trail[i].x,pred.trail[i].y); ctx.stroke();
+}
+for(let i=1;i<n;i++){
+const t=Math.pow(i/(n-1),0.5);
+ctx.globalAlpha=t*0.85*TRAIL_OPACITY;
+ctx.lineWidth=t*3.5+0.4; ctx.strokeStyle='#ffffff';
+ctx.beginPath(); ctx.moveTo(pred.trail[i-1].x,pred.trail[i-1].y); ctx.lineTo(pred.trail[i].x,pred.trail[i].y); ctx.stroke();
+}
+ctx.globalAlpha=1;
+}
+
+// body glow
+const grd=ctx.createRadialGradient(pred.x,pred.y,0,pred.x,pred.y,r*3);
+grd.addColorStop(0,isHungry?'rgba(255,255,255,0.28)':'rgba(200,200,200,0.1)');
+grd.addColorStop(1,'rgba(255,255,255,0)');
+ctx.beginPath(); ctx.arc(pred.x,pred.y,r*3,0,Math.PI*2);
+ctx.fillStyle=grd; ctx.fill();
+
+// tail (pointing backward, mirrored boid horn)
+const tailLen=r*2.2, baseW=r*0.42;
+const tbx=pred.x-cos*r*0.65, tby=pred.y-sin*r*0.65;
+const ttx=pred.x-cos*(r+tailLen), tty=pred.y-sin*(r+tailLen);
+const cpx=pred.x-cos*(r+tailLen*0.5), cpy=pred.y-sin*(r+tailLen*0.5);
+ctx.beginPath();
+ctx.moveTo(tbx+px*baseW, tby+py*baseW);
+ctx.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
+ctx.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
+ctx.closePath();
+ctx.fillStyle='white'; ctx.fill();
+
+// body: filled half-circle, curved part backward, flat (open) side forward
+ctx.beginPath();
+ctx.arc(pred.x,pred.y,r, ang+Math.PI/2, ang-Math.PI/2, false); // clockwise = back arc
+ctx.closePath(); // straight line closes the diameter at the front
+ctx.fillStyle='white'; ctx.fill();
+
+// dot on back: color of the family this predator is not eating
+const dotCol = FAMILY_CSS[preferredFamily] || '#ffffff';
+const bx = pred.x - cos * r * 0.65, by = pred.y - sin * r * 0.65;
+ctx.beginPath(); ctx.arc(bx, by, r * 0.28, 0, Math.PI * 2);
+ctx.fillStyle = dotCol; ctx.fill();
+
+// eyes at the diameter endpoints (front corners of the half-circle)
+const e1x=pred.x+Math.cos(ang-Math.PI/2)*r, e1y=pred.y+Math.sin(ang-Math.PI/2)*r;
+const e2x=pred.x+Math.cos(ang+Math.PI/2)*r, e2y=pred.y+Math.sin(ang+Math.PI/2)*r;
+// yellow (full) → orange → red (very hungry), 0..1 over 2×FULL_DURATION
+const hungerRatio=Math.min((simClock-pred.lastEaten)/(FULL_DURATION*2),1);
+const eyeG=Math.round(200*(1-hungerRatio)+20*hungerRatio);
+const eyeB=Math.round(20*hungerRatio);
+const eyeColor=`rgb(255,${eyeG},${eyeB})`;
+if(isHungry){
+const pulse=0.5+0.5*Math.sin(simClock*5);
+ctx.shadowColor=eyeColor; ctx.shadowBlur=8+pulse*14;
+}
+ctx.fillStyle=eyeColor;
+ctx.beginPath(); ctx.arc(e1x,e1y,r*0.25,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.arc(e2x,e2y,r*0.25,0,Math.PI*2); ctx.fill();
+ctx.shadowBlur=0;
+}
+ctx.restore();
+}
+
+function drawDeathSplashes(){
+ctx.save();
+for(const s of deathSplashes){
+const t=s.age/s.duration;
+const alpha=1-t;
+// outer ring
+ctx.beginPath(); ctx.arc(s.x,s.y,t*110,0,Math.PI*2);
+ctx.strokeStyle=`rgba(210,0,0,${alpha*0.8})`; ctx.lineWidth=6*(1-t); ctx.stroke();
+// second ring
+ctx.beginPath(); ctx.arc(s.x,s.y,t*70,0,Math.PI*2);
+ctx.strokeStyle=`rgba(255,40,0,${alpha*0.6})`; ctx.lineWidth=3*(1-t); ctx.stroke();
+// inner flash
+if(t<0.4){
+const ft=t/0.4;
+ctx.beginPath(); ctx.arc(s.x,s.y,(1-ft)*42,0,Math.PI*2);
+ctx.fillStyle=`rgba(255,100,0,${(1-ft)*0.8})`; ctx.fill();
+}
+// blood particles
+ctx.fillStyle=`rgba(180,0,0,${alpha*0.9})`;
+for(const p of s.particles){
+const bx=s.x+Math.cos(p.ang)*p.spd*t;
+const by=s.y+Math.sin(p.ang)*p.spd*t;
+ctx.beginPath(); ctx.arc(bx,by,p.r*(1-t*0.3),0,Math.PI*2); ctx.fill();
+}
+}
+ctx.restore();
+}
+
 // ── drawing ───────────────────────────────────────────────────────────────────
 function drawBackground(){
 const w=canvas.width,h=canvas.height;
@@ -1006,9 +1328,9 @@ grd.addColorStop(0, `rgba(255,140,0,${alpha*0.9})`);
 grd.addColorStop(0.5, `rgba(255,200,80,${alpha})`);
 grd.addColorStop(1, `rgba(255,140,0,${alpha*0.9})`);
 } else {
-grd.addColorStop(0, boid.color +Math.round(alpha*0.8*255).toString(16).padStart(2,'0'));
-grd.addColorStop(0.5,'rgba(255,255,255,'+alpha*0.3+')');
-grd.addColorStop(1, partner.color+Math.round(alpha*0.8*255).toString(16).padStart(2,'0'));
+grd.addColorStop(0, boidColorAlpha(boid, alpha*0.8));
+grd.addColorStop(0.5,`rgba(255,255,255,${alpha*0.3})`);
+grd.addColorStop(1, boidColorAlpha(partner, alpha*0.8));
 }
 ctx.beginPath(); ctx.moveTo(boid.x,boid.y); ctx.lineTo(partner.x,partner.y);
 ctx.strokeStyle=grd; ctx.lineWidth=flashTime>0?4.5:fertile?3.5:1.5; ctx.stroke();
@@ -1031,7 +1353,7 @@ for(let i=1;i<n;i++){
 const t=Math.pow(i/(n-1), 0.6);
 ctx.globalAlpha=t*0.28*bAlpha*TRAIL_OPACITY;
 ctx.lineWidth=t*18+1;
-ctx.strokeStyle=boid.color;
+ctx.strokeStyle=boidColorStr(boid);
 ctx.beginPath();
 ctx.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
 ctx.lineTo(boid.trail[i].x,boid.trail[i].y);
@@ -1042,7 +1364,7 @@ for(let i=1;i<n;i++){
 const t=Math.pow(i/(n-1), 0.5);
 ctx.globalAlpha=t*0.85*bAlpha*TRAIL_OPACITY;
 ctx.lineWidth=t*3.5+0.4;
-ctx.strokeStyle=boid.color;
+ctx.strokeStyle=boidColorStr(boid);
 ctx.beginPath();
 ctx.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
 ctx.lineTo(boid.trail[i].x,boid.trail[i].y);
@@ -1061,14 +1383,14 @@ if(t >= 1) continue;
 // soft bloom — large filled circle, fades fast
 const tBloom = Math.min(t * 3, 1);
 ctx.globalAlpha = Math.pow(1 - tBloom, 1.8) * 0.35;
-ctx.fillStyle = ring.color;
+ctx.fillStyle = `hsl(${ring.hue},${Math.round(ring.sat*100)}%,50%)`;
 ctx.beginPath(); ctx.arc(ring.x, ring.y, tBloom * 110, 0, Math.PI*2); ctx.fill();
 
 // outer ring — slow, thick
 const r1 = t * 150;
 const a1 = Math.pow(1 - t, 1.2) * 0.95;
 ctx.globalAlpha = a1;
-ctx.strokeStyle = ring.color;
+ctx.strokeStyle = `hsl(${ring.hue},${Math.round(ring.sat*100)}%,50%)`;
 ctx.lineWidth = (1 - t) * 9 + 1;
 ctx.beginPath(); ctx.arc(ring.x, ring.y, r1, 0, Math.PI*2); ctx.stroke();
 
@@ -1085,7 +1407,7 @@ if(t < 0.25){
 const tf = t / 0.25;
 ctx.globalAlpha = Math.pow(1 - tf, 0.8);
 ctx.beginPath(); ctx.arc(ring.x, ring.y, tf * 28, 0, Math.PI*2);
-ctx.fillStyle = ring.color; ctx.fill();
+ctx.fillStyle = `hsl(${ring.hue},${Math.round(ring.sat*100)}%,50%)`; ctx.fill();
 }
 }
 ctx.restore();
@@ -1120,11 +1442,16 @@ const r = boid.isSingle ? RADIUS*0.7 : RADIUS; // singles are smaller
 
 ctx.save(); ctx.globalAlpha=alpha*(fertile?1.0:0.55);
 
-const glowHex=isBonded?'ffcc44':boid.color.slice(1);
 const grd=ctx.createRadialGradient(boid.x,boid.y,0,boid.x,boid.y,RADIUS*2.8);
-grd.addColorStop(0,'#'+glowHex+'bb');
-grd.addColorStop(0.4,'#'+glowHex+'44');
-grd.addColorStop(1,'#'+glowHex+'00');
+if(isBonded){
+grd.addColorStop(0,'rgba(255,204,68,0.73)');
+grd.addColorStop(0.4,'rgba(255,204,68,0.27)');
+grd.addColorStop(1,'rgba(255,204,68,0)');
+} else {
+grd.addColorStop(0,boidColorAlpha(boid,0.73));
+grd.addColorStop(0.4,boidColorAlpha(boid,0.27));
+grd.addColorStop(1,boidColorAlpha(boid,0));
+}
 ctx.beginPath(); ctx.arc(boid.x,boid.y,RADIUS*2.8,0,Math.PI*2);
 ctx.fillStyle=grd; ctx.fill();
 
@@ -1141,9 +1468,9 @@ ctx.moveTo(tbx+px*baseW, tby+py*baseW);
 ctx.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
 ctx.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
 ctx.closePath();
-ctx.fillStyle=boid.color; ctx.fill();
+ctx.fillStyle=boidColorStr(boid); ctx.fill();
 ctx.beginPath(); ctx.arc(boid.x,boid.y,r,0,Math.PI*2);
-ctx.fillStyle=boid.color; ctx.fill();
+ctx.fillStyle=boidColorStr(boid); ctx.fill();
 const mer=eyeRadius(boid.eyeGene, r);
 const mspread=r*0.45+mer*0.5;
 const mfwd=r*0.55;
@@ -1157,7 +1484,7 @@ ctx.beginPath(); ctx.arc(mlx-mer*0.28,mly-mer*0.28,mer*0.3,0,Math.PI*2); ctx.fil
 ctx.beginPath(); ctx.arc(mrx-mer*0.28,mry-mer*0.28,mer*0.3,0,Math.PI*2); ctx.fill();
 } else {
 ctx.beginPath(); ctx.arc(boid.x,boid.y,r,0,Math.PI*2);
-ctx.fillStyle=boid.color; ctx.fill();
+ctx.fillStyle=boidColorStr(boid); ctx.fill();
 const ang=Math.atan2(boid.vy,boid.vx);
 const cos=Math.cos(ang), sin=Math.sin(ang);
 const px=-sin, py=cos;
@@ -1277,6 +1604,17 @@ inbreedWarn.style.display = 'none';
 diseaseDeathEvents = diseaseDeathEvents.filter(ev=>ev>cutoff);
 document.getElementById('rdDied').textContent = diseaseDeathEvents.length;
 
+// ── family indicator ──
+const aliveFF=boids.filter(b=>b.alive&&!b.dying);
+const inFamFF=aliveFF.filter(b=>boidInPreferredFamily(b)).length;
+const convPct=aliveFF.length>0?Math.round(inFamFF/aliveFF.length*100):0;
+document.getElementById('familyDot').style.color=FAMILY_CSS[preferredFamily]||'#fff';
+document.getElementById('familyName').style.color=FAMILY_CSS[preferredFamily]||'#fff';
+document.getElementById('familyName').textContent=preferredFamily;
+document.getElementById('familyConv').textContent=convPct+'%';
+const holdLeft=familyConvergedTimer>0?(FAMILY_CONVERGE_HOLD-familyConvergedTimer).toFixed(1)+'s':'';
+document.getElementById('familyTimer').textContent=holdLeft;
+
 const eb = _cachedEffectiveBreeders;
 const rdEffBr = document.getElementById('rdEffBr');
 rdEffBr.textContent = eb;
@@ -1370,10 +1708,12 @@ ctx.restore();
 }
 
 function startSim(){
-nextId=0; boids=[];
+nextId=0; boids=[]; predators=[]; deathSplashes=[];
+preferredFamilyIdx=0; preferredFamily=COLOR_FAMILY_CYCLE[0]; familyConvergedTimer=0;
 hits.clear(); cooldown.clear(); pairChildren.clear(); spawnFlashPairs.clear(); diseaseCooldown.clear(); birthRings=[];
 smoothPressure=0.5; smoothGlobalPressure=0.0; lastTime=null; immigrationTimer=10;
 birthEvents=[]; deathEvents=[]; immigrantEvents=[]; simClock=0; rHistory=[]; diseaseDeathEvents=[]; _cachedDiversity=0.3; _cachedEffectiveBreeders=0;
+for(let i=0;i<N_PREDATORS;i++) predators.push(makePredator());
 for(let i=0;i<TARGET_POP;i++){
 const b=makeBoid();
 b.age=Math.random()*b.maxLifespan*0.9;
@@ -1410,6 +1750,23 @@ statusEl.textContent='';
 drawIdle();
 updateViability();
 
+// ── family cycle ─────────────────────────────────────────────────────────────
+function updateFamilyCycle(dt){
+const alive=boids.filter(b=>b.alive&&!b.dying);
+if(alive.length<3){ familyConvergedTimer=0; return; }
+const inFam=alive.filter(b=>boidInPreferredFamily(b)).length;
+if(inFam/alive.length>=0.9){
+  familyConvergedTimer+=dt;
+  if(familyConvergedTimer>=FAMILY_CONVERGE_HOLD){
+    familyConvergedTimer=0;
+    preferredFamilyIdx=(preferredFamilyIdx+1)%COLOR_FAMILY_CYCLE.length;
+    preferredFamily=COLOR_FAMILY_CYCLE[preferredFamilyIdx];
+  }
+} else {
+  familyConvergedTimer=0;
+}
+}
+
 // ── main loop ─────────────────────────────────────────────────────────────────
 const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
@@ -1430,6 +1787,7 @@ drawBackground();
 drawTrails();
 drawBondLines();
 updateCollisions();
+updatePredators(dt);
 
 for(const boid of boids){
 if(!boid.alive) continue;
@@ -1452,13 +1810,76 @@ for(let i=birthRings.length-1;i>=0;i--){ birthRings[i].age+=dt; if(birthRings[i]
 boids=boids.filter(b=>b.alive);
 updateDivorce(dt);
 updateImmigration(dt);
+updateFamilyCycle(dt);
 updateDiseaseCollisions();
+if(AUTO_DISEASE){
+_autoDisTimer-=dt;
+if(_autoDisTimer<=0){
+_autoDisTimer=30+Math.random()*60;
+const candidates=boids.filter(b=>b.alive&&!b.dying&&!b.diseased&&!b.immune);
+if(candidates.length>0) infectBoid(candidates[Math.floor(Math.random()*candidates.length)]);
+}
+}
 updateDisease(dt);
 
 for(const boid of boids) drawBoid(boid);
+drawDeathSplashes();
+drawPredators();
 drawBirthRings();
 updateStatus();
+// age death splashes
+for(let i=deathSplashes.length-1;i>=0;i--){
+deathSplashes[i].age+=dt;
+if(deathSplashes[i].age>=deathSplashes[i].duration) deathSplashes.splice(i,1);
 }
+}
+
+// ── export ────────────────────────────────────────────────────────────────────
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+// Sync current slider positions → HTML attributes so outerHTML captures them
+document.querySelectorAll('input[type="range"]').forEach(el => el.setAttribute('value', el.value));
+
+let html = document.documentElement.outerHTML;
+
+// 1. Inject CSS at the very start of <head> — applied before any rendering, no flash
+const exportCSS = `<style>
+#ui { display:none !important; }
+body { margin:0; padding:0; overflow:hidden; background:#050e18; }
+canvas#c { position:fixed; top:0; left:0; display:block; }
+</style>`;
+html = html.replace('<head>', '<head>\n' + exportCSS);
+
+// 2. Boot script at end of body — all inline scripts already done, startSim available
+const bootScript = `<script>
+(function(){
+MAX_TRAIL         = ${MAX_TRAIL};
+TRAIL_OPACITY     = ${TRAIL_OPACITY};
+immigrationEnabled= ${immigrationEnabled};
+AUTO_DISEASE      = true;
+resize = function(){
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  SENSING_RADIUS = Math.round(Math.min(canvas.width, canvas.height) * 0.3);
+};
+window.addEventListener('resize', resize);
+resize();
+startSim();
+})();
+<\/script>`;
+
+const idx = html.lastIndexOf('</body>');
+html = idx !== -1
+  ? html.slice(0, idx) + bootScript + '\n</body></html>'
+  : html + bootScript;
+
+const blob = new Blob([html], {type:'text/html'});
+const url  = URL.createObjectURL(blob);
+const a    = document.createElement('a');
+a.href = url; a.download = 'boids-aquarium.html';
+document.body.appendChild(a); a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+});
 </script>
 
 </body>

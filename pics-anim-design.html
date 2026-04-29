@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boids Aquarium (Animated) — Design & Implementation</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:15px; }
+body {
+  background:#0a1520;
+  color:#c8d8e8;
+  font-family:'Courier New', monospace;
+  line-height:1.7;
+  padding:40px 24px 80px;
+}
+.page { max-width:860px; margin:0 auto; }
+
+h1 {
+  color:#54a0ff;
+  font-size:1.5rem;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  border-bottom:2px solid rgba(84,160,255,0.3);
+  padding-bottom:12px;
+  margin-bottom:32px;
+}
+h2 {
+  color:#54a0ff;
+  font-size:1.05rem;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin:48px 0 16px;
+  padding-bottom:6px;
+  border-bottom:1px solid rgba(84,160,255,0.2);
+}
+h3 {
+  color:#00d2d3;
+  font-size:0.9rem;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  margin:28px 0 10px;
+}
+p { margin-bottom:12px; color:#b0c4d8; }
+ul, ol { margin:0 0 12px 22px; color:#b0c4d8; }
+li { margin-bottom:4px; }
+strong { color:#e0ecff; }
+em { color:#a29bfe; font-style:normal; }
+hr { border:none; border-top:1px solid rgba(84,160,255,0.15); margin:40px 0; }
+
+/* code */
+code {
+  font-family:'Courier New', monospace;
+  font-size:0.88rem;
+  background:rgba(84,160,255,0.08);
+  color:#0be881;
+  padding:1px 5px;
+  border-radius:3px;
+}
+pre {
+  background:rgba(0,0,0,0.35);
+  border:1px solid rgba(84,160,255,0.15);
+  border-radius:6px;
+  padding:16px 20px;
+  margin:12px 0 18px;
+  overflow-x:auto;
+}
+pre code {
+  background:none;
+  padding:0;
+  color:#0be881;
+  font-size:0.84rem;
+  line-height:1.6;
+}
+
+/* tables */
+table {
+  width:100%;
+  border-collapse:collapse;
+  margin:12px 0 20px;
+  font-size:0.84rem;
+}
+th {
+  background:rgba(84,160,255,0.12);
+  color:#54a0ff;
+  text-align:left;
+  padding:7px 12px;
+  letter-spacing:0.8px;
+  text-transform:uppercase;
+  font-size:0.76rem;
+  border-bottom:1px solid rgba(84,160,255,0.25);
+}
+td {
+  padding:6px 12px;
+  border-bottom:1px solid rgba(84,160,255,0.08);
+  color:#b0c4d8;
+  vertical-align:top;
+}
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(84,160,255,0.04); }
+
+/* section labels */
+.tag {
+  display:inline-block;
+  background:rgba(84,160,255,0.12);
+  color:#54a0ff;
+  font-size:0.72rem;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  padding:2px 8px;
+  border-radius:3px;
+  margin-bottom:10px;
+}
+
+/* feedback arm boxes */
+.arm {
+  border-left:3px solid rgba(84,160,255,0.4);
+  padding:4px 0 4px 16px;
+  margin:16px 0;
+}
+
+/* toc */
+#toc {
+  background:rgba(0,0,0,0.3);
+  border:1px solid rgba(84,160,255,0.2);
+  border-radius:8px;
+  padding:20px 28px;
+  margin-bottom:48px;
+}
+#toc h2 { margin-top:0; font-size:0.85rem; }
+#toc ol { margin-left:18px; }
+#toc li { margin-bottom:3px; }
+#toc a { color:#54a0ff; text-decoration:none; font-size:0.84rem; }
+#toc a:hover { color:#00d2d3; text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Boids Aquarium (Animated)<br>Design &amp; Implementation</h1>
+
+<nav id="toc">
+<h2>Contents</h2>
+<ol>
+  <li><a href="#overview">Overview</a></li>
+  <li><a href="#appearance">Boid Appearance</a></li>
+  <li><a href="#lifecycle">Boid Lifecycle</a></li>
+  <li><a href="#movement">Movement</a></li>
+  <li><a href="#singles">Singles</a></li>
+  <li><a href="#orientation">Sexual Orientation</a></li>
+  <li><a href="#bonding">Bonding</a></li>
+  <li><a href="#divorce">Divorce</a></li>
+  <li><a href="#fertility">Sex and Fertility</a></li>
+  <li><a href="#breeding">Breeding</a></li>
+  <li><a href="#feedback">The Feedback Loop</a></li>
+  <li><a href="#genetics">Genetic System</a></li>
+  <li><a href="#immigration">Immigration</a></li>
+  <li><a href="#disease">Disease</a></li>
+  <li><a href="#trails">Motion Trails</a></li>
+  <li><a href="#birthrings">Birth Rings</a></li>
+  <li><a href="#deathsplash">Death Splashes</a></li>
+  <li><a href="#morph">Morphological Genetics</a></li>
+  <li><a href="#colormut">Colour Representation &amp; Mutation</a></li>
+  <li><a href="#colorpref">Colour Family Cycle</a></li>
+  <li><a href="#predators">Predators</a></li>
+  <li><a href="#export">Export</a></li>
+  <li><a href="#performance">Performance</a></li>
+  <li><a href="#controls">User Controls</a></li>
+  <li><a href="#visualkey">Visual Key</a></li>
+</ol>
+</nav>
+
+<!-- ───────────────────────────── OVERVIEW ───────────────────────────────── -->
+<h2 id="overview">Overview</h2>
+<p>An animated browser-based population simulation built on the classic boids algorithm. Coloured boids wander autonomously inside a bounded aquarium. They can bond, breed, age and die. A multi-arm feedback loop attempts to maintain a stable population around a user-defined target.</p>
+<p>The visual layer extends the base simulation with:</p>
+<ul>
+  <li><strong>Motion trails</strong> with two-pass glow rendering</li>
+  <li><strong>Birth rings</strong> at spawn events</li>
+  <li><strong>Morphological genetics</strong> — males carry a <code>beakGene</code> (horn length), all boids carry an <code>eyeGene</code> (eye size), both heritable and mutable via bit-flip</li>
+  <li><strong>Colour as HSL</strong> — boids store <code>{hue, sat}</code>; rendered at fixed lightness 50%</li>
+  <li><strong>Colour family cycle</strong> — a preferred family (red → yellow → green → blue → magenta → …) cycles automatically; three selection pressures drive convergence</li>
+  <li><strong>Predators</strong> — autonomous hunters that preferentially eat wrong-family boids</li>
+  <li><strong>Export</strong> button — generates a standalone full-screen HTML with no UI, auto-start, auto-disease</li>
+</ul>
+<p>Target framerate is 30 fps (capped; simulation time is dt-based so it runs correctly at any framerate). All logic runs in a single self-contained HTML file with no external dependencies.</p>
+
+<!-- ───────────────────────────── APPEARANCE ─────────────────────────────── -->
+<h2 id="appearance">Boid Appearance</h2>
+<h3>Males</h3>
+<p>Rendered as a <strong>filled body circle</strong> + a <strong>forward-pointing tapered horn</strong> (unicorn style). Horn length is determined by <code>beakGene</code> (see <em>Morphological Genetics</em>). Base length = <code>RADIUS × 2.2 × beakMultiplier(beakGene)</code>.</p>
+<p>Both sexes have <strong>two eyes</strong> (filled dark circles with a white highlight dot) placed at the front of the body, spread perpendicular to the direction of movement. Eye radius is determined by <code>eyeGene</code>.</p>
+<h3>Females</h3>
+<p>Rendered as a <strong>filled body circle</strong> + two eyes. No horn.</p>
+<h3>Both sexes</h3>
+<table>
+<thead><tr><th>State</th><th>Visual</th></tr></thead>
+<tbody>
+<tr><td>Fertile</td><td>Full opacity</td></tr>
+<tr><td>Infertile</td><td>55% opacity</td></tr>
+<tr><td>Bonded</td><td>Gold radial glow around body</td></tr>
+<tr><td>Diseased</td><td>White spot at body centre</td></tr>
+<tr><td>Fading in/out</td><td>globalAlpha ramps over BIRTH_DURATION / FADE_DURATION</td></tr>
+<tr><td>Trail</td><td>Two-pass glow + core line behind every moving boid</td></tr>
+</tbody>
+</table>
+
+<!-- ───────────────────────────── LIFECYCLE ──────────────────────────────── -->
+<h2 id="lifecycle">Boid Lifecycle</h2>
+<pre><code>spawn → fade-in → juvenile → fertile adult → post-fertile → dying → removed</code></pre>
+<table>
+<thead><tr><th>Property</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>age</code></td><td>Seconds lived since birth</td></tr>
+<tr><td><code>maxLifespan</code></td><td>Biological ceiling — fixed at birth, drawn from Normal(BASE_LIFESPAN, 0.2 × BASE_LIFESPAN), floored at 30% of base. Never changes.</td></tr>
+<tr><td><code>effectiveLifespan</code></td><td>Display-only: current implied mean lifespan given population pressure (= BASE_LIFESPAN × pressureScale). Not used as a death trigger.</td></tr>
+<tr><td><code>birthTimer</code></td><td>Fade-in duration (1.5 s)</td></tr>
+<tr><td><code>dying</code></td><td>True when age ≥ maxLifespan, or when a per-frame Gompertz hazard roll triggers death; boid fades out over 2 s</td></tr>
+</tbody>
+</table>
+
+<!-- ───────────────────────────── MOVEMENT ───────────────────────────────── -->
+<h2 id="movement">Movement</h2>
+<p>Each boid moves at a constant speed, direction updated every frame by four competing steering forces applied in sequence:</p>
+<ol>
+  <li><strong>Wall avoidance</strong> — soft repulsion begins 40 px from any wall; hard bounce at the wall itself</li>
+  <li><strong>Wander</strong> — a random-walk steering target projected ahead of the boid on a circle, jittered each frame</li>
+  <li><strong>Nearness</strong> — attraction toward the local flock centre (see Feedback Arm 1)</li>
+  <li><strong>Bond attraction</strong> — bonded partners stay within 45 px of each other</li>
+</ol>
+<p>Speed is user-controlled via a slider (1–10, mapped to 0.45–4.5 px/frame).</p>
+
+<!-- ───────────────────────────── SINGLES ────────────────────────────────── -->
+<h2 id="singles">Singles</h2>
+<p>Each boid is assigned a "single" status at birth, drawn probabilistically from the <strong>singles</strong> slider (0–80%, default 20%). Singles never bond. They are drawn at 0.7× the normal radius to visually distinguish them.</p>
+
+<!-- ───────────────────────────── ORIENTATION ────────────────────────────── -->
+<h2 id="orientation">Sexual Orientation</h2>
+<p>Each non-single boid is assigned an orientation at birth:</p>
+<ul>
+  <li><strong>Straight</strong> (default) — can only bond with an opposite-sex non-gay boid</li>
+  <li><strong>Gay</strong> — can only bond with a same-sex gay boid</li>
+</ul>
+<p>The <strong>gay %</strong> slider (0–50%, default 10%) sets the fraction of non-single boids born gay. Singles take precedence: a boid that is single is never also marked gay. Gay pairs bond and divorce normally but can never breed. The feedback loop's deadlock detection and immigration system ignore gay boids.</p>
+<p>Immigrants are always straight, as they are spawned specifically to break reproductive deadlocks.</p>
+
+<!-- ───────────────────────────── BONDING ────────────────────────────────── -->
+<h2 id="bonding">Bonding</h2>
+<p>Two unbonded, non-single boids bond after accumulating <code>BOND_THRESHOLD</code> collisions (overlapping circles). A per-pair cooldown prevents one slow overlap from counting as many hits.</p>
+<p><strong>Restrictions:</strong></p>
+<ul>
+  <li>A bonded boid cannot bond again until its partner dies or the pair divorces</li>
+  <li>A child cannot bond with either parent</li>
+  <li>Siblings (same two parents) cannot bond with each other</li>
+  <li>Singles never bond</li>
+  <li>Gay boids only bond with gay boids of the same sex; straight boids only bond with straight boids of the opposite sex</li>
+</ul>
+<p><strong>Bond threshold interaction with nearness:</strong> Higher <code>BOND_THRESHOLD</code> requires more collisions, so boids need sustained proximity. The nearness strength is scaled upward proportionally (<code>1 + (threshold - 1) × 0.24</code>) to compensate. The hit cooldown also shrinks with higher thresholds (<code>COOLDOWN_FRAMES / √threshold</code>) so hits accumulate faster.</p>
+
+<!-- ───────────────────────────── DIVORCE ────────────────────────────────── -->
+<h2 id="divorce">Divorce</h2>
+<p>Each frame, each bonded pair has a small chance to split equal to <code>DIVORCE_RATE × dt</code>. When a divorce occurs:</p>
+<ul>
+  <li>Both partners become unbonded and their hit/children records for that pair are cleared</li>
+  <li>Each partner's breed timer is reset with a random offset</li>
+  <li><code>pairFamilyTarget</code> is reset to 0 for both</li>
+</ul>
+<p>The <strong>divorce rate</strong> slider (0–50%, default 5%) sets the per-second probability.</p>
+
+<!-- ───────────────────────────── FERTILITY ──────────────────────────────── -->
+<h2 id="fertility">Sex and Fertility</h2>
+<p>Each boid is assigned a sex (<code>M</code> or <code>F</code>) at birth, biased toward whichever sex is currently underrepresented to keep the ratio close to 50/50.</p>
+<p>Fertility windows are fixed fractions of each boid's <code>maxLifespan</code>:</p>
+<table>
+<thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>♂ fertile from</td><td>20% of maxLifespan</td></tr>
+<tr><td>♂ fertile for</td><td>70% of maxLifespan</td></tr>
+<tr><td>♀ fertile from</td><td>20% of maxLifespan</td></tr>
+<tr><td>♀ fertile for</td><td>50% of maxLifespan</td></tr>
+</tbody>
+</table>
+<p>A boid is fertile only when <code>age</code> falls within <code>[maxLifespan × from, maxLifespan × (from + for)]</code>. Using <code>maxLifespan</code> (not the pressure-varying <code>effectiveLifespan</code>) means each boid's reproductive window is a fixed fraction of its own biology and does not shift as population pressure changes.</p>
+<p><strong>Only bonded straight M+F pairs where both partners are currently fertile can produce children.</strong></p>
+
+<!-- ───────────────────────────── BREEDING ───────────────────────────────── -->
+<h2 id="breeding">Breeding</h2>
+<p>When a bonded fertile M+F pair is active, a per-pair family target determines reproductive capacity. At bond formation the pair's family target is drawn from <code>Normal(FAMILY_SIZE, 0.8)</code>, clamped to a minimum of 0 and rounded to the nearest integer. This is stored on both partners as <code>pairFamilyTarget</code>.</p>
+<p>The effective maximum children is then:</p>
+<pre><code>t              = (globalPressure + 1) / 2          # 0..1
+desiredMax     = ceil(pairFamilyTarget × (1 − max(t − 0.5, 0) × 2))
+effectiveMax   = min(desiredMax, bioCeiling)
+bioCeiling     = floor(maxLifespan × F_FERTILE_FOR / PREG_INTERVAL)</code></pre>
+<ul>
+  <li>At target (t = 0.5): <code>desiredMax = pairFamilyTarget</code> (no reduction)</li>
+  <li>Overpopulated (t = 1): <code>desiredMax = 0</code> (breeding stops)</li>
+  <li>At crisis (t = 0): <code>desiredMax = pairFamilyTarget</code> (no bonus above the family target)</li>
+</ul>
+<p>The actual pregnancy interval is modulated by pressure:</p>
+<pre><code>intervalScale  = 3^globalPressure
+actualInterval = PREG_INTERVAL × intervalScale × random(0.8, 1.6)</code></pre>
+<table>
+<thead><tr><th>globalPressure</th><th>Interval</th></tr></thead>
+<tbody>
+<tr><td>−1 (crisis)</td><td>≈ PREG_INTERVAL × 0.33 (3× faster)</td></tr>
+<tr><td>0 (at target)</td><td>≈ PREG_INTERVAL</td></tr>
+<tr><td>+1 (over target)</td><td>≈ PREG_INTERVAL × 3.0 (3× slower)</td></tr>
+</tbody>
+</table>
+
+<!-- ───────────────────────────── FEEDBACK ───────────────────────────────── -->
+<h2 id="feedback">The Feedback Loop</h2>
+<p>Stability is maintained through three independent feedback arms, all driven by <strong>pressure signals</strong> derived from the current population state.</p>
+
+<h3>Pressure Signals</h3>
+<p><strong>Local pressure</strong> (<code>localPressure</code>, 0–1) — measures neighbourhood crowding:</p>
+<pre><code>localPressure = min(neighbours / max(TARGET_POP × 0.4, 1), 1)</code></pre>
+<p>The sensing radius is dynamic: 30% of the smaller canvas dimension.</p>
+
+<p><strong>Global pressure</strong> (<code>globalPressure</code>, −1 to +1) — measures population-level error:</p>
+<pre><code>targetPairs    = (TARGET_POP / 2) × min(M_FERTILE_FOR, F_FERTILE_FOR)
+fertilePairs   = min(fertile males, fertile females)
+globalPressure = clamp(fertilePairs / targetPairs − 1, −1, +1)</code></pre>
+<p>An <strong>extinction floor</strong> overrides <code>globalPressure</code> to −1 when total population drops below 4.</p>
+
+<p><strong>Population pressure</strong> (<code>popPressure</code>, −1 to +1) — measures raw headcount error (Arm 1 only):</p>
+<pre><code>popPressure = clamp(boids.length / TARGET_POP − 1, −1, +1)</code></pre>
+
+<div class="arm">
+<h3>Arm 1 — Nearness (birth rate, indirect)</h3>
+<p><strong>Signals:</strong> <code>localPressure</code> and <code>popPressure</code> — controls how strongly boids steer toward each other.</p>
+<pre><code>combinedPressure = min(localPressure + max(popPressure, 0), 1)
+strength = (MIN_NEARNESS + (BASE_NEARNESS − MIN_NEARNESS) × (1 − combinedPressure))
+           × thresholdScale</code></pre>
+<table>
+<thead><tr><th>combinedPressure</th><th>Nearness strength</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>0 (sparse)</td><td>High (up to 4.0×)</td><td>Boids cluster → more collisions → faster bonding</td></tr>
+<tr><td>1 (dense)</td><td>Low (0.05)</td><td>Boids spread out → fewer collisions</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="arm">
+<h3>Arm 2 — Mortality (death rate)</h3>
+<p><strong>Signal:</strong> <code>globalPressure</code> — modulates the per-frame probability of death via a Gompertz hazard rate.</p>
+<pre><code>scale    = LIFESPAN_SCALE_MAX + (LIFESPAN_SCALE_MIN − LIFESPAN_SCALE_MAX) × (globalPressure + 1) / 2
+modalAge = BASE_LIFESPAN × scale
+beta     = 3 / modalAge
+alpha    = beta × exp(−beta × modalAge)
+hazard   = alpha × exp(beta × boid.age) × inbreedingHazardMult × smallPopHazardMult</code></pre>
+<table>
+<thead><tr><th>globalPressure</th><th>scale</th><th>Modal age (base 80 s)</th><th>SD ≈</th></tr></thead>
+<tbody>
+<tr><td>−1 (crisis)</td><td>1.25×</td><td>100 s</td><td>~43 s</td></tr>
+<tr><td>0 (at target)</td><td>1.0×</td><td>80 s</td><td>~34 s</td></tr>
+<tr><td>+1 (over target)</td><td>0.4×</td><td>32 s</td><td>~14 s</td></tr>
+</tbody>
+</table>
+<p><code>inbreedingHazardMultiplier</code> (1× – 1.5×) rises as genetic diversity falls below 0.3. <code>smallPopHazardMultiplier</code> (1× – 1.2×) rises as effective breeders fall below 50. Worst case total: <strong>1.8×</strong> baseline.</p>
+</div>
+
+<div class="arm">
+<h3>Arm 3 — Breeding rate (birth rate, direct)</h3>
+<p><strong>Signal:</strong> <code>globalPressure</code> — scales both the pregnancy interval and the maximum children per pair.</p>
+<table>
+<thead><tr><th>globalPressure</th><th>Interval multiplier</th><th>Effective max children (family 4)</th></tr></thead>
+<tbody>
+<tr><td>−1 (crisis)</td><td>~0.33× (3× faster)</td><td>4 (no bonus above family target)</td></tr>
+<tr><td>0 (at target)</td><td>1.0×</td><td>4</td></tr>
+<tr><td>+1 (over target)</td><td>~3.0× (3× slower)</td><td>0 (breeding stops)</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Why three separate signals?</h3>
+<p>Early versions used a single blended pressure signal for all arms. This caused a critical failure: when population was low and nearness caused boids to cluster, local density increased, which raised pressure, which suppressed recovery — the system sabotaged itself. Separating the signals prevents this: Arm 1 responds to local density + raw headcount overshoot; Arms 2 and 3 respond only to global population-vs-target error.</p>
+
+<!-- ───────────────────────────── GENETICS ───────────────────────────────── -->
+<h2 id="genetics">Genetic System</h2>
+
+<h3>Colour as genome</h3>
+<p>Each boid carries <code>{hue: 0–360, sat: 0–1}</code> as its genome. Hue encodes colour family membership; saturation encodes vividness. Children inherit colour through <code>inheritColor</code> (see <em>Colour Family Cycle</em>). <code>beakGene</code> and <code>eyeGene</code> continue to use bit-flip mutation (see <em>Morphological Genetics</em>).</p>
+
+<h3>Genetic distance preference</h3>
+<p>When two unbonded boids collide, the cooldown before the next registered hit is modulated by their genetic distance:</p>
+<pre><code>let dh = |a.hue − b.hue|
+if dh &gt; 180: dh = 360 − dh
+geneticDistance = dh / 180        # circular hue distance, 0..1
+cooldownScale   = 2.0 − 1.5 × geneticDistance</code></pre>
+<p>Boids with similar hues (distance ≈ 0) have 2× longer cooldowns — they bond slowly. Hue-distant boids (distance ≈ 1) have 0.5× cooldowns — they bond up to 4× faster. This continues to favour outbreeding.</p>
+
+<h3>Inbreeding depression</h3>
+<p>As diversity falls, two independent fitness penalties activate:</p>
+<pre><code>t = 1 − clamp((diversity − 0.05) / (0.3 − 0.05), 0, 1)</code></pre>
+<ul>
+  <li><strong>Mortality penalty</strong> (<code>inbreedingHazardMultiplier = 1 + t × 0.5</code>, up to 1.5×) — models general fitness reduction from inbreeding.</li>
+  <li><strong>Disease susceptibility penalty</strong> (<code>diversityFatalityMultiplier = 1 + t × 2.0</code>, up to 3×) — models HLA diversity collapse. With 10% base fatality, full convergence pushes effective fatality to 30%.</li>
+</ul>
+
+<h3>50/500 rule</h3>
+<p><strong>Effective breeders</strong> = fertile bonded M+F pairs × 2.</p>
+<pre><code>smallPopHazardMultiplier = 1 + (1 − min(effectiveBreeders, 50) / 50) × 0.2</code></pre>
+<p>The 50/500 rule from conservation biology: <strong>&lt; 50</strong> effective breeders = immediate viability risk; <strong>&lt; 500</strong> = long-term drift risk. At typical simulation scales (target 30), effective breeders are almost always below 50.</p>
+
+<!-- ───────────────────────────── IMMIGRATION ────────────────────────────── -->
+<h2 id="immigration">Immigration</h2>
+<p>When immigration is enabled, an immigrant boid may be spawned based on combined deficit pressure:</p>
+<pre><code>popDeficit     = max(1 − boids.length / TARGET_POP, 0)
+fertileDeficit = max(−smoothGlobalPressure, 0)
+pressure       = max(popDeficit, fertileDeficit)</code></pre>
+<p>Immigration also triggers on genetic deadlock: when no valid unrelated straight M+F fertile non-single pairs exist. The spawn interval shortens as pressure increases (minimum ~5 s at full crisis). Immigration is suppressed entirely when population exceeds 120% of target.</p>
+<p>Immigrants arrive with a fresh random colour and genome, at mid-fertile-age, assigned the sex most needed for balance. Never singles, always straight.</p>
+
+<!-- ───────────────────────────── DISEASE ────────────────────────────────── -->
+<h2 id="disease">Disease</h2>
+<p>A contagious disease can be introduced by pressing <strong>infect</strong>. In exported files, disease occurs automatically on a random 30–90 s timer (<code>AUTO_DISEASE</code>).</p>
+
+<h3>Transmission</h3>
+<p>Healthy boids accumulate exposure hits whenever they physically overlap with an infected boid. A per-pair cooldown (<code>DISEASE_COOLDOWN = 1.5 s</code>) prevents rapid accumulation from a single sustained contact. Once hits reach <code>DISEASE_THRESHOLD</code>, the boid becomes infected.</p>
+
+<h3>Fatality</h3>
+<p>Each frame while diseased, a boid faces an additional death roll independent of the Gompertz hazard:</p>
+<pre><code>effFatality = min(0.9999, DISEASE_FATALITY × diversityFatalityMultiplier)
+h_disease   = −ln(1 − effFatality) / DISEASE_DURATION
+P(die from disease this frame) = h_disease × dt</code></pre>
+<p>Deaths are spread naturally across the illness period. <code>effFatality</code> rises up to 3× base with diversity loss.</p>
+
+<h3>Recovery, immunity and R-factor</h3>
+<p>Infected boids that survive the full <code>DISEASE_DURATION</code> recover and become permanently immune. The <strong>R-factor</strong> is the rolling mean of <code>infectCount</code> over the last 30 recovered or deceased infected boids.</p>
+
+<!-- ───────────────────────────── TRAILS ─────────────────────────────────── -->
+<h2 id="trails">Motion Trails</h2>
+<p>Every boid stores a fixed-length ring buffer of past positions (<code>trail[]</code>). Trails are rendered in <strong>two passes</strong> before boids are drawn, where <code>t = i / (n−1)</code> is the normalised position along the trail (0 = oldest, 1 = newest):</p>
+<table>
+<thead><tr><th>Pass</th><th>Alpha formula</th><th>Width formula</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>Outer glow</td><td><code>t^0.6 × 0.28 × TRAIL_OPACITY</code></td><td><code>t × 18 + 1 px</code></td><td>Soft wide halo</td></tr>
+<tr><td>Core line</td><td><code>t^0.5 × 0.85 × TRAIL_OPACITY</code></td><td><code>t × 3.5 + 0.4 px</code></td><td>Bright narrow centre</td></tr>
+</tbody>
+</table>
+<p>Dying boids shed one trail position per frame (instead of appending) so the trail dissolves during the 2 s fade. Predators use the same two-pass render with a white stroke colour.</p>
+
+<!-- ───────────────────────────── BIRTH RINGS ────────────────────────────── -->
+<h2 id="birthrings">Birth Rings</h2>
+<p>When a child is born, a <code>birthRing</code> entry is added at the midpoint between the parents. Three concentric expanding elements fade over the ring's lifetime:</p>
+<table>
+<thead><tr><th>Element</th><th>Max radius</th><th>Colour</th></tr></thead>
+<tbody>
+<tr><td>Outer bloom</td><td>150 px</td><td>Boid colour, alpha ∝ (1−t)</td></tr>
+<tr><td>Middle ring</td><td>80 px</td><td>White, stroked</td></tr>
+<tr><td>Central flash</td><td>28 px</td><td>White fill, only first 25% of lifetime</td></tr>
+</tbody>
+</table>
+
+<!-- ───────────────────────────── DEATH SPLASHES ─────────────────────────── -->
+<h2 id="deathsplash">Death Splashes</h2>
+<p>When a predator eats a boid, a <code>deathSplash</code> is spawned at the boid's position, rendering over ~0.85 s:</p>
+<table>
+<thead><tr><th>Element</th><th>Max radius</th><th>Colour</th></tr></thead>
+<tbody>
+<tr><td>Outer ring</td><td>110 px</td><td>Dark red, stroked, fades out</td></tr>
+<tr><td>Second ring</td><td>70 px</td><td>Red-orange, stroked, fades out</td></tr>
+<tr><td>Inner flash</td><td>42 px</td><td>Orange fill, only first 40% of lifetime</td></tr>
+<tr><td>20 particles</td><td>40–140 px travel</td><td>Dark red drops flying outward</td></tr>
+</tbody>
+</table>
+
+<!-- ───────────────────────────── MORPH GENETICS ─────────────────────────── -->
+<h2 id="morph">Morphological Genetics</h2>
+<p>Both <code>beakGene</code> and <code>eyeGene</code> are <strong>8-bit integers</strong> (0–255). They are heritable, blended at birth, and mutated via bit-flip:</p>
+<pre><code>childGene = mutateGene( round( (parentA.gene + parentB.gene) / 2 ) )
+
+# With probability MUTATION_RATE, one random bit is flipped:
+childGene = parentGene XOR (1 &lt;&lt; randomBit)   [masked to 8 bits]</code></pre>
+<p>Low bits produce tiny phenotypic shifts; flipping bit 7 (MSB) produces a dramatic jump of ±128 gene units.</p>
+
+<h3>Beak gene (males only expressed, carried by all)</h3>
+<table>
+<thead><tr><th>Gene</th><th>Multiplier</th><th>Range</th></tr></thead>
+<tbody>
+<tr><td>0</td><td><code>0.20</code></td><td>very short</td></tr>
+<tr><td>73</td><td><code>≈ 1.00</code></td><td>default</td></tr>
+<tr><td>255</td><td><code>3.00</code></td><td>very long</td></tr>
+</tbody>
+</table>
+<p>Horn length = <code>RADIUS × 2.2 × beakMultiplier</code>. Females carry the gene silently.</p>
+
+<h3>Eye gene (expressed by both sexes)</h3>
+<table>
+<thead><tr><th>Gene</th><th>Eye radius formula</th><th>Range</th></tr></thead>
+<tbody>
+<tr><td>0</td><td><code>r × 0.10</code></td><td>tiny dot</td></tr>
+<tr><td>64</td><td><code>r × ≈ 0.24</code></td><td>default</td></tr>
+<tr><td>255</td><td><code>r × 0.65</code></td><td>large</td></tr>
+</tbody>
+</table>
+<p>Eye spread (lateral offset from body centre) also scales with eye radius to prevent overlap at large sizes.</p>
+
+<!-- ───────────────────────────── COLOUR MUTATION ────────────────────────── -->
+<h2 id="colormut">Colour Representation &amp; Mutation</h2>
+<p>Each boid stores colour as <code>{hue: 0–360, sat: 0–1}</code> and is rendered as <code>hsl(hue, sat×100%, 50%)</code>. Lightness is fixed at 50% so all boids are equally vivid regardless of hue. sRGB is used throughout (Canvas 2D default).</p>
+
+<h3>Colour families</h3>
+<p>Hue maps to five named families used by the cycle system and predator preference:</p>
+<table>
+<thead><tr><th>Family</th><th>Hue range</th></tr></thead>
+<tbody>
+<tr><td>red</td><td>0–30° and 330–360°</td></tr>
+<tr><td>yellow</td><td>30–90°</td></tr>
+<tr><td>green</td><td>90–150°</td></tr>
+<tr><td>blue</td><td>150–270°</td></tr>
+<tr><td>magenta</td><td>270–330°</td></tr>
+</tbody>
+</table>
+<p>Boids with <code>sat &lt; 0.15</code> are treated as colourless (gray) and count as wrong-family for all selection pressures.</p>
+
+<h3>Mutation</h3>
+<p>With probability <code>MUTATION_RATE</code>, a small random jitter is applied to the child's hue and saturation after inheritance:</p>
+<pre><code>childHue = (hue + uniform(−15°, +15°) + 360) % 360
+childSat = clamp(sat + uniform(−0.1, +0.1), 0.2, 1.0)</code></pre>
+
+<!-- ───────────────────────────── COLOUR FAMILY CYCLE ────────────────────── -->
+<h2 id="colorpref">Colour Family Cycle</h2>
+<p>The simulation maintains a <strong>preferred colour family</strong> that the population is driven toward through three independent selection pressures. Once ≥ 90% of living boids belong to the preferred family for 5 consecutive seconds the target advances to the next family in the cycle:</p>
+<pre><code>red → yellow → green → blue → magenta → red → …</code></pre>
+<p>The current family, convergence percentage and countdown to advance are shown in the status panel.</p>
+
+<h3>Pressure 1 — bonding (family pull slider)</h3>
+<p>Each potential bonding hit is gated by a <code>matchScore</code> based on how many of the pair are in the preferred family:</p>
+<pre><code>matchScore = (aInFamily ? 0.5 : 0) + (bInFamily ? 0.5 : 0)   # 0, 0.5, or 1
+hitProb    = 1 − (1 − matchScore) × FAMILY_PULL × 0.85
+if random() &gt; hitProb: skip this hit</code></pre>
+<table>
+<thead><tr><th>Situation</th><th>matchScore</th><th>hitProb at 60% pull</th></tr></thead>
+<tbody>
+<tr><td>Both in preferred family</td><td>1.0</td><td>100%</td></tr>
+<tr><td>One in preferred family</td><td>0.5</td><td>~75%</td></tr>
+<tr><td>Neither in preferred family</td><td>0.0</td><td>~49%</td></tr>
+</tbody>
+</table>
+<p>At 0% pull there is no preference. At 100% pull wrong-family pairs have only a 15% hit chance, bonding roughly 7× slower than preferred-family pairs.</p>
+
+<h3>Pressure 2 — predator preference</h3>
+<p>Predators preferentially hunt and eat boids that do <em>not</em> belong to the preferred family. When <code>veryHungry</code> (no meal for 2× <code>FULL_DURATION</code>) they eat any boid regardless of family. See <em>Predators</em> below.</p>
+
+<h3>Pressure 3 — biased inheritance</h3>
+<p>Every birth nudges the child's hue toward the preferred family's representative hue, regardless of parent colours:</p>
+<pre><code>function mixHue(h1, h2):
+    d = h2 − h1
+    if |d| &gt; 180: d -= sign(d) × 360
+    return (h1 + d × 0.5 + 360) % 360
+
+function biasedHue(h1, h2, preferredHue):
+    child = mixHue(h1, h2)
+    d = preferredHue − child
+    if |d| &gt; 180: d -= sign(d) × 360
+    return (child + 0.3 × d + 360) % 360</code></pre>
+<p>The factor <strong>0.3</strong> is the evolutionary pressure constant — every child moves 30% of the remaining hue distance toward the target. When at least one parent is already in the preferred family, a stronger <strong>dominant inheritance</strong> rule applies: the child's hue is snapped directly into the preferred family, using the preferred parent's hue with a small ±10° jitter.</p>
+
+<!-- ───────────────────────────── PREDATORS ──────────────────────────────── -->
+<h2 id="predators">Predators</h2>
+<p>Predators are autonomous agents separate from the boid population. They do not flock, do not age, and do not breed.</p>
+
+<h3>Appearance</h3>
+<ul>
+  <li><strong>Body</strong> — filled half-circle (flat/open side faces forward, curved side faces backward), white</li>
+  <li><strong>Tail</strong> — same tapered shape as a male boid horn, pointing backward, white</li>
+  <li><strong>Eyes</strong> — two circles at the diameter endpoints (jaw tips); colour transitions from yellow (full) → orange → red (very hungry); pulse with a <code>shadowBlur</code> glow when hungry</li>
+  <li><strong>Glow</strong> — soft white radial halo; brighter when hungry</li>
+  <li><strong>Back dot</strong> — small filled circle on the rear of the body, coloured in the current protected family's CSS colour; indicates which colour family the predator will not eat</li>
+</ul>
+
+<h3>Movement</h3>
+<p>Speed = <code>SPEED × 1.2</code> (20% faster than boids at the same speed setting).</p>
+<p><strong>When hungry</strong> (time since last meal &gt; <code>FULL_DURATION</code>):</p>
+<ol>
+  <li>Scan all living boids within <code>PREDATOR_SENSE = 200 px</code></li>
+  <li>Target the nearest boid that does <em>not</em> belong to the current protected colour family; if none found within range, wander</li>
+  <li>If <code>veryHungry</code> (&gt; 2× <code>FULL_DURATION</code> without a meal), target any boid regardless of family</li>
+  <li>Steer toward target with a soft turn (<code>vx += (desired − vx) × 0.08</code>)</li>
+</ol>
+<p><strong>When full</strong>: wander at 60% speed with slow random heading changes. Wall behaviour: soft steering away from walls + hard velocity bounce. Predators do <strong>not</strong> wrap around.</p>
+
+<h3>Colour families and eating</h3>
+<p>Boid hues are partitioned into five named families. A boid counts as belonging to a family only if its saturation ≥ 0.15 (non-grey).</p>
+<table>
+<thead><tr><th>Family</th><th>Hue range</th><th>CSS colour</th></tr></thead>
+<tbody>
+<tr><td>red</td><td>330°–30°</td><td><code>#ff4444</code></td></tr>
+<tr><td>yellow</td><td>30°–90°</td><td><code>#ffd32a</code></td></tr>
+<tr><td>green</td><td>90°–150°</td><td><code>#0be881</code></td></tr>
+<tr><td>blue</td><td>150°–270°</td><td><code>#54a0ff</code></td></tr>
+<tr><td>magenta</td><td>270°–330°</td><td><code>#d980fa</code></td></tr>
+</tbody>
+</table>
+<p>A single global <code>preferredFamily</code> is active at any moment — this is the family predators will <strong>not</strong> eat. All predators share the same protected family.</p>
+<table>
+<thead><tr><th>Predator state</th><th>Boid not in preferred family</th><th>Boid in preferred family</th></tr></thead>
+<tbody>
+<tr><td>Hungry</td><td>Eats</td><td>Ignores (unless veryHungry)</td></tr>
+<tr><td>Very hungry (2×)</td><td>Eats</td><td>Eats</td></tr>
+<tr><td>Full</td><td>Ignores</td><td>Ignores</td></tr>
+</tbody>
+</table>
+<p>Eating kills the boid immediately, spawns a <strong>death splash</strong>, and resets the predator's <code>lastEaten</code> timer.</p>
+
+<h3>Starvation</h3>
+<p>If there are no living boids at all, the predator's <code>noPreyTimer</code> increments. After <code>STARVATION_TIME = 45 s</code> of zero available prey, the predator dies and is removed.</p>
+
+<h3>Count management</h3>
+<p>The <strong>predators</strong> slider (0–5) is reactive: increasing it spawns new predators immediately; decreasing it removes the excess. On simulation restart, predators are respawned according to the current slider value.</p>
+
+<!-- ───────────────────────────── EXPORT ─────────────────────────────────── -->
+<h2 id="export">Export</h2>
+<p>The <strong>⬇ export</strong> button generates a standalone <code>boids-aquarium.html</code> file:</p>
+<ol>
+  <li>All current slider positions are synced to their HTML attributes before capture</li>
+  <li><code>document.documentElement.outerHTML</code> is captured (preserving all current values)</li>
+  <li>A <code>&lt;style&gt;</code> block is injected at the top of <code>&lt;head&gt;</code> to hide <code>#ui</code> immediately — no rendering flash</li>
+  <li>The canvas is repositioned as <code>position:fixed</code> filling the full window</li>
+  <li>A boot script is injected before <code>&lt;/body&gt;</code> that overrides <code>resize()</code> to use <code>window.innerWidth / innerHeight</code>, sets <code>AUTO_DISEASE = true</code>, and calls <code>startSim()</code></li>
+</ol>
+
+<h3>Auto-disease</h3>
+<p>In the exported file, <code>AUTO_DISEASE = true</code> activates an automatic outbreak timer:</p>
+<pre><code>_autoDisTimer -= dt
+if _autoDisTimer &lt;= 0:
+    _autoDisTimer = random(30, 90)   # seconds
+    infect one random healthy boid</code></pre>
+
+<!-- ───────────────────────────── PERFORMANCE ────────────────────────────── -->
+<h2 id="performance">Performance</h2>
+<p>The frame loop is capped at <strong>30 fps</strong>:</p>
+<pre><code>const FRAME_MIN_MS = 1000 / 30;
+if (lastTime !== null &amp;&amp; ts - lastTime &lt; FRAME_MIN_MS) {
+    requestAnimationFrame(loop); return;
+}</code></pre>
+<p><code>dt</code> is computed from actual elapsed time so simulation speed is framerate-independent.</p>
+<table>
+<thead><tr><th>Control</th><th>Effect on cost</th></tr></thead>
+<tbody>
+<tr><td>Boid count</td><td>O(N²) collision detection + O(N × MAX_TRAIL) draw calls</td></tr>
+<tr><td>Trail length</td><td>Directly proportional to draw calls per frame</td></tr>
+<tr><td>Trail opacity 0%</td><td>Trail draw loop is still executed (no early-out)</td></tr>
+<tr><td>Predator count</td><td>Minor; each predator adds one O(N) scan per frame</td></tr>
+</tbody>
+</table>
+
+<!-- ───────────────────────────── CONTROLS ───────────────────────────────── -->
+<h2 id="controls">User Controls</h2>
+<table>
+<thead><tr><th>Slider</th><th>Range</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>Target population</td><td>2–100</td><td>30</td><td>Equilibrium point for all feedback arms</td></tr>
+<tr><td>Bond after</td><td>1–20 hits</td><td>1</td><td>Collisions required to form a bond</td></tr>
+<tr><td>Base lifespan</td><td>5–80 s</td><td>80 s</td><td>Lifespan at target population</td></tr>
+<tr><td>Pregnancy interval</td><td>1–20 s</td><td>1 s</td><td>Minimum time between births</td></tr>
+<tr><td>Family size</td><td>0–6</td><td>4.0</td><td>Mean children per pair</td></tr>
+<tr><td>Divorce rate</td><td>0–50%</td><td>5%</td><td>Per-second probability a pair splits</td></tr>
+<tr><td>Speed</td><td>1–10</td><td>7</td><td>Wander speed (mapped to 0.45–4.5 px/frame)</td></tr>
+<tr><td>Singles</td><td>0–80%</td><td>20%</td><td>Fraction of boids born unable to bond</td></tr>
+<tr><td>Gay %</td><td>0–50%</td><td>10%</td><td>Fraction of non-single boids that are gay</td></tr>
+<tr><td>Infect. hits</td><td>1–10</td><td>1</td><td>Exposure hits to catch disease</td></tr>
+<tr><td>Infect. dur.</td><td>5–60 s</td><td>10 s</td><td>How long a boid stays infectious</td></tr>
+<tr><td>Fatality %</td><td>0–80%</td><td>10%</td><td>Base case fatality rate (rises with diversity loss, up to 3×)</td></tr>
+<tr><td>Mutation %</td><td>0–50%</td><td>50%</td><td>Per-birth probability of one bit-flip in colour, beak, or eye</td></tr>
+<tr><td>Family pull</td><td>0–100%</td><td>60%</td><td>Assortative mating strength toward the current preferred colour family; 0% = no preference, 100% = wrong-family pairs bond ~7× slower</td></tr>
+<tr><td>Predators</td><td>0–5</td><td>0</td><td>Number of active predators (reactive — changes take effect live)</td></tr>
+<tr><td>Full for (s)</td><td>1–30 s</td><td>10 s</td><td>Time a predator won't eat after a meal</td></tr>
+<tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales both glow and core trail alpha</td></tr>
+<tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
+</tbody>
+</table>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>.</p>
+
+<!-- ───────────────────────────── VISUAL KEY ─────────────────────────────── -->
+<h2 id="visualkey">Visual Key</h2>
+<table>
+<thead><tr><th>Visual element</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Circle body (female)</td><td>Female boid; colour encodes genetic lineage</td></tr>
+<tr><td>Circle body + forward horn (male)</td><td>Male boid; horn length encodes beakGene</td></tr>
+<tr><td>Two dark eyes (both sexes)</td><td>Eye size encodes eyeGene; same gene inherited by both sexes</td></tr>
+<tr><td>Small body (0.7× size)</td><td>Single boid — will never bond</td></tr>
+<tr><td>Gold glow around body</td><td>Bonded boid</td></tr>
+<tr><td>Dimmed opacity (55%)</td><td>Outside fertile window (juvenile or post-reproductive)</td></tr>
+<tr><td>White spot (centre)</td><td>Diseased boid — currently infectious</td></tr>
+<tr><td>Coloured trail behind boid</td><td>Motion history; length = MAX_TRAIL frames; colour matches boid</td></tr>
+<tr><td>White trail</td><td>Predator motion history</td></tr>
+<tr><td>Expanding rings at birth</td><td>Birth ring event at spawn point</td></tr>
+<tr><td>Red expanding rings + particles</td><td>Death splash — boid eaten by predator</td></tr>
+<tr><td>Gold arc (partial)</td><td>Hit progress toward bonding threshold</td></tr>
+<tr><td>Gradient line (amber)</td><td>Bond between fertile straight M+F partners</td></tr>
+<tr><td>Gradient line (colour)</td><td>Bond — partners not forming a fertile pair</td></tr>
+<tr><td>Bright red bond line (2 s)</td><td>Flash at moment of child birth</td></tr>
+<tr><td>White half-circle body + tail</td><td>Predator (full = dark glow; hungry = bright glow + pulsing eyes)</td></tr>
+<tr><td>Yellow→red pulsing eyes</td><td>Predator hunger level: yellow = full, orange = hungry, red = very hungry</td></tr>
+<tr><td>Coloured dot on predator back</td><td>Protected colour family — predators will not eat boids of this colour (unless very hungry)</td></tr>
+<tr><td>Density bar</td><td>Real-time combined pressure (Arm 1)</td></tr>
+<tr><td>Lifespan bar</td><td>Real-time effective lifespan (Arm 2)</td></tr>
+<tr><td>pairs X:Y readout</td><td>Total bonded pairs : fertile bonded M+F pairs</td></tr>
+<tr><td>sick / R readout</td><td>Current infected count and rolling R-factor</td></tr>
+<tr><td>dis.deaths readout</td><td>Disease fatalities in the last 30 s of simulation time</td></tr>
+<tr><td>eff.br. readout</td><td>Effective breeders (fertile bonded M+F × 2); red when &lt; 50</td></tr>
+<tr><td>50-rule readout</td><td>critical (&lt; 50) / at risk (&lt; 500) / ok (≥ 500)</td></tr>
+<tr><td>inbreeding warning</td><td>Appears when diversity &lt; 0.3; shows hazard multiplier and modal age reduction</td></tr>
+<tr><td>fatality → N% label</td><td>Appears when effective fatality diverges from base due to low diversity</td></tr>
+</tbody>
+</table>
+
+</div>
+</body>
+</html>
