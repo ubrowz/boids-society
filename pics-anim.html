@@ -107,6 +107,10 @@ cursor:pointer; border:2px solid #fff;
 #fullDurSlider::-webkit-slider-thumb { background:#884400; box-shadow:0 0 8px rgba(136,68,0,0.8); }
 #fullDurSlider::-moz-range-thumb { background:#884400; }
 #fullDurVal { color:#000; }
+#predatorDietSlider { background:linear-gradient(to right,#0a0500,#ff7f00); }
+#predatorDietSlider::-webkit-slider-thumb { background:#ff7f00; box-shadow:0 0 8px rgba(255,127,0,0.8); }
+#predatorDietSlider::-moz-range-thumb { background:#ff7f00; }
+#predatorDietVal { color:#000; }
 #trailOpacitySlider { background:linear-gradient(to right,#0a0a1a,#00d2d3); }
 #trailOpacitySlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
 #trailOpacitySlider::-moz-range-thumb { background:#00d2d3; }
@@ -240,6 +244,11 @@ display:flex; align-items:center; justify-content:center;
 <label>full for (s)</label>
 <input type="range" id="fullDurSlider" min="1" max="30" value="10" step="1">
 <span class="ctrl-val" id="fullDurVal">10 s</span>
+</div>
+<div class="ctrl-row">
+<label>prey</label>
+<input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
+<span class="ctrl-val" id="predatorDietVal">other</span>
 </div>
 <div class="ctrl-row">
 <label>trail opacity</label>
@@ -410,6 +419,7 @@ wire('mutationSlider',     'mutationVal',      v=>parseInt(v),   v=>v+'%',  v=>{
 wire('familyPullSlider',   'familyPullVal',    v=>parseInt(v),   v=>v+'%',  v=>{ FAMILY_PULL=v/100; });
 wire('predatorSlider',     'predatorVal',      v=>parseInt(v),   v=>v,       v=>{ syncPredatorCount(v); });
 wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>{ FULL_DURATION=v; });
+wire('predatorDietSlider', 'predatorDietVal',  v=>parseInt(v),   v=>['','any','favored','other'][v], v=>{ PREDATOR_DIET=v; });
 wire('trailOpacitySlider', 'trailOpacityVal',  v=>parseInt(v),   v=>v+'%',  v=>{ TRAIL_OPACITY=v/100; });
 wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
 
@@ -458,6 +468,7 @@ let MUTATION_RATE    = parseInt(document.getElementById('mutationSlider').value)
 let FAMILY_PULL      = parseInt(document.getElementById('familyPullSlider').value)  / 100;
 let N_PREDATORS      = parseInt(document.getElementById('predatorSlider').value);
 let FULL_DURATION    = parseInt(document.getElementById('fullDurSlider').value);
+let PREDATOR_DIET    = parseInt(document.getElementById('predatorDietSlider').value);
 let AUTO_DISEASE     = false;
 let _autoDisTimer    = 30 + Math.random()*60;
 const PREDATOR_RADIUS   = 15;
@@ -1136,7 +1147,7 @@ for(const b of aliveBoids){
 const dx=b.x-pred.x, dy=b.y-pred.y;
 const dist=Math.sqrt(dx*dx+dy*dy);
 if(dist>PREDATOR_SENSE) continue; // out of sensing range — wander instead
-const edible=!boidInPreferredFamily(b)||veryHungry;
+const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
 if(edible && dist<bestDist){ bestDist=dist; target=b; }
 }
 if(target){
@@ -1173,9 +1184,9 @@ if(isHungry){
 for(const b of aliveBoids){
 const dx=b.x-pred.x, dy=b.y-pred.y;
 if(Math.sqrt(dx*dx+dy*dy)<PREDATOR_RADIUS+RADIUS){
-const wrongFamily=!boidInPreferredFamily(b);
 const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
-if(wrongFamily||veryHungry){
+const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
+if(edible){
 // eat it
 b.alive=false;
 spawnDeathSplash(b.x,b.y);
