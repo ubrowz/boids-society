@@ -165,7 +165,7 @@ display:flex; align-items:center; justify-content:center;
 <div id="controls">
 <div class="ctrl-row">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="200" value="30">
+<input type="range" id="targetSlider" min="2" max="100" value="30">
 <span class="ctrl-val" id="targetVal">30</span>
 </div>
 <div class="ctrl-row">
@@ -444,13 +444,13 @@ let preferredFamilyIdx = 0;
 let preferredFamily    = COLOR_FAMILY_CYCLE[0];
 let familyConvergedTimer = 0;
 const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
-const RADIUS = 10;
+const RADIUS = 20;
 let MAX_TRAIL = 30;
 let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
 const TURN_SPEED = 0.07;
 const WANDER_STR = 0.12;
-const WALL_MARGIN = 40;
-const BOND_DIST = 45;
+const WALL_MARGIN = 80;
+const BOND_DIST = 90;
 const BOND_STRENGTH = 3.0;
 const COOLDOWN_FRAMES = 30;
 const FADE_DURATION = 2.0;
@@ -471,7 +471,7 @@ let FULL_DURATION    = parseInt(document.getElementById('fullDurSlider').value);
 let PREDATOR_DIET    = parseInt(document.getElementById('predatorDietSlider').value);
 let AUTO_DISEASE     = false;
 let _autoDisTimer    = 30 + Math.random()*60;
-const PREDATOR_RADIUS   = 15;
+const PREDATOR_RADIUS   = 30;
 const PREDATOR_SENSE    = 200; // sensing radius — only pursues boids within this range
 const STARVATION_TIME   = 45; // seconds hungry with no prey before dying
 let predators = [];
@@ -489,6 +489,41 @@ let _cachedEffectiveBreeders = 0;  // fertile bonded M+F pairs × 2; updated eac
 const diseaseCooldown = new Map(); // pairKey → expiry simClock time
 let rHistory = [];                 // infectCount of each recovered/dead diseased boid
 let diseaseDeathEvents = [];       // simClock timestamps of disease fatalities
+
+// ── boidMap + spatial grid (Pi perf) ─────────────────────────────────────────
+let boidMap = new Map(); // id → boid; rebuilt each frame
+let _sgGrid = null;
+let _sgCellSize = 1;
+
+function _buildSpatialGrid(){
+_sgCellSize = Math.max(SENSING_RADIUS, RADIUS * 2);
+_sgGrid = new Map();
+for(const b of boids){
+  if(!b.alive) continue;
+  const cx = Math.floor(b.x / _sgCellSize);
+  const cy = Math.floor(b.y / _sgCellSize);
+  const key = cx * 10000 + cy;
+  let cell = _sgGrid.get(key);
+  if(!cell){ cell=[]; _sgGrid.set(key, cell); }
+  cell.push(b);
+}
+}
+
+function _sgNeighbors(x, y, radius){
+const cs = _sgCellSize;
+const cx0 = Math.floor((x - radius) / cs);
+const cx1 = Math.floor((x + radius) / cs);
+const cy0 = Math.floor((y - radius) / cs);
+const cy1 = Math.floor((y + radius) / cs);
+const out = [];
+for(let cx = cx0; cx <= cx1; cx++){
+  for(let cy = cy0; cy <= cy1; cy++){
+    const cell = _sgGrid.get(cx * 10000 + cy);
+    if(cell) for(const b of cell) out.push(b);
+  }
+}
+return out;
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function gaussianRandom(mean, std){
@@ -591,11 +626,10 @@ while(alive.length > N_PREDATORS){ alive[alive.length-1].alive=false; alive.pop(
 function spawnDeathSplash(x,y){
 deathSplashes.push({
 x, y, age:0, duration:0.85,
-particles: Array.from({length:20},()=>({
-ang:Math.random()*Math.PI*2,
-spd:40+Math.random()*100,
-r:3+Math.random()*5
-}))
+particles: Array.from({length:12},()=>{
+const ang=Math.random()*Math.PI*2;
+return {cx:Math.cos(ang),cy:Math.sin(ang),spd:80+Math.random()*200,r:6+Math.random()*10};
+})
 });
 }
 
@@ -702,10 +736,11 @@ return 1 + t * 0.2;
 
 function computePressure(boid){
 let n=0;
-for(const o of boids){
+const _sr2=SENSING_RADIUS*SENSING_RADIUS;
+for(const o of _sgNeighbors(boid.x,boid.y,SENSING_RADIUS)){
 if(!o.alive||o===boid) continue;
 const dx=o.x-boid.x, dy=o.y-boid.y;
-if(dx*dx+dy*dy<SENSING_RADIUS*SENSING_RADIUS) n++;
+if(dx*dx+dy*dy<_sr2) n++;
 }
 boid.localPressure = Math.min(n / Math.max(TARGET_POP * 0.4, 1), 1);
 
@@ -754,10 +789,11 @@ const warmup = Math.min(simClock / WARMUP_DURATION, 1);
 const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
 
 let cx=0,cy=0,count=0;
-for(const o of boids){
+const _sr2b=SENSING_RADIUS*SENSING_RADIUS;
+for(const o of _sgNeighbors(boid.x,boid.y,SENSING_RADIUS)){
 if(!o.alive||o===boid) continue;
 const dx=o.x-boid.x, dy=o.y-boid.y;
-if(dx*dx+dy*dy<SENSING_RADIUS*SENSING_RADIUS){ cx+=o.x; cy+=o.y; count++; }
+if(dx*dx+dy*dy<_sr2b){ cx+=o.x; cy+=o.y; count++; }
 }
 if(count===0){
 // no local neighbours — steer weakly toward global centroid so isolated boids find the flock
@@ -777,7 +813,7 @@ steerToward(boid,2*boid.x-cx/count,2*boid.y-cy/count,-strength);
 
 function bondAttraction(boid){
 if(boid.partnerId===null) return;
-const partner=boids.find(b=>b.id===boid.partnerId);
+const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive) return;
 const dx=partner.x-boid.x, dy=partner.y-boid.y;
 const dist=Math.sqrt(dx*dx+dy*dy);
@@ -845,7 +881,7 @@ boid.alive=false;
 if(boid.diseased){ rHistory.push(boid.infectCount); if(rHistory.length>30) rHistory.shift(); }
 deathEvents.push(simClock);
 if(boid.partnerId!==null){
-const partner=boids.find(b=>b.id===boid.partnerId);
+const partner=boidMap.get(boid.partnerId);
 if(partner&&partner.alive){
 partner.partnerId=null;
 partner.breedTimer=PREG_INTERVAL*(0.5+Math.random());
@@ -867,7 +903,7 @@ function clearPairChildren(a,b) { pairChildren.delete(pairKey(a,b)); }
 
 function updateBreeding(boid,dt){
 if(!boid.alive||boid.dying||boid.partnerId===null) return;
-const partner=boids.find(b=>b.id===boid.partnerId);
+const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive||boid.id>partner.id) return;
 if(boid.sex===partner.sex) return;
 if(!isFertile(boid)||!isFertile(partner)) return;
@@ -924,14 +960,15 @@ return dh/180; // 0..1, circular hue distance
 
 // ── collision & bonding ───────────────────────────────────────────────────────
 function updateCollisions(){
-const alive=boids.filter(b=>b.alive&&!b.dying);
-for(let i=0;i<alive.length;i++){
-for(let j=i+1;j<alive.length;j++){
-const a=alive[i],b=alive[j];
+const r2=RADIUS*2*RADIUS*2;
+for(const a of boids){
+if(!a.alive||a.dying) continue;
+for(const b of _sgNeighbors(a.x,a.y,RADIUS*2)){
+if(b.id<=a.id||!b.alive||b.dying) continue;
 const c=getCool(a.id,b.id);
 if(c>0){setCool(a.id,b.id,c-1);continue;}
 const dx=b.x-a.x,dy=b.y-a.y;
-if(Math.sqrt(dx*dx+dy*dy)<RADIUS*2){
+if(dx*dx+dy*dy>=r2) continue;
 if(a.partnerId!==null||b.partnerId!==null) continue;
 if(a.isSingle||b.isSingle) continue;
 if(a.isGay!==b.isGay) continue; // gay only bonds with gay, straight with straight
@@ -962,7 +999,6 @@ b.pairFamilyTarget = target;
 }
 }
 }
-}
 
 // ── divorce ───────────────────────────────────────────────────────────────────
 function updateDivorce(dt){
@@ -970,7 +1006,7 @@ if(DIVORCE_RATE===0) return;
 const seen=new Set();
 for(const boid of boids){
 if(!boid.alive||boid.dying||boid.partnerId===null||seen.has(boid.id)) continue;
-const partner=boids.find(b=>b.id===boid.partnerId);
+const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive) continue;
 seen.add(boid.id); seen.add(partner.id);
 if(Math.random() < DIVORCE_RATE * dt){
@@ -1029,17 +1065,18 @@ if(rHistory.length>30) rHistory.shift();
 
 function updateDiseaseCollisions(){
 // collision-based transmission (physical overlap required)
-const alive=boids.filter(b=>b.alive&&!b.dying);
-for(let i=0;i<alive.length;i++){
-for(let j=i+1;j<alive.length;j++){
-const a=alive[i],b=alive[j];
+const r2=RADIUS*2*RADIUS*2;
+for(const a of boids){
+if(!a.alive||a.dying) continue;
+for(const b of _sgNeighbors(a.x,a.y,RADIUS*2)){
+if(b.id<=a.id||!b.alive||b.dying) continue;
 const aD=a.diseased, bD=b.diseased;
 if(!aD&&!bD) continue;
 if(aD&&bD) continue;
 const infected=aD?a:b, healthy=aD?b:a;
-if(healthy.immune||healthy.diseased) continue;
+if(healthy.immune) continue;
 const dx=b.x-a.x, dy=b.y-a.y;
-if(dx*dx+dy*dy>=RADIUS*2*RADIUS*2) continue;
+if(dx*dx+dy*dy>=r2) continue;
 const k=pairKey(infected.id,healthy.id);
 if((diseaseCooldown.get(k)||0)>simClock) continue;
 diseaseCooldown.set(k,simClock+DISEASE_COOLDOWN);
@@ -1050,7 +1087,7 @@ if(healthy.diseaseHits>=DISEASE_THRESHOLD){ infectBoid(healthy); infected.infect
 // bonded-partner transmission (slow trickle — no overlap required)
 for(const boid of boids){
 if(!boid.alive||boid.dying||!boid.diseased||boid.partnerId===null) continue;
-const partner=boids.find(b=>b.id===boid.partnerId);
+const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive||partner.dying||partner.immune||partner.diseased) continue;
 const k='b'+pairKey(boid.id,partner.id);
 if((diseaseCooldown.get(k)||0)>simClock) continue;
@@ -1144,10 +1181,11 @@ pred.wanderAngle=Math.atan2(pred.vy,pred.vx);
 // target seeking or wander
 if(isHungry && aliveBoids.length>0){
 let target=null, bestDist=Infinity;
-for(const b of aliveBoids){
+for(const b of _sgNeighbors(pred.x,pred.y,PREDATOR_SENSE)){
+if(b.dying) continue;
 const dx=b.x-pred.x, dy=b.y-pred.y;
 const dist=Math.sqrt(dx*dx+dy*dy);
-if(dist>PREDATOR_SENSE) continue; // out of sensing range — wander instead
+if(dist>PREDATOR_SENSE) continue;
 const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
 if(edible && dist<bestDist){ bestDist=dist; target=b; }
 }
@@ -1182,9 +1220,11 @@ pred.trail.push({x:pred.x,y:pred.y});
 if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
 // eating collision
 if(isHungry){
-for(const b of aliveBoids){
+const eatR=(PREDATOR_RADIUS+RADIUS)/2, eatR2=eatR*eatR;
+for(const b of _sgNeighbors(pred.x,pred.y,eatR)){
+if(b.dying) continue;
 const dx=b.x-pred.x, dy=b.y-pred.y;
-if(Math.sqrt(dx*dx+dy*dy)<PREDATOR_RADIUS+RADIUS){
+if(dx*dx+dy*dy<eatR2){
 const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
 const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
 if(edible){
@@ -1217,13 +1257,13 @@ const n=pred.trail.length;
 for(let i=1;i<n;i++){
 const t=Math.pow(i/(n-1),0.6);
 ctx.globalAlpha=t*0.28*TRAIL_OPACITY;
-ctx.lineWidth=t*18+1; ctx.strokeStyle='#ffffff'; ctx.lineCap='round';
+ctx.lineWidth=t*36+2; ctx.strokeStyle='#ffffff'; ctx.lineCap='round';
 ctx.beginPath(); ctx.moveTo(pred.trail[i-1].x,pred.trail[i-1].y); ctx.lineTo(pred.trail[i].x,pred.trail[i].y); ctx.stroke();
 }
 for(let i=1;i<n;i++){
 const t=Math.pow(i/(n-1),0.5);
 ctx.globalAlpha=t*0.85*TRAIL_OPACITY;
-ctx.lineWidth=t*3.5+0.4; ctx.strokeStyle='#ffffff';
+ctx.lineWidth=t*7+0.8; ctx.strokeStyle='#ffffff';
 ctx.beginPath(); ctx.moveTo(pred.trail[i-1].x,pred.trail[i-1].y); ctx.lineTo(pred.trail[i].x,pred.trail[i].y); ctx.stroke();
 }
 ctx.globalAlpha=1;
@@ -1236,33 +1276,47 @@ grd.addColorStop(1,'rgba(255,255,255,0)');
 ctx.beginPath(); ctx.arc(pred.x,pred.y,r*3,0,Math.PI*2);
 ctx.fillStyle=grd; ctx.fill();
 
-// tail (pointing backward, mirrored boid horn)
-const tailLen=r*2.2, baseW=r*0.42;
+// tail — same bezier shape as boid horn but pointing backward, fades to transparent
+const tailLen=r*1.4, baseW=r*0.38;
 const tbx=pred.x-cos*r*0.65, tby=pred.y-sin*r*0.65;
 const ttx=pred.x-cos*(r+tailLen), tty=pred.y-sin*(r+tailLen);
 const cpx=pred.x-cos*(r+tailLen*0.5), cpy=pred.y-sin*(r+tailLen*0.5);
+const tailGrd=ctx.createLinearGradient(tbx,tby,ttx,tty);
+tailGrd.addColorStop(0,'rgba(255,255,255,0.85)');
+tailGrd.addColorStop(1,'rgba(255,255,255,0)');
 ctx.beginPath();
 ctx.moveTo(tbx+px*baseW, tby+py*baseW);
 ctx.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
 ctx.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
 ctx.closePath();
-ctx.fillStyle='white'; ctx.fill();
+ctx.fillStyle=tailGrd; ctx.fill();
 
-// body: filled half-circle, curved part backward, flat (open) side forward
+// body: manta ray — cubic bezier leading edges, barely-concave trailing edge
+const noseX=pred.x+cos*r*1.0, noseY=pred.y+sin*r*1.0;
+const wlX=pred.x-cos*r*0.5+px*r*1.5, wlY=pred.y-sin*r*0.5+py*r*1.5;
+const wrX=pred.x-cos*r*0.5-px*r*1.5, wrY=pred.y-sin*r*0.5-py*r*1.5;
 ctx.beginPath();
-ctx.arc(pred.x,pred.y,r, ang+Math.PI/2, ang-Math.PI/2, false); // clockwise = back arc
-ctx.closePath(); // straight line closes the diameter at the front
-ctx.fillStyle='white'; ctx.fill();
+ctx.moveTo(noseX, noseY);
+ctx.bezierCurveTo(
+  pred.x+cos*r*0.6+px*r*0.7, pred.y+sin*r*0.6+py*r*0.7,
+  pred.x+cos*r*0.1+px*r*1.5, pred.y+sin*r*0.1+py*r*1.5,
+  wlX, wlY);
+ctx.quadraticCurveTo(pred.x-cos*r*0.15, pred.y-sin*r*0.15, wrX, wrY);
+ctx.bezierCurveTo(
+  pred.x+cos*r*0.1-px*r*1.5, pred.y+sin*r*0.1-py*r*1.5,
+  pred.x+cos*r*0.6-px*r*0.7, pred.y+sin*r*0.6-py*r*0.7,
+  noseX, noseY);
+ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.fill();
 
 // dot on back: color of the family this predator is not eating
 const dotCol = FAMILY_CSS[preferredFamily] || '#ffffff';
-const bx = pred.x - cos * r * 0.65, by = pred.y - sin * r * 0.65;
+const bx = pred.x - cos * r * 0.35, by = pred.y - sin * r * 0.35;
 ctx.beginPath(); ctx.arc(bx, by, r * 0.28, 0, Math.PI * 2);
 ctx.fillStyle = dotCol; ctx.fill();
 
-// eyes at the diameter endpoints (front corners of the half-circle)
-const e1x=pred.x+Math.cos(ang-Math.PI/2)*r, e1y=pred.y+Math.sin(ang-Math.PI/2)*r;
-const e2x=pred.x+Math.cos(ang+Math.PI/2)*r, e2y=pred.y+Math.sin(ang+Math.PI/2)*r;
+// eyes just behind the nose
+const e1x=pred.x+cos*r*0.55+px*r*0.3, e1y=pred.y+sin*r*0.55+py*r*0.3;
+const e2x=pred.x+cos*r*0.55-px*r*0.3, e2y=pred.y+sin*r*0.55-py*r*0.3;
 // yellow (full) → orange → red (very hungry), 0..1 over 2×FULL_DURATION
 const hungerRatio=Math.min((simClock-pred.lastEaten)/(FULL_DURATION*2),1);
 const eyeG=Math.round(200*(1-hungerRatio)+20*hungerRatio);
@@ -1286,24 +1340,25 @@ for(const s of deathSplashes){
 const t=s.age/s.duration;
 const alpha=1-t;
 // outer ring
-ctx.beginPath(); ctx.arc(s.x,s.y,t*110,0,Math.PI*2);
-ctx.strokeStyle=`rgba(210,0,0,${alpha*0.8})`; ctx.lineWidth=6*(1-t); ctx.stroke();
+ctx.beginPath(); ctx.arc(s.x,s.y,t*220,0,Math.PI*2);
+ctx.strokeStyle=`rgba(210,0,0,${alpha*0.8})`; ctx.lineWidth=12*(1-t); ctx.stroke();
 // second ring
-ctx.beginPath(); ctx.arc(s.x,s.y,t*70,0,Math.PI*2);
-ctx.strokeStyle=`rgba(255,40,0,${alpha*0.6})`; ctx.lineWidth=3*(1-t); ctx.stroke();
+ctx.beginPath(); ctx.arc(s.x,s.y,t*140,0,Math.PI*2);
+ctx.strokeStyle=`rgba(255,40,0,${alpha*0.6})`; ctx.lineWidth=6*(1-t); ctx.stroke();
 // inner flash
 if(t<0.4){
 const ft=t/0.4;
-ctx.beginPath(); ctx.arc(s.x,s.y,(1-ft)*42,0,Math.PI*2);
+ctx.beginPath(); ctx.arc(s.x,s.y,(1-ft)*84,0,Math.PI*2);
 ctx.fillStyle=`rgba(255,100,0,${(1-ft)*0.8})`; ctx.fill();
 }
-// blood particles
+// blood particles — batched into one fill
 ctx.fillStyle=`rgba(180,0,0,${alpha*0.9})`;
+ctx.beginPath();
 for(const p of s.particles){
-const bx=s.x+Math.cos(p.ang)*p.spd*t;
-const by=s.y+Math.sin(p.ang)*p.spd*t;
-ctx.beginPath(); ctx.arc(bx,by,p.r*(1-t*0.3),0,Math.PI*2); ctx.fill();
+const bx=s.x+p.cx*p.spd*t, by=s.y+p.cy*p.spd*t, r=p.r*(1-t*0.3);
+ctx.moveTo(bx+r,by); ctx.arc(bx,by,r,0,Math.PI*2);
 }
+ctx.fill();
 }
 ctx.restore();
 }
@@ -1320,7 +1375,7 @@ function drawBondLines(){
 const drawn=new Set();
 for(const boid of boids){
 if(!boid.alive||boid.partnerId===null) continue;
-const partner=boids.find(b=>b.id===boid.partnerId);
+const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive) continue;
 const key=Math.min(boid.id,partner.id)+'-'+Math.max(boid.id,partner.id);
 if(drawn.has(key)) continue; drawn.add(key);
@@ -1345,7 +1400,7 @@ grd.addColorStop(0.5,`rgba(255,255,255,${alpha*0.3})`);
 grd.addColorStop(1, boidColorAlpha(partner, alpha*0.8));
 }
 ctx.beginPath(); ctx.moveTo(boid.x,boid.y); ctx.lineTo(partner.x,partner.y);
-ctx.strokeStyle=grd; ctx.lineWidth=flashTime>0?4.5:fertile?3.5:1.5; ctx.stroke();
+ctx.strokeStyle=grd; ctx.lineWidth=flashTime>0?9:fertile?7:3; ctx.stroke();
 }
 }
 
@@ -1359,23 +1414,11 @@ if(boid.birthTimer>0) bAlpha=1-(boid.birthTimer/BIRTH_DURATION);
 if(boid.dying) bAlpha=1-(boid.fadeTimer/FADE_DURATION);
 bAlpha=Math.max(0,bAlpha);
 const n=boid.trail.length;
-// use a power curve so brightness extends further back along the trail
-// outer glow pass — wide, soft halo
-for(let i=1;i<n;i++){
-const t=Math.pow(i/(n-1), 0.6);
-ctx.globalAlpha=t*0.28*bAlpha*TRAIL_OPACITY;
-ctx.lineWidth=t*18+1;
-ctx.strokeStyle=boidColorStr(boid);
-ctx.beginPath();
-ctx.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
-ctx.lineTo(boid.trail[i].x,boid.trail[i].y);
-ctx.stroke();
-}
-// core pass — narrow, bright
+// core pass — narrow, bright (glow pass removed for Pi perf)
 for(let i=1;i<n;i++){
 const t=Math.pow(i/(n-1), 0.5);
 ctx.globalAlpha=t*0.85*bAlpha*TRAIL_OPACITY;
-ctx.lineWidth=t*3.5+0.4;
+ctx.lineWidth=t*7+0.8;
 ctx.strokeStyle=boidColorStr(boid);
 ctx.beginPath();
 ctx.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
@@ -1434,9 +1477,9 @@ if(h===0) continue;
 const progress=Math.min(h/BOND_THRESHOLD,1);
 [alive[i],alive[j]].forEach(boid=>{
 ctx.beginPath();
-ctx.arc(boid.x,boid.y,RADIUS+4,-Math.PI/2,-Math.PI/2+progress*Math.PI*2);
+ctx.arc(boid.x,boid.y,RADIUS+8,-Math.PI/2,-Math.PI/2+progress*Math.PI*2);
 ctx.strokeStyle=`rgba(255,211,42,${0.4+progress*0.5})`;
-ctx.lineWidth=2; ctx.stroke();
+ctx.lineWidth=4; ctx.stroke();
 });
 }
 }
@@ -1467,56 +1510,56 @@ grd.addColorStop(1,boidColorAlpha(boid,0));
 ctx.beginPath(); ctx.arc(boid.x,boid.y,RADIUS*2.8,0,Math.PI*2);
 ctx.fillStyle=grd; ctx.fill();
 
-if(boid.sex==='M'){
-const ang=Math.atan2(boid.vy,boid.vx);
-const cos=Math.cos(ang), sin=Math.sin(ang);
-const px=-sin, py=cos; // perpendicular
-const tailLen=r*2.2*beakMultiplier(boid.beakGene), baseW=r*0.38;
-const tbx=boid.x+cos*r*0.65, tby=boid.y+sin*r*0.65; // horn base (front)
-const ttx=boid.x+cos*(r+tailLen), tty=boid.y+sin*(r+tailLen); // horn tip (forward)
-const cpx=boid.x+cos*(r+tailLen*0.5), cpy=boid.y+sin*(r+tailLen*0.5); // ctrl pt
-ctx.beginPath();
-ctx.moveTo(tbx+px*baseW, tby+py*baseW);
-ctx.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
-ctx.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
-ctx.closePath();
-ctx.fillStyle=boidColorStr(boid); ctx.fill();
-ctx.beginPath(); ctx.arc(boid.x,boid.y,r,0,Math.PI*2);
-ctx.fillStyle=boidColorStr(boid); ctx.fill();
-const mer=eyeRadius(boid.eyeGene, r);
-const mspread=r*0.45+mer*0.5;
-const mfwd=r*0.55;
-const mlx=boid.x+cos*mfwd+px*mspread, mly=boid.y+sin*mfwd+py*mspread;
-const mrx=boid.x+cos*mfwd-px*mspread, mry=boid.y+sin*mfwd-py*mspread;
-ctx.fillStyle='rgba(0,0,0,0.75)';
-ctx.beginPath(); ctx.arc(mlx,mly,mer,0,Math.PI*2); ctx.fill();
-ctx.beginPath(); ctx.arc(mrx,mry,mer,0,Math.PI*2); ctx.fill();
-ctx.fillStyle='rgba(255,255,255,0.6)';
-ctx.beginPath(); ctx.arc(mlx-mer*0.28,mly-mer*0.28,mer*0.3,0,Math.PI*2); ctx.fill();
-ctx.beginPath(); ctx.arc(mrx-mer*0.28,mry-mer*0.28,mer*0.3,0,Math.PI*2); ctx.fill();
-} else {
-ctx.beginPath(); ctx.arc(boid.x,boid.y,r,0,Math.PI*2);
-ctx.fillStyle=boidColorStr(boid); ctx.fill();
+// teardrop body + beak — beakGene→beak length, eyeGene→eye size
 const ang=Math.atan2(boid.vy,boid.vx);
 const cos=Math.cos(ang), sin=Math.sin(ang);
 const px=-sin, py=cos;
-const er=eyeRadius(boid.eyeGene, r);
-const spread=r*0.45+er*0.5;
-const fwd=r*0.55;
-const lx=boid.x+cos*fwd+px*spread, ly=boid.y+sin*fwd+py*spread;
-const rx=boid.x+cos*fwd-px*spread, ry=boid.y+sin*fwd-py*spread;
-ctx.fillStyle='rgba(0,0,0,0.75)';
-ctx.beginPath(); ctx.arc(lx,ly,er,0,Math.PI*2); ctx.fill();
-ctx.beginPath(); ctx.arc(rx,ry,er,0,Math.PI*2); ctx.fill();
-// white highlight
-ctx.fillStyle='rgba(255,255,255,0.6)';
-ctx.beginPath(); ctx.arc(lx-er*0.28,ly-er*0.28,er*0.3,0,Math.PI*2); ctx.fill();
-ctx.beginPath(); ctx.arc(rx-er*0.28,ry-er*0.28,er*0.3,0,Math.PI*2); ctx.fill();
-}
+const tipx=boid.x-cos*r*1.6, tipy=boid.y-sin*r*1.6;
+const cpLx=boid.x-cos*r*0.35+px*r*0.75, cpLy=boid.y-sin*r*0.35+py*r*0.75;
+const cpRx=boid.x-cos*r*0.35-px*r*0.75, cpRy=boid.y-sin*r*0.35-py*r*0.75;
+ctx.beginPath();
+ctx.arc(boid.x,boid.y,r, ang+Math.PI/2, ang-Math.PI/2, true);
+ctx.quadraticCurveTo(cpRx, cpRy, tipx, tipy);
+ctx.quadraticCurveTo(cpLx, cpLy, boid.x+px*r, boid.y+py*r);
+ctx.fillStyle=boidColorStr(boid); ctx.fill();
+// beak: pointed horn from dome front, length driven by beakGene
+const beakLen=r*(0.3+boid.beakGene/255*0.6);
+const bkBx=boid.x+cos*r*0.88, bkBy=boid.y+sin*r*0.88;
+const bkTx=boid.x+cos*(r+beakLen), bkTy=boid.y+sin*(r+beakLen);
+const bkCpx=boid.x+cos*(r+beakLen*0.5), bkCpy=boid.y+sin*(r+beakLen*0.5);
+const bkW=r*0.2;
+ctx.beginPath();
+ctx.moveTo(bkBx+px*bkW, bkBy+py*bkW);
+ctx.quadraticCurveTo(bkCpx+px*bkW*0.2, bkCpy+py*bkW*0.2, bkTx, bkTy);
+ctx.quadraticCurveTo(bkCpx-px*bkW*0.2, bkCpy-py*bkW*0.2, bkBx-px*bkW, bkBy-py*bkW);
+ctx.closePath();
+ctx.fillStyle=boidColorStr(boid); ctx.fill();
+// eyes on the upper dome, spread sideways
+const er=Math.max(1, r*(0.07+(boid.eyeGene/255)*0.2));
+const eyeSpread=r*0.44+er*0.5;
+const elx=boid.x+cos*r*0.58+px*eyeSpread, ely=boid.y+sin*r*0.58+py*eyeSpread;
+const erx=boid.x+cos*r*0.58-px*eyeSpread, ery=boid.y+sin*r*0.58-py*eyeSpread;
+ctx.fillStyle='rgba(0,0,0,0.85)';
+ctx.beginPath(); ctx.arc(elx,ely,er,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.arc(erx,ery,er,0,Math.PI*2); ctx.fill();
+ctx.fillStyle='rgba(255,255,255,0.7)';
+ctx.beginPath(); ctx.arc(elx-er*0.3,ely-er*0.3,er*0.38,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.arc(erx-er*0.3,ery-er*0.3,er*0.38,0,Math.PI*2); ctx.fill();
 
 if(boid.diseased){
-ctx.beginPath(); ctx.arc(boid.x,boid.y,r*0.38,0,Math.PI*2);
-ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fill();
+const _a=ctx.globalAlpha;
+ctx.globalAlpha=alpha; // ignore fertility dimming — always clearly visible
+ctx.beginPath(); ctx.arc(boid.x,boid.y,r*0.5,0,Math.PI*2);
+ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.fill();
+ctx.globalAlpha=_a;
+}
+
+if(boid.birthTimer>0){
+const bt=boid.birthTimer/BIRTH_DURATION;
+ctx.globalAlpha=bt*bt*0.9;
+ctx.strokeStyle=boidColorStr(boid);
+ctx.lineWidth=bt*8;
+ctx.beginPath(); ctx.arc(boid.x,boid.y,RADIUS*(1+(1-bt)*4),0,Math.PI*2); ctx.stroke();
 }
 
 ctx.restore();
@@ -1557,7 +1600,7 @@ let totalBondedPairs = 0;
 let fertilePairs = 0;
 for(const b of boids){
 if(!b.alive||b.dying||b.partnerId===null||seen.has(b.id)) continue;
-const partner=boids.find(p=>p.id===b.partnerId);
+const partner=boidMap.get(b.partnerId);
 if(!partner||!partner.alive) continue;
 seen.add(b.id); seen.add(partner.id);
 totalBondedPairs++;
@@ -1791,6 +1834,9 @@ lastTime=ts;
 simClock+=dt;
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
 
+boidMap.clear(); for(const b of boids) if(b.alive) boidMap.set(b.id, b);
+_buildSpatialGrid();
+
 updateFertileCounts();
 updateEffectiveBreeders();
 for(const boid of boids) if(boid.alive) computePressure(boid);
@@ -1837,7 +1883,6 @@ updateDisease(dt);
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
-drawBirthRings();
 updateStatus();
 // age death splashes
 for(let i=deathSplashes.length-1;i>=0;i--){
