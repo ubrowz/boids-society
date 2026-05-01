@@ -1306,7 +1306,13 @@ ctx.bezierCurveTo(
   pred.x+cos*r*0.1-px*r*1.5, pred.y+sin*r*0.1-py*r*1.5,
   pred.x+cos*r*0.6-px*r*0.7, pred.y+sin*r*0.6-py*r*0.7,
   noseX, noseY);
-ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.fill();
+// 3D gradient — highlight near nose, shadow toward wings/tail
+const phlx=pred.x+cos*r*0.35+px*r*0.2, phly=pred.y+sin*r*0.35+py*r*0.2;
+const pgrd=ctx.createRadialGradient(phlx,phly,0,pred.x,pred.y,r*1.65);
+pgrd.addColorStop(0,   'rgba(255,255,255,0.97)');
+pgrd.addColorStop(0.35,'rgba(225,228,235,0.88)');
+pgrd.addColorStop(1,   'rgba(140,148,168,0.70)');
+ctx.fillStyle=pgrd; ctx.fill();
 
 // dot on back: color of the family this predator is not eating
 const dotCol = FAMILY_CSS[preferredFamily] || '#ffffff';
@@ -1330,6 +1336,11 @@ ctx.fillStyle=eyeColor;
 ctx.beginPath(); ctx.arc(e1x,e1y,r*0.25,0,Math.PI*2); ctx.fill();
 ctx.beginPath(); ctx.arc(e2x,e2y,r*0.25,0,Math.PI*2); ctx.fill();
 ctx.shadowBlur=0;
+// white highlight spot on each eye
+const eyr=r*0.25;
+ctx.fillStyle='rgba(255,255,255,0.75)';
+ctx.beginPath(); ctx.arc(e1x-eyr*0.3,e1y-eyr*0.3,eyr*0.38,0,Math.PI*2); ctx.fill();
+ctx.beginPath(); ctx.arc(e2x-eyr*0.3,e2y-eyr*0.3,eyr*0.38,0,Math.PI*2); ctx.fill();
 }
 ctx.restore();
 }
@@ -1521,9 +1532,16 @@ ctx.beginPath();
 ctx.arc(boid.x,boid.y,r, ang+Math.PI/2, ang-Math.PI/2, true);
 ctx.quadraticCurveTo(cpRx, cpRy, tipx, tipy);
 ctx.quadraticCurveTo(cpLx, cpLy, boid.x+px*r, boid.y+py*r);
-ctx.fillStyle=boidColorStr(boid); ctx.fill();
+// 3D radial gradient — highlight offset toward front-perpendicular
+const _h=boid.hue.toFixed(1), _s=Math.round(boid.sat*100);
+const hlx=boid.x+cos*r*0.28+px*r*0.22, hly=boid.y+sin*r*0.28+py*r*0.22;
+const grd3d=ctx.createRadialGradient(hlx,hly,0,boid.x,boid.y,r*1.1);
+grd3d.addColorStop(0,   `hsl(${_h},${_s}%,78%)`);
+grd3d.addColorStop(0.45,`hsl(${_h},${_s}%,54%)`);
+grd3d.addColorStop(1,   `hsl(${_h},${_s}%,27%)`);
+ctx.fillStyle=grd3d; ctx.fill();
 // beak: pointed horn from dome front, length driven by beakGene
-const beakLen=r*(0.3+boid.beakGene/255*0.6);
+const beakLen=r*(0.3+boid.beakGene/255*1.7);
 const bkBx=boid.x+cos*r*0.88, bkBy=boid.y+sin*r*0.88;
 const bkTx=boid.x+cos*(r+beakLen), bkTy=boid.y+sin*(r+beakLen);
 const bkCpx=boid.x+cos*(r+beakLen*0.5), bkCpy=boid.y+sin*(r+beakLen*0.5);
@@ -1533,9 +1551,9 @@ ctx.moveTo(bkBx+px*bkW, bkBy+py*bkW);
 ctx.quadraticCurveTo(bkCpx+px*bkW*0.2, bkCpy+py*bkW*0.2, bkTx, bkTy);
 ctx.quadraticCurveTo(bkCpx-px*bkW*0.2, bkCpy-py*bkW*0.2, bkBx-px*bkW, bkBy-py*bkW);
 ctx.closePath();
-ctx.fillStyle=boidColorStr(boid); ctx.fill();
+ctx.fillStyle=`hsl(${_h},${_s}%,56%)`; ctx.fill();
 // eyes on the upper dome, spread sideways
-const er=Math.max(1, r*(0.07+(boid.eyeGene/255)*0.2));
+const er=r*(0.15+(boid.eyeGene/255)*0.4);
 const eyeSpread=r*0.44+er*0.5;
 const elx=boid.x+cos*r*0.58+px*eyeSpread, ely=boid.y+sin*r*0.58+py*eyeSpread;
 const erx=boid.x+cos*r*0.58-px*eyeSpread, ery=boid.y+sin*r*0.58-py*eyeSpread;
