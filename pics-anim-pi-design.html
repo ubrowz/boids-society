@@ -255,6 +255,19 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 </ul>
 <p><strong>Bond threshold interaction with nearness:</strong> Higher <code>BOND_THRESHOLD</code> requires more collisions, so boids need sustained proximity. The nearness strength is scaled upward proportionally (<code>1 + (threshold - 1) × 0.24</code>) to compensate. The hit cooldown also shrinks with higher thresholds (<code>COOLDOWN_FRAMES / √threshold</code>) so hits accumulate faster.</p>
 
+<h3>Morphological bonding preferences</h3>
+<p>For straight M+F collision pairs, each hit probability is further scaled by the morphological attractiveness of the two individuals:</p>
+<pre><code>morphScore = (female.eyeGene/255 + male.beakGene/255) / 2   # 0..1, neutral at 0.5
+hitProb    = min(1, hitProb × (0.5 + morphScore))            # multiplier 0.5..1.5</code></pre>
+<ul>
+  <li><strong>Males prefer big-eyed females</strong> — a female with <code>eyeGene = 255</code> contributes 0.5 to <code>morphScore</code></li>
+  <li><strong>Females prefer long-beaked males</strong> — a male with <code>beakGene = 255</code> contributes 0.5 to <code>morphScore</code></li>
+  <li>At average genes (128/255 ≈ 0.5), <code>morphScore = 0.5</code> → multiplier = 1.0 (no change)</li>
+  <li>Extreme mismatch (both genes = 0) → multiplier = 0.5 (bonding half as likely)</li>
+  <li>Extreme match (both genes = 255) → multiplier = 1.5 (bonding 50% more likely)</li>
+</ul>
+<p>This creates runaway sexual selection: big-eyed females and long-beaked males bond more readily, reproduce more, and pass their genes on — driving both traits upward over generations. The preference applies only to straight pairs; gay pairs are unaffected.</p>
+
 <!-- ───────────────────────────── DIVORCE ────────────────────────────────── -->
 <h2 id="divorce">Divorce</h2>
 <p>Each frame, each bonded pair has a small chance to split equal to <code>DIVORCE_RATE × dt</code>. When a divorce occurs:</p>
@@ -623,6 +636,17 @@ function biasedHue(h1, h2, preferredHue):
 if _autoDisTimer &lt;= 0:
     _autoDisTimer = random(30, 90)   # seconds
     infect one random healthy boid</code></pre>
+
+<h3>Auto-restart (kickstart)</h3>
+<p>Also gated on <code>AUTO_DISEASE = true</code>, the exported file monitors for a total extinction event. When all boids are gone <em>and</em> all predators are dead, a 3-second countdown begins. If the situation persists, <code>startSim()</code> is called automatically — the simulation restarts from scratch so the display never goes dark:</p>
+<pre><code>if boids.length === 0 and all predators dead:
+    _allDeadTimer += dt
+    if _allDeadTimer &gt;= 3:
+        _allDeadTimer = 0
+        startSim()
+else:
+    _allDeadTimer = 0</code></pre>
+<p>The 3-second grace period prevents an instant restart if the last boid dies mid-frame alongside a predator that is also on its last health point.</p>
 
 <!-- ───────────────────────────── PERFORMANCE ────────────────────────────── -->
 <h2 id="performance">Performance</h2>

@@ -470,6 +470,7 @@ let N_PREDATORS      = parseInt(document.getElementById('predatorSlider').value)
 let FULL_DURATION    = parseInt(document.getElementById('fullDurSlider').value);
 let PREDATOR_DIET    = parseInt(document.getElementById('predatorDietSlider').value);
 let AUTO_DISEASE     = false;
+let _allDeadTimer    = 0;
 let _autoDisTimer    = 30 + Math.random()*60;
 const PREDATOR_RADIUS   = 30;
 const PREDATOR_SENSE    = 200; // sensing radius — only pursues boids within this range
@@ -980,7 +981,13 @@ const areSiblings=a.familyKey!==null&&a.familyKey===b.familyKey;
 if(aIsParentOfB||bIsParentOfA||areSiblings) continue;
 const aIn=boidInPreferredFamily(a), bIn=boidInPreferredFamily(b);
 const matchScore=(aIn?0.5:0)+(bIn?0.5:0); // 0, 0.5, or 1
-const hitProb=1-(1-matchScore)*FAMILY_PULL*0.85;
+let hitProb=1-(1-matchScore)*FAMILY_PULL*0.85;
+// morphological preference: M attracted to big-eyed F; F attracted to long-beaked M
+if(!a.isGay){
+const male=a.sex==='M'?a:b, female=a.sex==='M'?b:a;
+const morphScore=(female.eyeGene/255+male.beakGene/255)*0.5; // 0..1, neutral at 0.5
+hitProb=Math.min(1, hitProb*(0.5+morphScore)); // mult 0.5..1.5
+}
 if(Math.random()>hitProb) continue;
 const h=getHits(a.id,b.id)+1;
 const genDist=geneticDistance(a,b);
@@ -1896,6 +1903,13 @@ if(_autoDisTimer<=0){
 _autoDisTimer=30+Math.random()*60;
 const candidates=boids.filter(b=>b.alive&&!b.dying&&!b.diseased&&!b.immune);
 if(candidates.length>0) infectBoid(candidates[Math.floor(Math.random()*candidates.length)]);
+}
+// kickstart: if everything is dead, restart after a brief pause
+if(boids.length===0 && predators.every(p=>!p.alive)){
+_allDeadTimer+=dt;
+if(_allDeadTimer>=3){ _allDeadTimer=0; startSim(); return; }
+} else {
+_allDeadTimer=0;
 }
 }
 updateDisease(dt);
