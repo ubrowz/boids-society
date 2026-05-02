@@ -623,9 +623,10 @@ while(predators.filter(p=>p.alive).length < N_PREDATORS) predators.push(makePred
 const alive=predators.filter(p=>p.alive);
 while(alive.length > N_PREDATORS){ alive[alive.length-1].alive=false; alive.pop(); }
 }
-function spawnDeathSplash(x,y){
+function spawnDeathSplash(x,y,hue,sat){
+const s=Math.round(sat*100);
 deathSplashes.push({
-x, y, age:0, duration:0.85,
+x, y, age:0, duration:0.85, hue, s,
 particles: Array.from({length:12},()=>{
 const ang=Math.random()*Math.PI*2;
 return {cx:Math.cos(ang),cy:Math.sin(ang),spd:80+Math.random()*200,r:6+Math.random()*10};
@@ -1230,7 +1231,7 @@ const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b
 if(edible){
 // eat it
 b.alive=false;
-spawnDeathSplash(b.x,b.y);
+spawnDeathSplash(b.x,b.y,b.hue,b.sat);
 pred.lastEaten=simClock;
 break;
 }
@@ -1269,12 +1270,6 @@ ctx.beginPath(); ctx.moveTo(pred.trail[i-1].x,pred.trail[i-1].y); ctx.lineTo(pre
 ctx.globalAlpha=1;
 }
 
-// body glow
-const grd=ctx.createRadialGradient(pred.x,pred.y,0,pred.x,pred.y,r*3);
-grd.addColorStop(0,isHungry?'rgba(255,255,255,0.28)':'rgba(200,200,200,0.1)');
-grd.addColorStop(1,'rgba(255,255,255,0)');
-ctx.beginPath(); ctx.arc(pred.x,pred.y,r*3,0,Math.PI*2);
-ctx.fillStyle=grd; ctx.fill();
 
 // tail — same bezier shape as boid horn but pointing backward, fades to transparent
 const tailLen=r*1.4, baseW=r*0.38;
@@ -1350,20 +1345,21 @@ ctx.save();
 for(const s of deathSplashes){
 const t=s.age/s.duration;
 const alpha=1-t;
+const h=s.hue, sat=s.s;
 // outer ring
 ctx.beginPath(); ctx.arc(s.x,s.y,t*220,0,Math.PI*2);
-ctx.strokeStyle=`rgba(210,0,0,${alpha*0.8})`; ctx.lineWidth=12*(1-t); ctx.stroke();
+ctx.strokeStyle=`hsla(${h},${sat}%,38%,${alpha*0.8})`; ctx.lineWidth=12*(1-t); ctx.stroke();
 // second ring
 ctx.beginPath(); ctx.arc(s.x,s.y,t*140,0,Math.PI*2);
-ctx.strokeStyle=`rgba(255,40,0,${alpha*0.6})`; ctx.lineWidth=6*(1-t); ctx.stroke();
+ctx.strokeStyle=`hsla(${h},${sat}%,58%,${alpha*0.6})`; ctx.lineWidth=6*(1-t); ctx.stroke();
 // inner flash
 if(t<0.4){
 const ft=t/0.4;
 ctx.beginPath(); ctx.arc(s.x,s.y,(1-ft)*84,0,Math.PI*2);
-ctx.fillStyle=`rgba(255,100,0,${(1-ft)*0.8})`; ctx.fill();
+ctx.fillStyle=`hsla(${h},${sat}%,75%,${(1-ft)*0.8})`; ctx.fill();
 }
-// blood particles — batched into one fill
-ctx.fillStyle=`rgba(180,0,0,${alpha*0.9})`;
+// particles — batched into one fill
+ctx.fillStyle=`hsla(${h},${sat}%,45%,${alpha*0.9})`;
 ctx.beginPath();
 for(const p of s.particles){
 const bx=s.x+p.cx*p.spd*t, by=s.y+p.cy*p.spd*t, r=p.r*(1-t*0.3);
@@ -1411,7 +1407,7 @@ grd.addColorStop(0.5,`rgba(255,255,255,${alpha*0.3})`);
 grd.addColorStop(1, boidColorAlpha(partner, alpha*0.8));
 }
 ctx.beginPath(); ctx.moveTo(boid.x,boid.y); ctx.lineTo(partner.x,partner.y);
-ctx.strokeStyle=grd; ctx.lineWidth=flashTime>0?9:fertile?7:3; ctx.stroke();
+ctx.strokeStyle=grd; ctx.lineWidth=flashTime>0?18:fertile?14:6; ctx.stroke();
 }
 }
 
@@ -1508,7 +1504,10 @@ const r = boid.isSingle ? RADIUS*0.7 : RADIUS; // singles are smaller
 
 ctx.save(); ctx.globalAlpha=alpha*(fertile?1.0:0.55);
 
-const grd=ctx.createRadialGradient(boid.x,boid.y,0,boid.x,boid.y,RADIUS*2.8);
+// glow only for bonded or fertile boids — skip for non-fertile singles
+if(isBonded||fertile){
+const glowR=RADIUS*2.0;
+const grd=ctx.createRadialGradient(boid.x,boid.y,0,boid.x,boid.y,glowR);
 if(isBonded){
 grd.addColorStop(0,'rgba(255,204,68,0.73)');
 grd.addColorStop(0.4,'rgba(255,204,68,0.27)');
@@ -1518,8 +1517,9 @@ grd.addColorStop(0,boidColorAlpha(boid,0.73));
 grd.addColorStop(0.4,boidColorAlpha(boid,0.27));
 grd.addColorStop(1,boidColorAlpha(boid,0));
 }
-ctx.beginPath(); ctx.arc(boid.x,boid.y,RADIUS*2.8,0,Math.PI*2);
+ctx.beginPath(); ctx.arc(boid.x,boid.y,glowR,0,Math.PI*2);
 ctx.fillStyle=grd; ctx.fill();
+}
 
 // teardrop body + beak — beakGene→beak length, eyeGene→eye size
 const ang=Math.atan2(boid.vy,boid.vx);
@@ -1540,7 +1540,8 @@ grd3d.addColorStop(0,   `hsl(${_h},${_s}%,78%)`);
 grd3d.addColorStop(0.45,`hsl(${_h},${_s}%,54%)`);
 grd3d.addColorStop(1,   `hsl(${_h},${_s}%,27%)`);
 ctx.fillStyle=grd3d; ctx.fill();
-// beak: pointed horn from dome front, length driven by beakGene
+// beak: males only
+if(boid.sex==='M'){
 const beakLen=r*(0.3+boid.beakGene/255*1.7);
 const bkBx=boid.x+cos*r*0.88, bkBy=boid.y+sin*r*0.88;
 const bkTx=boid.x+cos*(r+beakLen), bkTy=boid.y+sin*(r+beakLen);
@@ -1552,6 +1553,7 @@ ctx.quadraticCurveTo(bkCpx+px*bkW*0.2, bkCpy+py*bkW*0.2, bkTx, bkTy);
 ctx.quadraticCurveTo(bkCpx-px*bkW*0.2, bkCpy-py*bkW*0.2, bkBx-px*bkW, bkBy-py*bkW);
 ctx.closePath();
 ctx.fillStyle=`hsl(${_h},${_s}%,56%)`; ctx.fill();
+}
 // eyes on the upper dome, spread sideways
 const er=r*(0.15+(boid.eyeGene/255)*0.4);
 const eyeSpread=r*0.44+er*0.5;
@@ -1567,7 +1569,7 @@ ctx.beginPath(); ctx.arc(erx-er*0.3,ery-er*0.3,er*0.38,0,Math.PI*2); ctx.fill();
 if(boid.diseased){
 const _a=ctx.globalAlpha;
 ctx.globalAlpha=alpha; // ignore fertility dimming — always clearly visible
-ctx.beginPath(); ctx.arc(boid.x,boid.y,r*0.5,0,Math.PI*2);
+ctx.beginPath(); ctx.arc(boid.x,boid.y,r*0.28,0,Math.PI*2);
 ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.fill();
 ctx.globalAlpha=_a;
 }
