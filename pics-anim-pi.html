@@ -581,28 +581,61 @@ return out;
 // ── cluster detection ─────────────────────────────────────────────────────────
 const CLUSTER_RADIUS = BOND_DIST;
 const _cr2 = CLUSTER_RADIUS * CLUSTER_RADIUS;
+let _clusterIdCounter = 0;
+let _prevClusters = []; // [{cx,cy,id}] from previous frame for stable colour assignment
 
 function updateClusters(){
-for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; }
-let nextId=0;
+for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; b.clusterBoundR=0; }
+
+// BFS — collect raw clusters
+const rawClusters=[];
 for(const boid of boids){
   if(!boid.alive||boid.dying||boid.clusterId!==-1) continue;
   const members=[boid];
-  boid.clusterId=nextId;
+  boid.clusterId=0; // temp mark as visited
   for(let qi=0;qi<members.length;qi++){
     const b=members[qi];
     for(const nb of _sgNeighbors(b.x,b.y,CLUSTER_RADIUS)){
       if(!nb.alive||nb.dying||nb.clusterId!==-1) continue;
       const dx=nb.x-b.x, dy=nb.y-b.y;
-      if(dx*dx+dy*dy<_cr2){ nb.clusterId=nextId; members.push(nb); }
+      if(dx*dx+dy*dy<_cr2){ nb.clusterId=0; members.push(nb); }
     }
   }
   let cx=0,cy=0;
   for(const m of members){ cx+=m.x; cy+=m.y; }
   cx/=members.length; cy/=members.length;
-  for(const m of members){ m.clusterSize=members.length; m.clusterCx=cx; m.clusterCy=cy; }
-  nextId++;
+  let boundR=RADIUS*2;
+  for(const m of members){
+    const dx=m.x-cx, dy=m.y-cy;
+    const d=Math.sqrt(dx*dx+dy*dy)+RADIUS*1.5;
+    if(d>boundR) boundR=d;
+  }
+  rawClusters.push({members,cx,cy,boundR,id:-1});
 }
+
+// match each new cluster to nearest previous cluster for stable IDs
+const matchThresh2=(CLUSTER_RADIUS*2)*(CLUSTER_RADIUS*2);
+const usedPrev=new Set();
+for(const rc of rawClusters){
+  let bestId=-1, bestD2=Infinity;
+  for(const prev of _prevClusters){
+    if(usedPrev.has(prev.id)) continue;
+    const dx=rc.cx-prev.cx, dy=rc.cy-prev.cy;
+    const d2=dx*dx+dy*dy;
+    if(d2<matchThresh2 && d2<bestD2){ bestD2=d2; bestId=prev.id; }
+  }
+  if(bestId>=0){ rc.id=bestId; usedPrev.add(bestId); }
+  else { rc.id=_clusterIdCounter++; }
+}
+
+// write back to boids
+for(const rc of rawClusters){
+  for(const m of rc.members){
+    m.clusterId=rc.id; m.clusterSize=rc.members.length;
+    m.clusterCx=rc.cx; m.clusterCy=rc.cy; m.clusterBoundR=rc.boundR;
+  }
+}
+_prevClusters=rawClusters.map(rc=>({cx:rc.cx,cy:rc.cy,id:rc.id}));
 }
 
 function clusterEmigration(boid){
@@ -779,7 +812,7 @@ eyeGene: (parentA!==undefined && parentB!==undefined)
 : EYE_GENE_DEFAULT,
 immigrantGeneration, isSingle, isGay, pairFamilyTarget:0,
 diseased:false, immune:false, diseaseTimer:0, diseaseHits:0, infectCount:0,
-clusterId:-1, clusterSize:0, clusterCx:0, clusterCy:0,
+clusterId:-1, clusterSize:0, clusterCx:0, clusterCy:0, clusterBoundR:0,
 trail:[]
 };
 }
@@ -1950,6 +1983,33 @@ if(inFam/alive.length>=0.9){
 }
 }
 
+// ── cluster aura drawing ──────────────────────────────────────────────────────
+const CLUSTER_PALETTE=[
+[255,100, 80],  // coral
+[ 70,190,255],  // sky blue
+[120,255, 90],  // lime
+[255,175, 35],  // amber
+[195, 75,255],  // violet
+[ 35,215,170],  // teal
+];
+
+function drawClusters(){
+const seen=new Set();
+for(const b of boids){
+  if(!b.alive||b.dying||b.clusterSize<2||seen.has(b.clusterId)) continue;
+  seen.add(b.clusterId);
+  const [r,g,bl]=CLUSTER_PALETTE[b.clusterId%CLUSTER_PALETTE.length];
+  const auraR=b.clusterBoundR*1.3;
+  const grd=ctx.createRadialGradient(b.clusterCx,b.clusterCy,0,b.clusterCx,b.clusterCy,auraR);
+  grd.addColorStop(0,   `rgba(${r},${g},${bl},0.13)`);
+  grd.addColorStop(0.45,`rgba(${r},${g},${bl},0.07)`);
+  grd.addColorStop(1,   `rgba(${r},${g},${bl},0)`);
+  ctx.beginPath();
+  ctx.arc(b.clusterCx,b.clusterCy,auraR,0,Math.PI*2);
+  ctx.fillStyle=grd; ctx.fill();
+}
+}
+
 // ── main loop ─────────────────────────────────────────────────────────────────
 const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
@@ -1972,6 +2032,7 @@ for(const boid of boids) if(boid.alive) computePressure(boid);
 
 drawBackground();
 drawTrails();
+drawClusters();
 drawBondLines();
 updateCollisions();
 updatePredators(dt);
