@@ -607,10 +607,7 @@ for(const boid of boids){
 
 function clusterEmigration(boid){
 if(boid.clusterSize<=CLUSTER_MAX) return;
-// use LOCAL centre of mass (neighbours within CLUSTER_RADIUS) rather than the
-// cluster-wide centroid — when two clusters collide and merge, each boid still
-// sees mostly its own group locally, so they repel each other instead of both
-// disintegrating outward from the combined centroid
+// local centre of mass from neighbours within CLUSTER_RADIUS
 let lx=0,ly=0,lc=0;
 for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
   if(!o.alive||o.dying||o===boid) continue;
@@ -618,8 +615,14 @@ for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
   if(dx*dx+dy*dy<_cr2){ lx+=o.x; ly+=o.y; lc++; }
 }
 if(lc===0) return;
+const lcx=lx/lc, lcy=ly/lc;
+const awayX=boid.x-lcx, awayY=boid.y-lcy;
+// periphery fraction: 0 at local centre → 1 at CLUSTER_RADIUS edge
+// interior boids feel no push; only the outer ring is shed gradually
+const peripheryFrac=Math.min(Math.sqrt(awayX*awayX+awayY*awayY)/CLUSTER_RADIUS,1);
+if(peripheryFrac<0.01) return;
 const overload=Math.min((boid.clusterSize-CLUSTER_MAX)/CLUSTER_MAX,1);
-steerToward(boid, boid.x*2-lx/lc, boid.y*2-ly/lc, overload*EMIG_PUSH);
+steerToward(boid, boid.x+awayX, boid.y+awayY, overload*peripheryFrac*EMIG_PUSH);
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
