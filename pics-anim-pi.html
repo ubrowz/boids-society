@@ -548,6 +548,39 @@ for(let cx = cx0; cx <= cx1; cx++){
 return out;
 }
 
+// ── cluster detection ─────────────────────────────────────────────────────────
+const CLUSTER_RADIUS = BOND_DIST;
+const _cr2 = CLUSTER_RADIUS * CLUSTER_RADIUS;
+
+function updateClusters(){
+for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; }
+let nextId=0;
+for(const boid of boids){
+  if(!boid.alive||boid.dying||boid.clusterId!==-1) continue;
+  const members=[boid];
+  boid.clusterId=nextId;
+  for(let qi=0;qi<members.length;qi++){
+    const b=members[qi];
+    for(const nb of _sgNeighbors(b.x,b.y,CLUSTER_RADIUS)){
+      if(!nb.alive||nb.dying||nb.clusterId!==-1) continue;
+      const dx=nb.x-b.x, dy=nb.y-b.y;
+      if(dx*dx+dy*dy<_cr2){ nb.clusterId=nextId; members.push(nb); }
+    }
+  }
+  let cx=0,cy=0;
+  for(const m of members){ cx+=m.x; cy+=m.y; }
+  cx/=members.length; cy/=members.length;
+  for(const m of members){ m.clusterSize=members.length; m.clusterCx=cx; m.clusterCy=cy; }
+  nextId++;
+}
+}
+
+function clusterEmigration(boid){
+if(boid.clusterSize<=CLUSTER_MAX) return;
+const overload=Math.min((boid.clusterSize-CLUSTER_MAX)/CLUSTER_MAX,1);
+steerToward(boid, boid.x*2-boid.clusterCx, boid.y*2-boid.clusterCy, overload*1.5);
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 function gaussianRandom(mean, std){
 const u=1-Math.random(), v=Math.random();
@@ -702,6 +735,7 @@ eyeGene: (parentA!==undefined && parentB!==undefined)
 : EYE_GENE_DEFAULT,
 immigrantGeneration, isSingle, isGay, pairFamilyTarget:0,
 diseased:false, immune:false, diseaseTimer:0, diseaseHits:0, infectCount:0,
+clusterId:-1, clusterSize:0, clusterCx:0, clusterCy:0,
 trail:[]
 };
 }
@@ -1886,6 +1920,7 @@ for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else
 
 boidMap.clear(); for(const b of boids) if(b.alive) boidMap.set(b.id, b);
 _buildSpatialGrid();
+updateClusters();
 
 updateFertileCounts();
 updateEffectiveBreeders();
@@ -1903,7 +1938,7 @@ updateLifespan(boid,dt);
 if(!boid.alive) continue;
 updateBreeding(boid,dt);
 if(!boid.dying){
-avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid);
+avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid); clusterEmigration(boid);
 boid.x+=boid.vx; boid.y+=boid.vy;
 clampToBounds(boid);
 boid.trail.push({x:boid.x,y:boid.y});
