@@ -128,6 +128,10 @@ cursor:pointer; border:2px solid #fff;
 #clusterMaxSlider::-webkit-slider-thumb { background:#f9ca24; box-shadow:0 0 8px rgba(249,202,36,0.8); }
 #clusterMaxSlider::-moz-range-thumb { background:#f9ca24; }
 #clusterMaxVal { color:#000; }
+#minDensitySlider { background:linear-gradient(to right,#0a0800,#e8b423); }
+#minDensitySlider::-webkit-slider-thumb { background:#e8b423; box-shadow:0 0 8px rgba(232,180,35,0.8); }
+#minDensitySlider::-moz-range-thumb { background:#e8b423; }
+#minDensityVal { color:#000; }
 #emigStrSlider { background:linear-gradient(to right,#0a0500,#fd9644); }
 #emigStrSlider::-webkit-slider-thumb { background:#fd9644; box-shadow:0 0 8px rgba(253,150,68,0.8); }
 #emigStrSlider::-moz-range-thumb { background:#fd9644; }
@@ -248,6 +252,11 @@ display:flex; align-items:center; justify-content:center;
 <label>cluster max</label>
 <input type="range" id="clusterMaxSlider" min="2" max="100" value="20">
 <span class="ctrl-val" id="clusterMaxVal">20</span>
+</div>
+<div class="ctrl-row">
+<label>min density</label>
+<input type="range" id="minDensitySlider" min="1" max="8" value="3" step="1">
+<span class="ctrl-val" id="minDensityVal">3</span>
 </div>
 <div class="ctrl-row">
 <label>emigr. push</label>
@@ -404,7 +413,8 @@ const ctx = canvas.getContext('2d');
 // ── slider state ──────────────────────────────────────────────────────────────
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
-let CLUSTER_MAX    = parseInt(document.getElementById('clusterMaxSlider').value);
+let CLUSTER_MAX        = parseInt(document.getElementById('clusterMaxSlider').value);
+let MIN_CLUSTER_DENSITY = parseInt(document.getElementById('minDensitySlider').value);
 let EMIG_PUSH      = parseInt(document.getElementById('emigStrSlider').value) / 10;
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
@@ -453,7 +463,8 @@ el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
-wire('clusterMaxSlider', 'clusterMaxVal',  v=>parseInt(v),   v=>v,                              v=>{ CLUSTER_MAX=v; });
+wire('clusterMaxSlider',  'clusterMaxVal',   v=>parseInt(v), v=>v, v=>{ CLUSTER_MAX=v; });
+wire('minDensitySlider',  'minDensityVal',   v=>parseInt(v), v=>v, v=>{ MIN_CLUSTER_DENSITY=v; });
 wire('emigStrSlider',    'emigStrVal',     v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_PUSH=v/10; });
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
@@ -585,35 +596,66 @@ let _clusterIdCounter = 0;
 let _prevClusters = []; // [{cx,cy,id}] from previous frame for stable colour assignment
 
 function updateClusters(){
-for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; b.clusterBoundR=0; }
+for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; b.clusterBoundR=0; b._isCore=false; }
 
-// BFS — collect raw clusters
+// Step 1: classify core boids — need >= MIN_CLUSTER_DENSITY neighbours within CLUSTER_RADIUS
+for(const boid of boids){
+  if(!boid.alive||boid.dying) continue;
+  let n=0;
+  for(const nb of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+    if(!nb.alive||nb.dying||nb===boid) continue;
+    const dx=nb.x-boid.x, dy=nb.y-boid.y;
+    if(dx*dx+dy*dy<_cr2) n++;
+  }
+  boid._isCore = n>=MIN_CLUSTER_DENSITY;
+}
+
+// Step 2: BFS through core boids only — thin chains and bridge boids don't propagate
 const rawClusters=[];
 for(const boid of boids){
-  if(!boid.alive||boid.dying||boid.clusterId!==-1) continue;
-  const members=[boid];
-  boid.clusterId=0; // temp mark as visited
-  for(let qi=0;qi<members.length;qi++){
-    const b=members[qi];
+  if(!boid.alive||boid.dying||!boid._isCore||boid.clusterId!==-1) continue;
+  const ri=rawClusters.length;
+  const coreMembers=[boid];
+  boid.clusterId=ri;
+  for(let qi=0;qi<coreMembers.length;qi++){
+    const b=coreMembers[qi];
     for(const nb of _sgNeighbors(b.x,b.y,CLUSTER_RADIUS)){
-      if(!nb.alive||nb.dying||nb.clusterId!==-1) continue;
+      if(!nb.alive||nb.dying||!nb._isCore||nb.clusterId!==-1) continue;
       const dx=nb.x-b.x, dy=nb.y-b.y;
-      if(dx*dx+dy*dy<_cr2){ nb.clusterId=0; members.push(nb); }
+      if(dx*dx+dy*dy<_cr2){ nb.clusterId=ri; coreMembers.push(nb); }
     }
   }
+  rawClusters.push({allMembers:[...coreMembers], ri});
+}
+
+// Step 3: attach border boids to their nearest core neighbour
+for(const boid of boids){
+  if(!boid.alive||boid.dying||boid._isCore) continue;
+  let bestD2=Infinity, bestRi=-1;
+  for(const nb of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+    if(!nb.alive||nb.dying||!nb._isCore||nb.clusterId===-1) continue;
+    const dx=nb.x-boid.x, dy=nb.y-boid.y;
+    const d2=dx*dx+dy*dy;
+    if(d2<_cr2&&d2<bestD2){ bestD2=d2; bestRi=nb.clusterId; }
+  }
+  if(bestRi>=0){ boid.clusterId=bestRi; rawClusters[bestRi].allMembers.push(boid); }
+}
+
+// Step 4: compute centroids and bounding radii
+for(const rc of rawClusters){
   let cx=0,cy=0;
-  for(const m of members){ cx+=m.x; cy+=m.y; }
-  cx/=members.length; cy/=members.length;
+  for(const m of rc.allMembers){ cx+=m.x; cy+=m.y; }
+  cx/=rc.allMembers.length; cy/=rc.allMembers.length;
   let boundR=RADIUS*2;
-  for(const m of members){
+  for(const m of rc.allMembers){
     const dx=m.x-cx, dy=m.y-cy;
     const d=Math.sqrt(dx*dx+dy*dy)+RADIUS*1.5;
     if(d>boundR) boundR=d;
   }
-  rawClusters.push({members,cx,cy,boundR,id:-1});
+  rc.cx=cx; rc.cy=cy; rc.boundR=boundR;
 }
 
-// match each new cluster to nearest previous cluster for stable IDs
+// Step 5: stable colour IDs — match to nearest previous cluster centroid
 const matchThresh2=(CLUSTER_RADIUS*2)*(CLUSTER_RADIUS*2);
 const usedPrev=new Set();
 for(const rc of rawClusters){
@@ -622,20 +664,21 @@ for(const rc of rawClusters){
     if(usedPrev.has(prev.id)) continue;
     const dx=rc.cx-prev.cx, dy=rc.cy-prev.cy;
     const d2=dx*dx+dy*dy;
-    if(d2<matchThresh2 && d2<bestD2){ bestD2=d2; bestId=prev.id; }
+    if(d2<matchThresh2&&d2<bestD2){ bestD2=d2; bestId=prev.id; }
   }
-  if(bestId>=0){ rc.id=bestId; usedPrev.add(bestId); }
-  else { rc.id=_clusterIdCounter++; }
+  if(bestId>=0){ rc.stableId=bestId; usedPrev.add(bestId); }
+  else{ rc.stableId=_clusterIdCounter++; }
 }
 
-// write back to boids
+// Step 6: write back to boids
 for(const rc of rawClusters){
-  for(const m of rc.members){
-    m.clusterId=rc.id; m.clusterSize=rc.members.length;
+  const sz=rc.allMembers.length;
+  for(const m of rc.allMembers){
+    m.clusterId=rc.stableId; m.clusterSize=sz;
     m.clusterCx=rc.cx; m.clusterCy=rc.cy; m.clusterBoundR=rc.boundR;
   }
 }
-_prevClusters=rawClusters.map(rc=>({cx:rc.cx,cy:rc.cy,id:rc.id}));
+_prevClusters=rawClusters.map(rc=>({cx:rc.cx,cy:rc.cy,id:rc.stableId}));
 }
 
 function clusterEmigration(boid){
