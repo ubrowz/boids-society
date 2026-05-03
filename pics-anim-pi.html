@@ -258,6 +258,18 @@ display:flex; align-items:center; justify-content:center;
 <input type="range" id="minDensitySlider" min="1" max="8" value="3" step="1">
 <span class="ctrl-val" id="minDensityVal">3</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>aura</label>
+<button id="auraGradBtn" title="Toggle aura gradient" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#35d78a;position:relative;transition:background 0.2s;outline:none;">
+<span id="auraGradKnob" style="
+position:absolute;top:3px;left:25px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
+</div>
 <div class="ctrl-row">
 <label>emigr. push</label>
 <input type="range" id="emigStrSlider" min="0" max="30" value="15" step="1">
@@ -415,6 +427,7 @@ let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
 let CLUSTER_MAX        = parseInt(document.getElementById('clusterMaxSlider').value);
 let MIN_CLUSTER_DENSITY = parseInt(document.getElementById('minDensitySlider').value);
+let AURA_GRADIENT = true;
 let EMIG_PUSH      = parseInt(document.getElementById('emigStrSlider').value) / 10;
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
@@ -452,6 +465,20 @@ immigrationLabel.textContent = 'off';
 immigrationLabel.style.color = '#c0392b';
 }
 });
+const auraGradBtn   = document.getElementById('auraGradBtn');
+const auraGradKnob  = document.getElementById('auraGradKnob');
+const auraGradLabel = document.getElementById('auraGradLabel');
+auraGradBtn.addEventListener('click',()=>{
+AURA_GRADIENT = !AURA_GRADIENT;
+if(AURA_GRADIENT){
+  auraGradBtn.style.background='#35d78a'; auraGradKnob.style.left='25px';
+  auraGradLabel.textContent='gradient'; auraGradLabel.style.color='#35d78a';
+} else {
+  auraGradBtn.style.background='#f9ca24'; auraGradKnob.style.left='3px';
+  auraGradLabel.textContent='flat'; auraGradLabel.style.color='#c8a000';
+}
+});
+
 const M_FERTILE_FROM = 0.20; // males fertile from 20% of lifespan
 const M_FERTILE_FOR = 0.70; // males fertile for 70% of lifespan
 const F_FERTILE_FROM = 0.20; // females fertile from 20% of lifespan
@@ -2043,13 +2070,18 @@ for(const b of boids){
   seen.add(b.clusterId);
   const [r,g,bl]=CLUSTER_PALETTE[b.clusterId%CLUSTER_PALETTE.length];
   const auraR=b.clusterBoundR*1.3;
-  const grd=ctx.createRadialGradient(b.clusterCx,b.clusterCy,0,b.clusterCx,b.clusterCy,auraR);
-  grd.addColorStop(0,   `rgba(${r},${g},${bl},0.13)`);
-  grd.addColorStop(0.45,`rgba(${r},${g},${bl},0.07)`);
-  grd.addColorStop(1,   `rgba(${r},${g},${bl},0)`);
   ctx.beginPath();
   ctx.arc(b.clusterCx,b.clusterCy,auraR,0,Math.PI*2);
-  ctx.fillStyle=grd; ctx.fill();
+  if(AURA_GRADIENT){
+    const grd=ctx.createRadialGradient(b.clusterCx,b.clusterCy,0,b.clusterCx,b.clusterCy,auraR);
+    grd.addColorStop(0,   `rgba(${r},${g},${bl},0.13)`);
+    grd.addColorStop(0.45,`rgba(${r},${g},${bl},0.07)`);
+    grd.addColorStop(1,   `rgba(${r},${g},${bl},0)`);
+    ctx.fillStyle=grd;
+  } else {
+    ctx.fillStyle=`rgba(${r},${g},${bl},0.07)`;
+  }
+  ctx.fill();
 }
 }
 
