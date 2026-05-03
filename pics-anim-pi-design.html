@@ -257,16 +257,17 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 
 <h3>Morphological bonding preferences</h3>
 <p>For straight M+F collision pairs, each hit probability is further scaled by the morphological attractiveness of the two individuals:</p>
-<pre><code>morphScore = (female.eyeGene/255 + male.beakGene/255) / 2   # 0..1, neutral at 0.5
-hitProb    = min(1, hitProb × (0.5 + morphScore))            # multiplier 0.5..1.5</code></pre>
+<pre><code>eyeMult  = 0.75 + female.eyeGene/255 × 0.5   # 0.75..1.25, eyes alone
+beakMult = 0.75 + male.beakGene/255  × 0.5   # 0.75..1.25, beak alone
+hitProb  = min(1, hitProb × eyeMult × beakMult)   # combined 0.56..1.56</code></pre>
 <ul>
-  <li><strong>Males prefer big-eyed females</strong> — a female with <code>eyeGene = 255</code> contributes 0.5 to <code>morphScore</code></li>
-  <li><strong>Females prefer long-beaked males</strong> — a male with <code>beakGene = 255</code> contributes 0.5 to <code>morphScore</code></li>
-  <li>At average genes (128/255 ≈ 0.5), <code>morphScore = 0.5</code> → multiplier = 1.0 (no change)</li>
-  <li>Extreme mismatch (both genes = 0) → multiplier = 0.5 (bonding half as likely)</li>
-  <li>Extreme match (both genes = 255) → multiplier = 1.5 (bonding 50% more likely)</li>
+  <li><strong>Each trait is selected independently.</strong> Big eyes always help a female bond, regardless of the male's beak length — and vice versa.</li>
+  <li>At average genes (128/255 ≈ 0.5), both multipliers are 1.0 → no change to base behaviour</li>
+  <li>One trait maxed, other average → multiplier = 1.25 (25% more likely)</li>
+  <li>Both traits maxed → multiplier = 1.56 (56% more likely)</li>
+  <li>Both traits minimal → multiplier = 0.56 (44% less likely)</li>
 </ul>
-<p>This creates runaway sexual selection: big-eyed females and long-beaked males bond more readily, reproduce more, and pass their genes on — driving both traits upward over generations. The preference applies only to straight pairs; gay pairs are unaffected.</p>
+<p>This creates independent runaway sexual selection on both traits: big-eyed females and long-beaked males each bond more readily on their own merits, driving both traits upward over generations. The preference applies only to straight pairs; gay pairs are unaffected.</p>
 
 <!-- ───────────────────────────── DIVORCE ────────────────────────────────── -->
 <h2 id="divorce">Divorce</h2>
@@ -680,6 +681,7 @@ PREDATOR_RADIUS = 30    // predator body radius (was 15)</code></pre>
 <thead><tr><th>Slider</th><th>Range</th><th>Default</th><th>Effect</th></tr></thead>
 <tbody>
 <tr><td>Target population</td><td>2–100</td><td>30</td><td>Equilibrium point for all feedback arms</td></tr>
+<tr><td>Pop ceiling</td><td>0–150 (0 = off)</td><td>off</td><td>Hard population cap: each frame, if the number of non-fading boids exceeds this value, one random boid is immediately set dying. At 0 the check is skipped entirely. Works in exported files (value is baked in at export time).</td></tr>
 <tr><td>Bond after</td><td>1–20 hits</td><td>1</td><td>Collisions required to form a bond</td></tr>
 <tr><td>Base lifespan</td><td>5–80 s</td><td>80 s</td><td>Lifespan at target population</td></tr>
 <tr><td>Pregnancy interval</td><td>1–20 s</td><td>1 s</td><td>Minimum time between births</td></tr>

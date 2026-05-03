@@ -119,6 +119,10 @@ cursor:pointer; border:2px solid #fff;
 #trailLengthSlider::-webkit-slider-thumb { background:#48dbfb; box-shadow:0 0 8px rgba(72,219,251,0.8); }
 #trailLengthSlider::-moz-range-thumb { background:#48dbfb; }
 #trailLengthVal { color:#000; }
+#popCeilSlider { background:linear-gradient(to right,#0a0000,#e84393); }
+#popCeilSlider::-webkit-slider-thumb { background:#e84393; box-shadow:0 0 8px rgba(232,67,147,0.8); }
+#popCeilSlider::-moz-range-thumb { background:#e84393; }
+#popCeilVal { color:#000; }
 .ctrl-divider {
 font-size:10px; letter-spacing:2px; color:#000;
 text-transform:uppercase; padding:2px 0 0 0; user-select:none;
@@ -167,6 +171,11 @@ display:flex; align-items:center; justify-content:center;
 <label>target pop</label>
 <input type="range" id="targetSlider" min="2" max="100" value="30">
 <span class="ctrl-val" id="targetVal">30</span>
+</div>
+<div class="ctrl-row">
+<label>pop ceiling</label>
+<input type="range" id="popCeilSlider" min="0" max="150" value="0">
+<span class="ctrl-val" id="popCeilVal">off</span>
 </div>
 <div class="ctrl-row">
 <label>bond after</label>
@@ -359,6 +368,7 @@ const ctx = canvas.getContext('2d');
 
 // ── slider state ──────────────────────────────────────────────────────────────
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
+let POP_CEILING = parseInt(document.getElementById('popCeilSlider').value); // 0 = off
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
 let PREG_INTERVAL = parseInt(document.getElementById('childSlider').value);
@@ -404,6 +414,7 @@ const el=document.getElementById(id), vl=document.getElementById(valId);
 el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.value); });
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
+wire('popCeilSlider','popCeilVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
 wire('childSlider', 'childVal', v=>parseInt(v), v=>v+' s', v=>{ PREG_INTERVAL=v; updateViability(); });
@@ -985,8 +996,9 @@ let hitProb=1-(1-matchScore)*FAMILY_PULL*0.85;
 // morphological preference: M attracted to big-eyed F; F attracted to long-beaked M
 if(!a.isGay){
 const male=a.sex==='M'?a:b, female=a.sex==='M'?b:a;
-const morphScore=(female.eyeGene/255+male.beakGene/255)*0.5; // 0..1, neutral at 0.5
-hitProb=Math.min(1, hitProb*(0.5+morphScore)); // mult 0.5..1.5
+const eyeMult  = 0.75+(female.eyeGene/255)*0.5; // 0.75..1.25, independent of beak
+const beakMult = 0.75+(male.beakGene/255) *0.5; // 0.75..1.25, independent of eyes
+hitProb=Math.min(1, hitProb*eyeMult*beakMult);  // combined 0.56..1.56
 }
 if(Math.random()>hitProb) continue;
 const h=getHits(a.id,b.id)+1;
@@ -1893,6 +1905,11 @@ boid.trail.shift(); // shed one position per frame so trail dissipates during fa
 if(toSpawn.length){ boids.push(...toSpawn); toSpawn.length=0; }
 for(let i=birthRings.length-1;i>=0;i--){ birthRings[i].age+=dt; if(birthRings[i].age>=birthRings[i].duration) birthRings.splice(i,1); }
 boids=boids.filter(b=>b.alive);
+if(POP_CEILING>0){
+const living=boids.filter(b=>!b.dying);
+if(living.length>POP_CEILING)
+living[Math.floor(Math.random()*living.length)].dying=true;
+}
 updateDivorce(dt);
 updateImmigration(dt);
 updateFamilyCycle(dt);
