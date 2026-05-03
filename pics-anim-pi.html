@@ -846,18 +846,20 @@ const combinedPressure = Math.min(boid.localPressure + Math.max(boid.popPressure
 const warmup = Math.min(simClock / WARMUP_DURATION, 1);
 const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
 
+// cluster-aware: only attract toward same-cluster boids so cross-cluster nearness
+// doesn't fight against emigration and prevent clean separation
 let cx=0,cy=0,count=0;
 const _sr2b=SENSING_RADIUS*SENSING_RADIUS;
 for(const o of _sgNeighbors(boid.x,boid.y,SENSING_RADIUS)){
-if(!o.alive||o===boid) continue;
+if(!o.alive||o===boid||o.clusterId!==boid.clusterId) continue;
 const dx=o.x-boid.x, dy=o.y-boid.y;
 if(dx*dx+dy*dy<_sr2b){ cx+=o.x; cy+=o.y; count++; }
 }
 if(count===0){
-// no local neighbours — steer weakly toward global centroid so isolated boids find the flock
+// lone emigrant — weak pull toward nearest other boid so they don't get permanently lost
 let gx=0,gy=0,gc=0;
-for(const o of boids){ if(o.alive&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
-if(gc>0) steerToward(boid,gx/gc,gy/gc,1.0);
+for(const o of boids){ if(o.alive&&!o.dying&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
+if(gc>0) steerToward(boid,gx/gc,gy/gc,0.4);
 return;
 }
 
