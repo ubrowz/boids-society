@@ -18,7 +18,8 @@ gap:4px;
 canvas {
 display:block;
 }
-#controls { display:flex; flex-direction:column; align-items:center; gap:8px; }
+#controls { display:flex; flex-direction:row; align-items:flex-start; gap:12px; }
+.ctrl-col { display:flex; flex-direction:column; gap:8px; align-items:center; }
 .ctrl-row {
 display:flex; align-items:center; gap:6px;
 color:#000; font-size:10px; letter-spacing:0.5px;
@@ -127,6 +128,14 @@ cursor:pointer; border:2px solid #fff;
 #clusterMaxSlider::-webkit-slider-thumb { background:#f9ca24; box-shadow:0 0 8px rgba(249,202,36,0.8); }
 #clusterMaxSlider::-moz-range-thumb { background:#f9ca24; }
 #clusterMaxVal { color:#000; }
+#emigStrSlider { background:linear-gradient(to right,#0a0500,#fd9644); }
+#emigStrSlider::-webkit-slider-thumb { background:#fd9644; box-shadow:0 0 8px rgba(253,150,68,0.8); }
+#emigStrSlider::-moz-range-thumb { background:#fd9644; }
+#emigStrVal { color:#000; }
+#emigReturnSlider { background:linear-gradient(to right,#00120a,#26de81); }
+#emigReturnSlider::-webkit-slider-thumb { background:#26de81; box-shadow:0 0 8px rgba(38,222,129,0.8); }
+#emigReturnSlider::-moz-range-thumb { background:#26de81; }
+#emigReturnVal { color:#000; }
 .ctrl-divider {
 font-size:10px; letter-spacing:2px; color:#000;
 text-transform:uppercase; padding:2px 0 0 0; user-select:none;
@@ -171,6 +180,7 @@ display:flex; align-items:center; justify-content:center;
 
 <div id="ui">
 <div id="controls">
+<div class="ctrl-col">
 <div class="ctrl-row">
 <label>target pop</label>
 <input type="range" id="targetSlider" min="2" max="200" value="30">
@@ -180,11 +190,6 @@ display:flex; align-items:center; justify-content:center;
 <label>pop ceiling</label>
 <input type="range" id="popCeilSlider" min="0" max="150" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
-</div>
-<div class="ctrl-row">
-<label>cluster max</label>
-<input type="range" id="clusterMaxSlider" min="2" max="100" value="20">
-<span class="ctrl-val" id="clusterMaxVal">20</span>
 </div>
 <div class="ctrl-row">
 <label>bond after</label>
@@ -227,6 +232,35 @@ display:flex; align-items:center; justify-content:center;
 <span class="ctrl-val" id="gayVal">10%</span>
 </div>
 <div class="ctrl-row">
+<label>mutation %</label>
+<input type="range" id="mutationSlider" min="0" max="50" value="50" step="1">
+<span class="ctrl-val" id="mutationVal">50%</span>
+</div>
+<div class="ctrl-row">
+<label>family pull</label>
+<input type="range" id="familyPullSlider" min="0" max="100" value="60" step="5">
+<span class="ctrl-val" id="familyPullVal">60%</span>
+</div>
+</div>
+<div class="ctrl-col">
+<div class="ctrl-divider">clusters</div>
+<div class="ctrl-row">
+<label>cluster max</label>
+<input type="range" id="clusterMaxSlider" min="2" max="100" value="20">
+<span class="ctrl-val" id="clusterMaxVal">20</span>
+</div>
+<div class="ctrl-row">
+<label>emigr. push</label>
+<input type="range" id="emigStrSlider" min="0" max="30" value="15" step="1">
+<span class="ctrl-val" id="emigStrVal">1.5</span>
+</div>
+<div class="ctrl-row">
+<label>emigr. return</label>
+<input type="range" id="emigReturnSlider" min="0" max="10" value="4" step="1">
+<span class="ctrl-val" id="emigReturnVal">0.4</span>
+</div>
+<div class="ctrl-divider">disease</div>
+<div class="ctrl-row">
 <label>infect. hits</label>
 <input type="range" id="diseaseThreshSlider" min="1" max="10" value="1" step="1">
 <span class="ctrl-val" id="diseaseThreshVal">1</span>
@@ -241,16 +275,6 @@ display:flex; align-items:center; justify-content:center;
 <input type="range" id="fatalitySlider" min="0" max="80" value="10" step="5">
 <span class="ctrl-val" id="fatalityVal">10%</span>
 <span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#c0392b;letter-spacing:0.5px;"></span>
-</div>
-<div class="ctrl-row">
-<label>mutation %</label>
-<input type="range" id="mutationSlider" min="0" max="50" value="50" step="1">
-<span class="ctrl-val" id="mutationVal">50%</span>
-</div>
-<div class="ctrl-row">
-<label>family pull</label>
-<input type="range" id="familyPullSlider" min="0" max="100" value="60" step="5">
-<span class="ctrl-val" id="familyPullVal">60%</span>
 </div>
 <div class="ctrl-divider">predators</div>
 <div class="ctrl-row">
@@ -268,6 +292,7 @@ display:flex; align-items:center; justify-content:center;
 <input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
 <span class="ctrl-val" id="predatorDietVal">other</span>
 </div>
+<div class="ctrl-divider">visuals</div>
 <div class="ctrl-row">
 <label>trail opacity</label>
 <input type="range" id="trailOpacitySlider" min="0" max="100" value="40" step="5">
@@ -277,6 +302,7 @@ display:flex; align-items:center; justify-content:center;
 <label>trail length</label>
 <input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
 <span class="ctrl-val" id="trailLengthVal">30</span>
+</div>
 </div>
 </div>
 
@@ -378,7 +404,9 @@ const ctx = canvas.getContext('2d');
 // ── slider state ──────────────────────────────────────────────────────────────
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
-let CLUSTER_MAX   = parseInt(document.getElementById('clusterMaxSlider').value);
+let CLUSTER_MAX    = parseInt(document.getElementById('clusterMaxSlider').value);
+let EMIG_PUSH      = parseInt(document.getElementById('emigStrSlider').value) / 10;
+let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
 let PREG_INTERVAL = parseInt(document.getElementById('childSlider').value);
@@ -425,7 +453,9 @@ el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
-wire('clusterMaxSlider','clusterMaxVal', v=>parseInt(v), v=>v,                    v=>{ CLUSTER_MAX=v; });
+wire('clusterMaxSlider', 'clusterMaxVal',  v=>parseInt(v),   v=>v,                              v=>{ CLUSTER_MAX=v; });
+wire('emigStrSlider',    'emigStrVal',     v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_PUSH=v/10; });
+wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
 wire('childSlider', 'childVal', v=>parseInt(v), v=>v+' s', v=>{ PREG_INTERVAL=v; updateViability(); });
@@ -578,7 +608,7 @@ for(const boid of boids){
 function clusterEmigration(boid){
 if(boid.clusterSize<=CLUSTER_MAX) return;
 const overload=Math.min((boid.clusterSize-CLUSTER_MAX)/CLUSTER_MAX,1);
-steerToward(boid, boid.x*2-boid.clusterCx, boid.y*2-boid.clusterCy, overload*1.5);
+steerToward(boid, boid.x*2-boid.clusterCx, boid.y*2-boid.clusterCy, overload*EMIG_PUSH);
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -859,7 +889,7 @@ if(count===0){
 // lone emigrant — weak pull toward nearest other boid so they don't get permanently lost
 let gx=0,gy=0,gc=0;
 for(const o of boids){ if(o.alive&&!o.dying&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
-if(gc>0) steerToward(boid,gx/gc,gy/gc,0.4);
+if(gc>0) steerToward(boid,gx/gc,gy/gc,EMIG_RETURN);
 return;
 }
 
