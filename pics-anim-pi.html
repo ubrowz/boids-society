@@ -123,6 +123,10 @@ cursor:pointer; border:2px solid #fff;
 #popCeilSlider::-webkit-slider-thumb { background:#e84393; box-shadow:0 0 8px rgba(232,67,147,0.8); }
 #popCeilSlider::-moz-range-thumb { background:#e84393; }
 #popCeilVal { color:#000; }
+#clusterMaxSlider { background:linear-gradient(to right,#0a0a00,#f9ca24); }
+#clusterMaxSlider::-webkit-slider-thumb { background:#f9ca24; box-shadow:0 0 8px rgba(249,202,36,0.8); }
+#clusterMaxSlider::-moz-range-thumb { background:#f9ca24; }
+#clusterMaxVal { color:#000; }
 .ctrl-divider {
 font-size:10px; letter-spacing:2px; color:#000;
 text-transform:uppercase; padding:2px 0 0 0; user-select:none;
@@ -169,13 +173,18 @@ display:flex; align-items:center; justify-content:center;
 <div id="controls">
 <div class="ctrl-row">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="100" value="30">
+<input type="range" id="targetSlider" min="2" max="200" value="30">
 <span class="ctrl-val" id="targetVal">30</span>
 </div>
 <div class="ctrl-row">
 <label>pop ceiling</label>
 <input type="range" id="popCeilSlider" min="0" max="150" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
+</div>
+<div class="ctrl-row">
+<label>cluster max</label>
+<input type="range" id="clusterMaxSlider" min="2" max="100" value="20">
+<span class="ctrl-val" id="clusterMaxVal">20</span>
 </div>
 <div class="ctrl-row">
 <label>bond after</label>
@@ -368,7 +377,8 @@ const ctx = canvas.getContext('2d');
 
 // ── slider state ──────────────────────────────────────────────────────────────
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
-let POP_CEILING = parseInt(document.getElementById('popCeilSlider').value); // 0 = off
+let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
+let CLUSTER_MAX   = parseInt(document.getElementById('clusterMaxSlider').value);
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
 let PREG_INTERVAL = parseInt(document.getElementById('childSlider').value);
@@ -414,7 +424,8 @@ const el=document.getElementById(id), vl=document.getElementById(valId);
 el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.value); });
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
-wire('popCeilSlider','popCeilVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
+wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
+wire('clusterMaxSlider','clusterMaxVal', v=>parseInt(v), v=>v,                    v=>{ CLUSTER_MAX=v; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
 wire('childSlider', 'childVal', v=>parseInt(v), v=>v+' s', v=>{ PREG_INTERVAL=v; updateViability(); });
