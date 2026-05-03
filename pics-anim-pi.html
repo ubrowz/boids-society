@@ -876,14 +876,12 @@ const combinedPressure = Math.min(boid.localPressure + Math.max(boid.popPressure
 const warmup = Math.min(simClock / WARMUP_DURATION, 1);
 const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
 
-// cluster-aware: only attract toward same-cluster boids so cross-cluster nearness
-// doesn't fight against emigration and prevent clean separation
+// cohesion radius = CLUSTER_RADIUS so nearness never pulls across cluster boundaries
 let cx=0,cy=0,count=0;
-const _sr2b=SENSING_RADIUS*SENSING_RADIUS;
-for(const o of _sgNeighbors(boid.x,boid.y,SENSING_RADIUS)){
-if(!o.alive||o===boid||o.clusterId!==boid.clusterId) continue;
+for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+if(!o.alive||o===boid) continue;
 const dx=o.x-boid.x, dy=o.y-boid.y;
-if(dx*dx+dy*dy<_sr2b){ cx+=o.x; cy+=o.y; count++; }
+if(dx*dx+dy*dy<_cr2){ cx+=o.x; cy+=o.y; count++; }
 }
 if(count===0){
 // lone emigrant — weak pull toward nearest other boid so they don't get permanently lost
