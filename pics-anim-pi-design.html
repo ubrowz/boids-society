@@ -167,6 +167,7 @@ tr:hover td { background:rgba(84,160,255,0.04); }
   <li><a href="#export">Export</a></li>
   <li><a href="#performance">Performance</a></li>
   <li><a href="#controls">User Controls</a></li>
+  <li><a href="#pyramid">Population Pyramid</a></li>
   <li><a href="#visualkey">Visual Key</a></li>
 </ol>
 </nav>
@@ -755,9 +756,31 @@ PREDATOR_RADIUS = 30    // predator body radius (was 15)</code></pre>
 <tr><td>Emigr. return</td><td>0.0–1.0</td><td>0.4</td><td>Steering strength of the global-centroid pull on lone emigrants with no cluster-mates in range</td></tr>
 <tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales both glow and core trail alpha</td></tr>
 <tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
+<tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
 <p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>.</p>
+
+<!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
+<h2 id="pyramid">Population Pyramid</h2>
+<p>A 260×200 canvas below the controls shows a live age-sex pyramid, redrawn every <em>pyramid refresh</em> simulation-seconds. It is part of <code>#ui</code> and is therefore hidden in exported files.</p>
+
+<h3>Layout</h3>
+<ul>
+  <li><strong>Y axis</strong> — age bands of 5 simulation-seconds each; youngest band at the bottom, oldest at the top. The number of bands grows automatically if any boid outlives <code>BASE_LIFESPAN</code> (possible at low population pressure where the Gompertz scale reaches 1.25×).</li>
+  <li><strong>X axis (left)</strong> — male count, bars drawn right-to-left from the centre divider; colour <code>rgba(84,160,255,0.8)</code>.</li>
+  <li><strong>X axis (right)</strong> — female count, bars drawn left-to-right from the centre divider; colour <code>rgba(253,121,168,0.8)</code>.</li>
+  <li><strong>Centre column</strong> — 30 px label area showing the band start age (0, 5, 10 … seconds), flanked by two faint vertical divider lines.</li>
+  <li><strong>Headers</strong> — ♂ (blue) and ♀ (pink) above their respective halves, <em>age</em> above the centre column.</li>
+</ul>
+
+<h3>Scale and clipping</h3>
+<pre><code>maxCount = max(1, ceil(TARGET_POP / 4))
+barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
+<p>The reference value <code>TARGET_POP / 4</code> is fixed for a given target-population setting. A bar reaches full half-width when a single age-sex band contains ¼ of the target population. Bars that would exceed half-width are clipped at the centre divider so they never bleed into the opposite side. The scale updates if the user moves the target-population slider.</p>
+
+<h3>Timing</h3>
+<p>Redrawn when <code>simClock − lastPyramidUpdate ≥ pyramidRefreshInterval</code>. <code>lastPyramidUpdate</code> is reset to <code>−∞</code> on <code>startSim()</code> so the first frame always draws an initial pyramid. The pyramid is not redrawn while the simulation is paused.</p>
 
 <!-- ───────────────────────────── VISUAL KEY ─────────────────────────────── -->
 <h2 id="visualkey">Visual Key</h2>

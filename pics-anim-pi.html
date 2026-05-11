@@ -415,6 +415,16 @@ background:rgba(11,232,129,0.12);border:2px solid rgba(11,232,129,0.5);
 color:#0be881;cursor:pointer;box-shadow:0 0 16px rgba(11,232,129,0.25);
 font-family:'Courier New',monospace;outline:none;">⬇</button>
 </div>
+
+<div id="pyramidCol" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+<div class="ctrl-row" style="gap:6px;">
+<label style="min-width:auto;">refresh</label>
+<input type="range" id="pyramidRefreshSlider" min="1" max="10" value="3" style="width:80px;">
+<span id="pyramidRefreshVal" class="ctrl-val">3 s</span>
+</div>
+<canvas id="popPyramid" width="260" height="200"
+  style="display:block;border:1px solid rgba(0,0,0,0.08);border-radius:4px;background:#fafafa;"></canvas>
+</div>
 </div>
 
 <script>
@@ -445,6 +455,8 @@ const RATE_WINDOW = 30; // seconds
 let birthEvents = []; // timestamps of recent births
 let deathEvents = []; // timestamps of recent deaths
 let simClock = 0; // total sim time in seconds
+let pyramidRefreshInterval = 3;
+let lastPyramidUpdate = -Infinity;
 
 // ── immigration toggle ────────────────────────────────────────────────────────
 const immigrationBtn = document.getElementById('immigrationBtn');
@@ -512,6 +524,7 @@ wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>
 wire('predatorDietSlider', 'predatorDietVal',  v=>parseInt(v),   v=>['','any','favored','other'][v], v=>{ PREDATOR_DIET=v; });
 wire('trailOpacitySlider', 'trailOpacityVal',  v=>parseInt(v),   v=>v+'%',  v=>{ TRAIL_OPACITY=v/100; });
 wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
+wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
 // ── canvas sizing ─────────────────────────────────────────────────────────────
 let SENSING_RADIUS = 130;
@@ -1998,7 +2011,7 @@ nextId=0; boids=[]; predators=[]; deathSplashes=[];
 preferredFamilyIdx=0; preferredFamily=COLOR_FAMILY_CYCLE[0]; familyConvergedTimer=0;
 hits.clear(); cooldown.clear(); pairChildren.clear(); spawnFlashPairs.clear(); diseaseCooldown.clear(); birthRings=[];
 smoothPressure=0.5; smoothGlobalPressure=0.0; lastTime=null; immigrationTimer=10;
-birthEvents=[]; deathEvents=[]; immigrantEvents=[]; simClock=0; rHistory=[]; diseaseDeathEvents=[]; _cachedDiversity=0.3; _cachedEffectiveBreeders=0;
+birthEvents=[]; deathEvents=[]; immigrantEvents=[]; simClock=0; rHistory=[]; diseaseDeathEvents=[]; lastPyramidUpdate=-Infinity; _cachedDiversity=0.3; _cachedEffectiveBreeders=0;
 for(let i=0;i<N_PREDATORS;i++) predators.push(makePredator());
 for(let i=0;i<TARGET_POP;i++){
 const b=makeBoid();
@@ -2085,6 +2098,88 @@ for(const b of boids){
 }
 }
 
+// ── population pyramid ────────────────────────────────────────────────────────
+function drawPopPyramid() {
+const pc = document.getElementById('popPyramid');
+if (!pc) return;
+const pctx = pc.getContext('2d');
+const W = pc.width, H = pc.height;
+const BAND = 5;
+
+const alive = boids.filter(b => b.alive && !b.dying);
+
+let maxAge = BASE_LIFESPAN;
+for (const b of alive) if (b.age > maxAge) maxAge = b.age;
+const numBands = Math.max(1, Math.ceil(maxAge / BAND));
+
+const maleCounts   = new Array(numBands).fill(0);
+const femaleCounts = new Array(numBands).fill(0);
+for (const b of alive) {
+  const bi = Math.min(Math.floor(b.age / BAND), numBands - 1);
+  if (b.sex === 'M') maleCounts[bi]++;
+  else               femaleCounts[bi]++;
+}
+const maxCount = Math.max(1, Math.ceil(TARGET_POP / 4));
+
+pctx.clearRect(0, 0, W, H);
+
+const padT = 18, padB = 4, padL = 4, padR = 4;
+const labelW = 30;
+const halfW  = (W - padL - padR - labelW) / 2;
+const totalH = H - padT - padB;
+const rowH   = totalH / numBands;
+const centerX = padL + halfW + labelW / 2;
+const fontSize = Math.max(7, Math.min(9, Math.floor(rowH * 0.75)));
+
+// alternating row tint (youngest at bottom → band 0 drawn at bottom row)
+for (let i = 0; i < numBands; i++) {
+  const rowIdx = numBands - 1 - i;
+  const y = padT + rowIdx * rowH;
+  if (i % 2 === 0) {
+    pctx.fillStyle = 'rgba(0,0,0,0.03)';
+    pctx.fillRect(0, y, W, rowH);
+  }
+}
+
+// bars + age labels
+pctx.textAlign = 'center';
+pctx.textBaseline = 'middle';
+for (let i = 0; i < numBands; i++) {
+  const rowIdx = numBands - 1 - i;
+  const y = padT + rowIdx * rowH;
+  const mBar = Math.min((maleCounts[i]   / maxCount) * halfW, halfW);
+  const fBar = Math.min((femaleCounts[i] / maxCount) * halfW, halfW);
+
+  pctx.fillStyle = 'rgba(84,160,255,0.8)';
+  pctx.fillRect(centerX - labelW / 2 - mBar, y + 1, mBar, rowH - 2);
+
+  pctx.fillStyle = 'rgba(253,121,168,0.8)';
+  pctx.fillRect(centerX + labelW / 2,        y + 1, fBar, rowH - 2);
+
+  pctx.fillStyle = '#888';
+  pctx.font = `${fontSize}px Courier New`;
+  pctx.fillText(`${i * BAND}`, centerX, y + rowH / 2);
+}
+
+// center dividers
+pctx.strokeStyle = 'rgba(0,0,0,0.12)';
+pctx.lineWidth = 1;
+pctx.beginPath();
+pctx.moveTo(centerX - labelW / 2, padT); pctx.lineTo(centerX - labelW / 2, H - padB);
+pctx.moveTo(centerX + labelW / 2, padT); pctx.lineTo(centerX + labelW / 2, H - padB);
+pctx.stroke();
+
+// headers
+pctx.font = 'bold 10px Courier New';
+pctx.textBaseline = 'middle';
+pctx.fillStyle = 'rgba(84,160,255,0.9)';
+pctx.fillText('♂', padL + halfW / 2, padT / 2);
+pctx.fillStyle = '#aaa';
+pctx.fillText('age', centerX, padT / 2);
+pctx.fillStyle = 'rgba(253,121,168,0.9)';
+pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
+}
+
 // ── main loop ─────────────────────────────────────────────────────────────────
 const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
@@ -2161,6 +2256,10 @@ for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
 updateStatus();
+if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
+lastPyramidUpdate = simClock;
+drawPopPyramid();
+}
 // age death splashes
 for(let i=deathSplashes.length-1;i>=0;i--){
 deathSplashes[i].age+=dt;
