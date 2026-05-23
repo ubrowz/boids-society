@@ -924,7 +924,7 @@ const isGay = !isSingle && Math.random() < GAY_FRACTION;
 return {
 id:nextId++, x: x!==undefined?x:RADIUS+Math.random()*(canvas.width-RADIUS*2),
 y: y!==undefined?y:RADIUS+Math.random()*(canvas.height-RADIUS*2),
-vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED,
+vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED, _sa:angle,
 hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
 age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
 partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
@@ -1102,12 +1102,14 @@ steerToward(boid,boid.x+px*100,boid.y+py*100,2.0);
 
 function clampToBounds(boid){
 const w=canvas.width,h=canvas.height;
-if(boid.x<RADIUS) {boid.x=RADIUS; boid.vx= Math.abs(boid.vx);}
-if(boid.x>w-RADIUS) {boid.x=w-RADIUS; boid.vx=-Math.abs(boid.vx);}
-if(boid.y<RADIUS) {boid.y=RADIUS; boid.vy= Math.abs(boid.vy);}
-if(boid.y>h-RADIUS) {boid.y=h-RADIUS; boid.vy=-Math.abs(boid.vy);}
+let bounced=false;
+if(boid.x<RADIUS) {boid.x=RADIUS; boid.vx= Math.abs(boid.vx); bounced=true;}
+if(boid.x>w-RADIUS) {boid.x=w-RADIUS; boid.vx=-Math.abs(boid.vx); bounced=true;}
+if(boid.y<RADIUS) {boid.y=RADIUS; boid.vy= Math.abs(boid.vy); bounced=true;}
+if(boid.y>h-RADIUS) {boid.y=h-RADIUS; boid.vy=-Math.abs(boid.vy); bounced=true;}
 const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
 boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
+if(bounced) boid._sa=Math.atan2(boid.vy,boid.vx); // keep smooth angle in sync after wall bounce
 }
 
 // ── body separation (no-overlap mode) ────────────────────────────────────────
@@ -1127,10 +1129,8 @@ for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
 }
 if(fx!==0||fy!==0){
   const m=Math.sqrt(fx*fx+fy*fy)||1;
-  // Blend current heading 30% with separation direction 70%
-  boid.vx=boid.vx*0.3+(fx/m)*SPEED*0.7;
-  boid.vy=boid.vy*0.3+(fy/m)*SPEED*0.7;
-  // clampToBounds (called next) will renormalise to SPEED
+  // steerToward respects the TURN_SPEED cap; smooth-angle clamp applies afterwards
+  steerToward(boid, boid.x+fx/m*100, boid.y+fy/m*100, 8);
 }
 }
 
@@ -2280,6 +2280,14 @@ updateBreeding(boid,dt);
 if(!boid.dying){
 avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid); clusterEmigration(boid);
 if(NO_OVERLAP) separateBoid(boid);
+// Smooth-angle cap: all forces above produce a desired heading; the boid can
+// only actually rotate toward it by at most TURN_SPEED×6 per frame, preventing
+// multi-force compounding and sudden snaps from any single force.
+let _da=Math.atan2(boid.vy,boid.vx)-boid._sa;
+if(_da>Math.PI)_da-=Math.PI*2; else if(_da<-Math.PI)_da+=Math.PI*2;
+const _cap=TURN_SPEED*6;
+boid._sa+=Math.max(-_cap,Math.min(_cap,_da));
+boid.vx=Math.cos(boid._sa)*SPEED; boid.vy=Math.sin(boid._sa)*SPEED;
 boid.x+=boid.vx; boid.y+=boid.vy;
 clampToBounds(boid);
 boid.trail.push({x:boid.x,y:boid.y});
