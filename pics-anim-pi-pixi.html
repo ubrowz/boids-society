@@ -1170,7 +1170,10 @@ if(boid.y<RADIUS) {boid.y=RADIUS; boid.vy= Math.abs(boid.vy); bounced=true;}
 if(boid.y>h-RADIUS) {boid.y=h-RADIUS; boid.vy=-Math.abs(boid.vy); bounced=true;}
 const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
 boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
-if(bounced) boid._sa=Math.atan2(boid.vy,boid.vx); // keep smooth angle in sync after wall bounce
+if(bounced){
+  boid._sa=Math.atan2(boid.vy,boid.vx);       // physics angle: snap immediately
+  boid._drawAngle=boid._sa;                    // display angle: snap too — avoids lerping through 180°
+}
 }
 
 // ── body separation (no-overlap mode) ────────────────────────────────────────
@@ -1179,29 +1182,40 @@ if(bounced) boid._sa=Math.atan2(boid.vy,boid.vx); // keep smooth angle in sync a
 //   • steerToward turns the boid by at most TURN_SPEED×cap per frame — too slow.
 //   • Position projection resolves overlap immediately, with no heading/velocity change,
 //     so it causes zero rotation jitter.
-// _SEP_D is the minimum desired centre-to-centre distance.
-// The sprite extends ≈54 px behind and ≈49 px ahead at RADIUS=20; using RADIUS*4=80 px
-// ensures the bodies don't visually interpenetrate even when swimming in the same direction.
-const _SEP_D  = RADIUS * 4;
+// _SEP_D must stay ≤ RADIUS*2 (the bonding collision distance).
+// If _SEP_D > RADIUS*2 boids are pushed apart before they can ever bond.
+// The sprite body is visually larger than this radius — some visual overlap is unavoidable
+// while bonding is enabled; "no overlap" mode reduces crowding but can't fully prevent it.
+const _SEP_D  = RADIUS * 2;
 const _SEP_D2 = _SEP_D * _SEP_D;
 function separateBoid(boid){
-const w=canvas.width, h=canvas.height;
+// Two-layer separation:
+//   1. Gentle position nudge — resolves hard overlaps immediately without touching heading.
+//   2. steerToward — changes heading so boids actually navigate around each other.
+//      With cap=TURN_SPEED×1.5 and _drawAngle lerp 0.20 the visual snap is ≤0.84°/frame.
+//      (The old jitter came from the old cap of TURN_SPEED×6 = 16.8°/frame, now gone.)
+let fx=0, fy=0;
+const cw=canvas.width, ch=canvas.height;
 for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
   if(!nb.alive || nb===boid) continue;
   const dx=boid.x-nb.x, dy=boid.y-nb.y;
   const d2=dx*dx+dy*dy;
   if(d2<_SEP_D2){
     const d=d2>0.25?Math.sqrt(d2):0.5;
-    // Push this boid 20 % of the overlap distance away — gentle enough to avoid
-    // position jitter but resolves even severe pileups within a few frames.
-    const push=(_SEP_D-d)*0.20;
+    const wt=(_SEP_D-d)/_SEP_D; // weight: 1 at same pos, 0 at edge
+    fx+=dx/d*wt; fy+=dy/d*wt;
+    // Immediate position nudge: 8 % of overlap — prevents freezing in tight clusters
+    const push=(_SEP_D-d)*0.08;
     boid.x+=dx/d*push;
     boid.y+=dy/d*push;
   }
 }
-// Keep position inside canvas (heading unchanged)
-boid.x=Math.max(RADIUS,Math.min(w-RADIUS,boid.x));
-boid.y=Math.max(RADIUS,Math.min(h-RADIUS,boid.y));
+if(fx!==0||fy!==0){
+  const m=Math.sqrt(fx*fx+fy*fy)||1;
+  steerToward(boid, boid.x+fx/m*100, boid.y+fy/m*100, 5);
+}
+boid.x=Math.max(RADIUS,Math.min(cw-RADIUS,boid.x));
+boid.y=Math.max(RADIUS,Math.min(ch-RADIUS,boid.y));
 }
 
 // ── lifespan feedback ─────────────────────────────────────────────────────────
@@ -1861,19 +1875,22 @@ if(isBonded||fertile){
 // Scale r/13 makes the shape appear roughly the right display size;
 // tweak this constant if bodies need to be bigger or smaller.
 const ang=Math.atan2(boid.vy,boid.vx);
-const cos=Math.cos(ang), sin=Math.sin(ang);
-const px=-sin, py=cos; // perpendicular (left) — still needed for beak/eyes below
 const bx=boid.x, by=boid.y;
+
+// ── smoothed display angle ────────────────────────────────────────────────────
+// Compute _drawAngle FIRST so tail, eyes, beak and sprite all use the same angle.
+// clampToBounds snaps _drawAngle on wall bounces (avoids slow 180° lerp after bounce).
+if(boid._drawAngle===undefined) boid._drawAngle=ang;
+let _dda=ang-boid._drawAngle;
+if(_dda>Math.PI)_dda-=Math.PI*2; else if(_dda<-Math.PI)_dda+=Math.PI*2;
+boid._drawAngle+=_dda*0.20; // lerp: 0.20 — smooth turns, no jitter
+// All drawing uses the smoothed angle — sprite, tail, eyes, beak stay in sync.
+const cos=Math.cos(boid._drawAngle), sin=Math.sin(boid._drawAngle);
+const px=-sin, py=cos; // perpendicular (left)
 
 const spr=_getBodySprite(_spriteCount++);
 spr.visible=true;
 spr.x=bx; spr.y=by;
-// Smoothly interpolate the display angle to hide per-frame physics snaps.
-// _drawAngle is purely cosmetic — boid._sa drives the actual physics.
-if(boid._drawAngle===undefined) boid._drawAngle=ang;
-let _dda=ang-boid._drawAngle;
-if(_dda>Math.PI)_dda-=Math.PI*2; else if(_dda<-Math.PI)_dda+=Math.PI*2;
-boid._drawAngle+=_dda*0.20; // lerp: 0.20 — slower visual follow = much smoother rotation
 spr.rotation=boid._drawAngle;
 spr.tint=boidHex(boid);
 spr.alpha=baseAlpha;
