@@ -175,33 +175,43 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 <!-- ───────────────────────────── OVERVIEW ───────────────────────────────── -->
 <h2 id="overview">Overview</h2>
 <p>An animated browser-based population simulation built on the classic boids algorithm. Coloured boids wander autonomously inside a bounded aquarium. They can bond, breed, age and die. A multi-arm feedback loop attempts to maintain a stable population around a user-defined target.</p>
+<p>The rendering engine is <strong>PixiJS v7 (WebGL)</strong>, replacing the original Canvas 2D path. Boid and predator bodies are drawn as textured sprites (teardrop-v2.png, embedded as base64); trail lines, tail fins, beaks, and effects are drawn with <code>PIXI.Graphics</code>. This gives a large framerate gain on the Raspberry Pi 4, which benefits strongly from GPU-accelerated sprite batching.</p>
 <p>The visual layer extends the base simulation with:</p>
 <ul>
-  <li><strong>Motion trails</strong> with two-pass glow rendering</li>
+  <li><strong>Motion trails</strong> — single-pass core line behind every moving boid and predator</li>
+  <li><strong>Forked tail fin</strong> — a V-shaped Graphics polygon drawn behind each boid body, peeking out from behind the sprite</li>
   <li><strong>Birth rings</strong> at spawn events</li>
-  <li><strong>Morphological genetics</strong> — males carry a <code>beakGene</code> (horn length), all boids carry an <code>eyeGene</code> (eye size), both heritable and mutable via bit-flip</li>
-  <li><strong>Colour as HSL</strong> — boids store <code>{hue, sat}</code>; rendered at fixed lightness 50%</li>
+  <li><strong>Morphological genetics</strong> — males carry a <code>beakGene</code> (beak length), all boids carry an <code>eyeGene</code> (eye size), both heritable and mutable via bit-flip</li>
+  <li><strong>Colour as HSL</strong> — boids store <code>{hue, sat}</code>; rendered at fixed lightness 50% via sprite tint</li>
   <li><strong>Colour family cycle</strong> — a preferred family (red → yellow → green → blue → magenta → …) cycles automatically; three selection pressures drive convergence</li>
-  <li><strong>Predators</strong> — autonomous hunters that preferentially eat wrong-family boids</li>
+  <li><strong>Predators</strong> — autonomous hunters that preferentially eat wrong-family boids; rendered as white teardrop sprites identical in shape to boids</li>
   <li><strong>Export</strong> button — generates a standalone full-screen HTML with no UI, auto-start, auto-disease</li>
 </ul>
 <p>Target framerate is 30 fps (capped; simulation time is dt-based so it runs correctly at any framerate). All logic runs in a single self-contained HTML file with no external dependencies.</p>
 
 <!-- ───────────────────────────── APPEARANCE ─────────────────────────────── -->
 <h2 id="appearance">Boid Appearance</h2>
-<h3>Both sexes — body</h3>
-<p>Rendered as a <strong>teardrop shape</strong>: a front-facing semicircle (radius <code>RADIUS</code>) plus two quadratic bezier curves tapering to a point at the tail. The tail length is fixed at <code>RADIUS × 1.6</code>. The body is filled with a <strong>radial gradient</strong> (highlight offset toward front-perpendicular, deep shadow at trailing edge) giving a 3D appearance. Both sexes have <strong>two eyes</strong> (filled dark circles with a white highlight dot) spread sideways on the front dome. Eye radius is determined by <code>eyeGene</code>.</p>
+<h3>Both sexes — body sprite</h3>
+<p>Rendered as a <strong>PixiJS Sprite</strong> using the embedded PNG texture <em>teardrop-v2.png</em> (80×80 px RGBA, anchor at pixel 40,40). The sprite is scaled to <code>RADIUS / 13</code> and tinted to the boid's colour via PixiJS's multiplicative tint. The PNG encodes shape and greyscale shading; the tint supplies hue. Nose (forward) is at pixel 72 (+32 px from anchor → 2.46r ahead in world space); tail base is at pixel 5 (−35 px → 2.69r behind).</p>
+<h3>Both sexes — forked tail fin</h3>
+<p>A <strong>V-shaped forked tail</strong> is drawn behind each boid as a <code>PIXI.Graphics</code> polygon in the <code>tails</code> layer (below the sprite layer), so it visually peeks out from behind the body. The fill colour is the boid's hue at lightness 68% (lighter than the 50% body). Key geometry constants:</p>
+<pre><code>junction   = 1.70r back  (where the fork starts, inside sprite tail)
+notch      = 2.70r back  (centre indent between the two lobes)
+tip        = 3.00r back  (furthest point of each lobe)
+spread     = ±0.55r sideways at the tips</code></pre>
 <h3>Males only — beak</h3>
-<p>A <strong>forward-pointing tapered beak horn</strong> projects from the dome front. Beak length is determined by <code>beakGene</code>: <code>RADIUS × (0.3 + beakGene/255 × 1.7)</code>, giving a range of roughly 0.3r (stub) to 2.0r (long spike). Females carry <code>beakGene</code> silently but do not express it.</p>
+<p>A <strong>forward-pointing tapered beak</strong> projects from the sprite nose edge at <code>noseEdge × 0.93</code>. The tip reaches <code>noseEdge + beakLen</code> ahead of the boid centre. Beak length is determined by <code>beakGene</code>: <code>RADIUS × (0.3 + beakGene/255 × 1.7)</code>, giving a range of roughly 0.3r (stub) to 2.0r (long spike). Females carry <code>beakGene</code> silently but do not express it.</p>
+<h3>Rotation smoothing</h3>
+<p>Each boid maintains a separate <code>_drawAngle</code> field that lerps toward the physics heading at factor 0.20 per frame. All drawing (sprite rotation, tail fin, beak, eyes) uses <code>_drawAngle</code>, not the raw velocity angle. On wall bounces, <code>_drawAngle</code> is snapped immediately to the new heading to avoid lerping through a 180° arc.</p>
 <h3>Both sexes — state visuals</h3>
 <table>
 <thead><tr><th>State</th><th>Visual</th></tr></thead>
 <tbody>
-<tr><td>Fertile or bonded</td><td>Radial glow (gold if bonded, boid colour if just fertile)</td></tr>
-<tr><td>Infertile, unbonded</td><td>55% opacity, no glow (glow skipped for performance)</td></tr>
+<tr><td>Fertile or bonded</td><td>Three concentric circles approximating a radial glow (gold if bonded, boid colour if just fertile)</td></tr>
+<tr><td>Infertile, unbonded</td><td>55% opacity, no glow</td></tr>
 <tr><td>Diseased</td><td>Small white spot at body centre (radius 0.28r)</td></tr>
-<tr><td>Fading in/out</td><td>globalAlpha ramps over BIRTH_DURATION / FADE_DURATION</td></tr>
-<tr><td>Trail</td><td>Single-pass core line behind every moving boid (Pi: glow pass removed)</td></tr>
+<tr><td>Fading in/out</td><td>Sprite alpha ramps over BIRTH_DURATION / FADE_DURATION</td></tr>
+<tr><td>Trail</td><td>Single-pass core line behind every moving boid</td></tr>
 </tbody>
 </table>
 
@@ -329,7 +339,7 @@ actualInterval = PREG_INTERVAL × intervalScale × random(0.8, 1.6)</code></pre>
 <h3>Pressure Signals</h3>
 <p><strong>Local pressure</strong> (<code>localPressure</code>, 0–1) — measures neighbourhood crowding:</p>
 <pre><code>localPressure = min(neighbours / max(TARGET_POP × 0.4, 1), 1)</code></pre>
-<p>The sensing radius is dynamic: 30% of the smaller canvas dimension.</p>
+<p>The sensing radius (<code>SENSING_RADIUS</code>) is user-adjustable via the <strong>sensing radius</strong> slider (30–300 px, default 130 px). It controls how far each boid can "see" for pressure calculation, neighbour attraction, and collision detection.</p>
 
 <p><strong>Global pressure</strong> (<code>globalPressure</code>, −1 to +1) — measures population-level error:</p>
 <pre><code>targetPairs    = (TARGET_POP / 2) × min(M_FERTILE_FOR, F_FERTILE_FOR)
@@ -445,15 +455,14 @@ P(die from disease this frame) = h_disease × dt</code></pre>
 
 <!-- ───────────────────────────── TRAILS ─────────────────────────────────── -->
 <h2 id="trails">Motion Trails</h2>
-<p>Every boid stores a fixed-length ring buffer of past positions (<code>trail[]</code>). Trails are rendered in <strong>two passes</strong> before boids are drawn, where <code>t = i / (n−1)</code> is the normalised position along the trail (0 = oldest, 1 = newest):</p>
+<p>Every boid and predator stores a fixed-length ring buffer of past positions (<code>trail[]</code>). Trails are rendered in a <strong>single core pass</strong> with <code>t = i / (n−1)</code> (0 = oldest, 1 = newest):</p>
 <table>
-<thead><tr><th>Pass</th><th>Alpha formula</th><th>Width formula</th><th>Purpose</th></tr></thead>
+<thead><tr><th>Pass</th><th>Alpha formula</th><th>Width formula</th></tr></thead>
 <tbody>
-<tr><td>Outer glow</td><td><code>t^0.6 × 0.28 × TRAIL_OPACITY</code></td><td><code>t × 18 + 1 px</code></td><td>Soft wide halo</td></tr>
-<tr><td>Core line</td><td><code>t^0.5 × 0.85 × TRAIL_OPACITY</code></td><td><code>t × 3.5 + 0.4 px</code></td><td>Bright narrow centre</td></tr>
+<tr><td>Core line</td><td><code>t^0.5 × 0.85 × TRAIL_OPACITY</code></td><td><code>t × 7 + 0.8 px</code></td></tr>
 </tbody>
 </table>
-<p>Dying boids shed one trail position per frame (instead of appending) so the trail dissolves during the 2 s fade. Predators use the same two-pass render with a white stroke colour.</p>
+<p>Boid trails use the boid's own colour; predator trails use white. Dying boids shed one trail position per frame (instead of appending) so the trail dissolves during the 2 s fade.</p>
 
 <!-- ───────────────────────────── BIRTH RINGS ────────────────────────────── -->
 <h2 id="birthrings">Birth Pulse</h2>
@@ -574,12 +583,15 @@ function biasedHue(h1, h2, preferredHue):
 <p>Predators are autonomous agents separate from the boid population. They do not flock, do not age, and do not breed.</p>
 
 <h3>Appearance</h3>
+<p>Predators use the same teardrop PNG sprite and forked tail fin as boids, tinted <strong>white</strong> (<code>0xffffff</code>). The PNG's greyscale shading is preserved by multiplicative tinting, giving a white body with natural depth.</p>
 <ul>
-  <li><strong>Body</strong> — manta ray / delta wing shape drawn with cubic bezier leading edges and a barely-concave trailing edge. Filled with a radial gradient (bright white highlight near nose, cool blue-gray shadow toward wing tips). Semi-transparent (82% alpha base).</li>
-  <li><strong>Tail</strong> — tapered bezier horn pointing backward, filled with a gradient fading to transparent</li>
-  <li><strong>Eyes</strong> — two circles just behind the nose; colour transitions from yellow (full) → orange → red (very hungry); pulse with <code>shadowBlur</code> glow when hungry; each has a small white highlight dot</li>
+  <li><strong>Body sprite</strong> — teardrop-v2.png at scale <code>PREDATOR_RADIUS / 13</code>, tint <code>0xffffff</code>, alpha 0.92</li>
+  <li><strong>Forked tail fin</strong> — same V-fork geometry as boid tails, filled near-white (<code>0xf0f4ff</code>, 90% alpha), drawn in the predator's own <code>predFin</code> layer below the sprite</li>
+  <li><strong>Beak</strong> — always present (predators always express a beak); light grey (<code>0xd0d8e8</code>), same quadratic-curve shape as male boid beaks, length <code>PREDATOR_RADIUS × 0.9</code></li>
+  <li><strong>Eyes</strong> — two circles at <code>noseEdge × 0.55</code> forward; colour transitions yellow (full) → orange → red (very hungry); each has a small white highlight dot; size increases slightly when hungry</li>
   <li><strong>Back dot</strong> — small filled circle on the rear of the body, coloured in the current protected family's CSS colour</li>
 </ul>
+<p>Predators also maintain a <code>_drawAngle</code> with lerp factor 0.18, snapped immediately on wall bounces — same smoothing approach as boids. Wander perturbation is reduced to ±0.10 rad/frame (hunting, no target) and ±0.07 rad/frame (full) to limit left-right oscillation.</p>
 
 <h3>Movement</h3>
 <p>Speed = <code>SPEED × 1.2</code> (20% faster than boids at the same speed setting).</p>
@@ -614,7 +626,13 @@ function biasedHue(h1, h2, preferredHue):
 <tr><td>Full</td><td>Ignores</td><td>Ignores</td></tr>
 </tbody>
 </table>
-<p>Eating kills the boid immediately, spawns a <strong>death splash</strong>, and resets the predator's <code>lastEaten</code> timer.</p>
+<p>Eating is detected when the <strong>beak tip</strong> enters the boid's body radius. The beak tip position is computed each frame from the physics heading:</p>
+<pre><code>noseEdge = PREDATOR_RADIUS × (32/13)   # sprite nose geometry
+beakLen  = PREDATOR_RADIUS × 0.9
+tipX     = pred.x + cos(heading) × (noseEdge + beakLen)
+tipY     = pred.y + sin(heading) × (noseEdge + beakLen)
+eat if distance(tip, boid) &lt; RADIUS</code></pre>
+<p>This matches the visual moment the beak point touches the boid body. Eating kills the boid immediately, spawns a <strong>death splash</strong>, and resets the predator's <code>lastEaten</code> timer.</p>
 
 <h3>Starvation</h3>
 <p>If there are no living boids at all, the predator's <code>noPreyTimer</code> increments. After <code>STARVATION_TIME = 45 s</code> of zero available prey, the predator dies and is removed.</p>
@@ -705,18 +723,22 @@ else:
 <h2 id="performance">Performance</h2>
 <p>The frame loop is capped at <strong>30 fps</strong>. <code>dt</code> is computed from actual elapsed time so simulation speed is framerate-independent.</p>
 
-<h3>Pi-specific algorithmic optimisations</h3>
+<h3>Pi-specific optimisations</h3>
 <table>
 <thead><tr><th>Optimisation</th><th>Before</th><th>After</th></tr></thead>
 <tbody>
+<tr><td>Rendering engine</td><td>Canvas 2D (CPU rasterised)</td><td>PixiJS v7 WebGL — boid/predator bodies are GPU-batched sprite quads; Graphics calls (trails, fins, beaks, effects) still go via WebGL draw calls but benefit from batching</td></tr>
+<tr><td>Boid body draw</td><td>Per-frame Canvas 2D bezier curves + radial gradient per boid</td><td>Pooled <code>PIXI.Sprite</code> with multiplicative tint — one textured quad per boid, no per-frame path construction</td></tr>
+<tr><td>Predator body draw</td><td>Per-frame manta-ray cubic bezier + glow gradient</td><td>Same pooled sprite as boids (white tint) — same negligible cost as a single boid</td></tr>
+<tr><td>Predator eating scan</td><td>Centre-to-centre, radius 21.5 px (~1,450 px² search area)</td><td>Beak-tip position, radius 13 px (~530 px² search area) — ~2.7× smaller spatial query</td></tr>
 <tr><td>Neighbour queries (pressure, nearness, collision, disease)</td><td>O(N²) per frame</td><td>O(N·k) via spatial hash grid; cell size = max(SENSING_RADIUS, RADIUS×2)</td></tr>
 <tr><td>Partner / child lookups (<code>.find()</code>)</td><td>O(N) each, 7 call sites</td><td>O(1) via <code>boidMap</code> (Map keyed by id, rebuilt once per frame)</td></tr>
 <tr><td>Collision pairs</td><td>Double loop with sqrt distance</td><td>Grid neighbours + <code>b.id ≤ a.id</code> dedup, squared distance only</td></tr>
 <tr><td>Trail render</td><td>Two passes (glow + core)</td><td>Core pass only — glow pass removed</td></tr>
-<tr><td>Boid glow gradient</td><td>Every boid, radius 2.8r (~9,900 px²)</td><td>Bonded or fertile boids only, radius 2.0r (~5,000 px²) — ~70–80% pixel reduction</td></tr>
+<tr><td>Boid glow</td><td>Every boid, radial gradient, radius 2.8r</td><td>Bonded or fertile boids only, three concentric circles at 2.0r — ~70–80% pixel reduction</td></tr>
 <tr><td>Predator glow</td><td>Radial gradient, radius 3r per predator</td><td>Removed — eye colour signals hunger instead</td></tr>
 <tr><td>Birth rings</td><td>Separate array + draw function</td><td>Birth pulse reuses <code>birthTimer</code> on every boid — zero extra arrays</td></tr>
-<tr><td>Death splash particles</td><td>20 particles, trig computed each frame</td><td>12 particles, trig precomputed at spawn; all arcs batched into one <code>ctx.fill()</code></td></tr>
+<tr><td>Death splash particles</td><td>20 particles, trig computed each frame</td><td>12 particles, trig precomputed at spawn</td></tr>
 </tbody>
 </table>
 
@@ -754,14 +776,16 @@ PREDATOR_RADIUS = 30    // predator body radius (was 15)</code></pre>
 <tr><td>Min density</td><td>1–8</td><td>3</td><td>Minimum neighbours within 90 px for a boid to be a cluster core boid; at 1 degrades to connected-component clustering</td></tr>
 <tr><td>Emigr. push</td><td>0.0–3.0</td><td>1.5</td><td>Steering strength of the centrifugal emigration force on outer-ring boids of an overcrowded cluster</td></tr>
 <tr><td>Emigr. return</td><td>0.0–1.0</td><td>0.4</td><td>Steering strength of the global-centroid pull on lone emigrants with no cluster-mates in range</td></tr>
-<tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales both glow and core trail alpha</td></tr>
+<tr><td>Sensing radius</td><td>30–300 px</td><td>130 px</td><td>How far boids can sense neighbours for pressure, cohesion, collision, and disease. Smaller values reduce CPU load (smaller spatial grid queries); larger values give a more globally-aware flock. Exported (baked into boot script).</td></tr>
+<tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales core trail alpha for both boids and predators</td></tr>
 <tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
 <tr><td>Background</td><td>colour picker</td><td>#081828</td><td>Canvas background colour — flat fill applied every frame. Exported. Any colour is valid; dark colours work best with the existing trail glow and boid shading.</td></tr>
-<tr><td>No overlap</td><td>toggle (off/on)</td><td>off</td><td>When on, a body-separation force prevents boid circles from overlapping. Each frame, boids within 2×RADIUS of each other accumulate a push-away impulse (weighted by overlap depth, normalised, then blended 70% into the velocity direction before <code>clampToBounds</code> re-pins speed). Bonded pairs settle at ~2×RADIUS apart. Uses the existing spatial grid — O(N·k). Exported.</td></tr>
+<tr><td>No overlap</td><td>toggle (off/on)</td><td>off</td><td>When on, a body-separation force prevents boid circles from overlapping. Each frame, boids within 2×RADIUS of each other receive a position nudge (8% of overlap depth) plus a <code>steerToward</code> impulse (strength 5). Bonded pairs settle at ~2×RADIUS apart. Uses the existing spatial grid — O(N·k). Exported.</td></tr>
+<tr><td>Bond lines</td><td>toggle (on/off)</td><td>on</td><td>Show or hide bond lines between paired boids (thin coloured line; thick amber when fertile; brief red flash at birth). Turning off removes all bond line rendering without affecting simulation logic. Exported.</td></tr>
 <tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
-<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
 
 <!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
 <h2 id="pyramid">Population Pyramid</h2>
@@ -789,8 +813,9 @@ barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
 <table>
 <thead><tr><th>Visual element</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td>Teardrop body (female)</td><td>Female boid; colour encodes genetic lineage; 3D radial gradient shading</td></tr>
+<tr><td>Teardrop body (female)</td><td>Female boid; colour = HSL tint on greyscale PNG sprite; genetic lineage encoded in hue</td></tr>
 <tr><td>Teardrop body + forward beak (male)</td><td>Male boid; beak length encodes beakGene</td></tr>
+<tr><td>Forked V-tail behind body</td><td>Tail fin, lighter shade of body colour; extends ~3r behind boid centre</td></tr>
 <tr><td>Two dark eyes with highlight (both sexes)</td><td>Eye size encodes eyeGene; same gene inherited by both sexes</td></tr>
 <tr><td>Small body (0.7× size)</td><td>Single boid — will never bond</td></tr>
 <tr><td>Gold glow around body</td><td>Bonded boid</td></tr>
@@ -806,9 +831,9 @@ barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
 <tr><td>Gradient line (colour)</td><td>Bond — partners not forming a fertile pair</td></tr>
 <tr><td>Bright red bond line (2 s)</td><td>Flash at moment of child birth</td></tr>
 <tr><td>Soft coloured glow (behind boids)</td><td>Cluster aura — one of six colours per cluster; only drawn for clusters of ≥ 2 boids. Lone emigrants have no aura.</td></tr>
-<tr><td>Manta-shaped white body + tail</td><td>Predator; 3D gradient shading</td></tr>
-<tr><td>Yellow→red pulsing eyes</td><td>Predator hunger level: yellow = full, orange = hungry, red = very hungry</td></tr>
-<tr><td>Coloured dot on predator back</td><td>Protected colour family — predators will not eat boids of this colour (unless very hungry)</td></tr>
+<tr><td>White teardrop body with forked tail + beak</td><td>Predator; same PNG sprite as boids, tinted white; beak always present; forked tail in near-white</td></tr>
+<tr><td>Yellow→red eyes on predator</td><td>Hunger level: yellow = full, orange = hungry, red = very hungry</td></tr>
+<tr><td>Coloured dot on predator rear</td><td>Protected colour family — predators will not eat boids of this colour (unless very hungry)</td></tr>
 <tr><td>Density bar</td><td>Real-time combined pressure (Arm 1)</td></tr>
 <tr><td>Lifespan bar</td><td>Real-time effective lifespan (Arm 2)</td></tr>
 <tr><td>pairs X:Y readout</td><td>Total bonded pairs : fertile bonded M+F pairs</td></tr>
