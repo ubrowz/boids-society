@@ -478,6 +478,8 @@ const _BOID_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAAC
 let _boidTexture = null; // Sprite texture
 const _bodySprites = []; // reusable Sprite pool — one per visible boid per frame
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
+const _predBodySprites = []; // predator sprite pool — same texture, white tint
+let _predSpriteCount = 0;
 const _gfx = {}; // named Graphics layers, populated after app is created
 
 
@@ -652,9 +654,16 @@ app.stage.addChild(_gfx.tails);
 // so eyes/beak/glow are drawn on top of the sprite body
 _gfx.bodySprites = new PIXI.Container();
 app.stage.addChild(_gfx.bodySprites);
-['boids','splashes','predators'].forEach(k=>{
+['boids','splashes'].forEach(k=>{
 _gfx[k] = new PIXI.Graphics(); app.stage.addChild(_gfx[k]);
 });
+// Predator layers (above boid splashes, below predator beak/eyes overlay):
+//   predFin  — predator trail + forked tail fin (below sprite)
+//   predSprites — white teardrop body sprites
+//   predators — beak + eyes drawn on top of body sprite
+_gfx.predFin = new PIXI.Graphics(); app.stage.addChild(_gfx.predFin);
+_gfx.predSprites = new PIXI.Container(); app.stage.addChild(_gfx.predSprites);
+_gfx.predators = new PIXI.Graphics(); app.stage.addChild(_gfx.predators);
 // Body sprite texture embedded as base64 — no file loading needed
 _boidTexture = PIXI.Texture.from(_BOID_PNG);
 
@@ -904,6 +913,16 @@ if(idx>=_bodySprites.length){
   _bodySprites.push(spr);
 }
 return _bodySprites[idx];
+}
+// Predator sprite pool — same texture, white tint, own container above boid sprites
+function _getPredSprite(idx){
+if(idx>=_predBodySprites.length){
+  const spr=new PIXI.Sprite(_boidTexture);
+  spr.anchor.set(0.5,0.5);
+  _gfx.predSprites.addChild(spr);
+  _predBodySprites.push(spr);
+}
+return _predBodySprites[idx];
 }
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
@@ -1662,90 +1681,102 @@ predators=predators.filter(p=>p.alive);
 }
 
 function drawPredators(){
-const g=_gfx.predators; g.clear();
+// Three layers (cleared at frame start):
+//   _gfx.predFin    — trail + forked tail fin  (below sprite)
+//   _gfx.predSprites — white teardrop body sprites
+//   _gfx.predators  — beak + eyes drawn on top of sprite
+const g=_gfx.predators;   // overlay (beak, eyes, family dot)
+const gf=_gfx.predFin;    // trail + tail fin
+
 for(const pred of predators){
 if(!pred.alive) continue;
 const ang=Math.atan2(pred.vy,pred.vx);
-// Smooth the display angle to eliminate jitter (lerp factor 0.18 — slower than boids)
+// Smooth display angle — same lerp as boids, snapped on wall bounce
 if(pred._drawAngle===undefined) pred._drawAngle=ang;
 let _pda=ang-pred._drawAngle;
 if(_pda>Math.PI)_pda-=Math.PI*2; else if(_pda<-Math.PI)_pda+=Math.PI*2;
 pred._drawAngle+=_pda*0.18;
 const cos=Math.cos(pred._drawAngle), sin=Math.sin(pred._drawAngle);
-const px=-sin, py=cos;
+const px=-sin, py=cos; // perpendicular (left)
 const r=PREDATOR_RADIUS;
-const isHungry=(simClock-pred.lastEaten)>FULL_DURATION;
+const bx=pred.x, by=pred.y;
 
-// trail — two-pass white lines, width/alpha fading by position
+// ── trail (same style as boid trail, white) ──────────────────────────────
 if(pred.trail.length>=2){
-const n=pred.trail.length;
-for(let i=1;i<n;i++){
-  const t=Math.pow(i/(n-1),0.6);
-  g.lineStyle(t*36+2, 0xffffff, t*0.28*TRAIL_OPACITY);
-  g.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
-  g.lineTo(pred.trail[i].x,pred.trail[i].y);
-}
-for(let i=1;i<n;i++){
-  const t=Math.pow(i/(n-1),0.5);
-  g.lineStyle(t*7+0.8, 0xffffff, t*0.85*TRAIL_OPACITY);
-  g.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
-  g.lineTo(pred.trail[i].x,pred.trail[i].y);
-}
-g.lineStyle(0);
+  const n=pred.trail.length;
+  for(let i=1;i<n;i++){
+    const t=Math.pow(i/(n-1),0.5);
+    gf.lineStyle(t*7+0.8, 0xffffff, t*0.85*TRAIL_OPACITY);
+    gf.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
+    gf.lineTo(pred.trail[i].x,  pred.trail[i].y);
+  }
+  gf.lineStyle(0);
 }
 
-// tail — tapered white shape (gradient approximated as flat alpha)
-const tailLen=r*1.4, baseW=r*0.38;
-const tbx=pred.x-cos*r*0.65, tby=pred.y-sin*r*0.65;
-const ttx=pred.x-cos*(r+tailLen), tty=pred.y-sin*(r+tailLen);
-const cpx=pred.x-cos*(r+tailLen*0.5), cpy=pred.y-sin*(r+tailLen*0.5);
-g.beginFill(0xffffff, 0.5);
-g.moveTo(tbx+px*baseW, tby+py*baseW);
-g.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
-g.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
+// ── forked tail fin (white, same geometry as boid fin) ───────────────────
+{
+  const junc=1.70, tip=3.00, notch=2.70, forkW=0.55, juncW=0.26;
+  const mid=(junc+tip)/2;
+  gf.beginFill(0xf0f4ff, 0.90); // near-white with a hint of blue
+  gf.moveTo(bx - cos*r*junc + px*r*juncW, by - sin*r*junc + py*r*juncW);
+  gf.quadraticCurveTo(
+    bx - cos*r*mid + px*r*forkW*1.15, by - sin*r*mid + py*r*forkW*1.15,
+    bx - cos*r*tip + px*r*forkW,      by - sin*r*tip + py*r*forkW);
+  gf.lineTo(bx - cos*r*notch, by - sin*r*notch);
+  gf.lineTo(bx - cos*r*tip - px*r*forkW, by - sin*r*tip - py*r*forkW);
+  gf.quadraticCurveTo(
+    bx - cos*r*mid - px*r*forkW*1.15, by - sin*r*mid - py*r*forkW*1.15,
+    bx - cos*r*junc - px*r*juncW,     by - sin*r*junc - py*r*juncW);
+  gf.closePath();
+  gf.endFill();
+}
+
+// ── body sprite (white teardrop — tint 0xffffff keeps PNG grey values) ───
+const spr=_getPredSprite(_predSpriteCount++);
+spr.visible=true;
+spr.x=bx; spr.y=by;
+spr.rotation=pred._drawAngle;
+spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
+spr.alpha=0.92;
+spr.scale.set(r/13); // same scale formula as boids (PREDATOR_RADIUS=30 vs RADIUS=13)
+
+// ── beak (always present on predator — light grey) ───────────────────────
+const noseEdge=r*(32/13); // same PNG geometry as boid
+const beakLen=r*0.9;
+const bkBx=bx+cos*noseEdge*0.93, bkBy=by+sin*noseEdge*0.93;
+const bkTx=bx+cos*(noseEdge+beakLen), bkTy=by+sin*(noseEdge+beakLen);
+const bkCpx=bx+cos*(noseEdge+beakLen*0.5), bkCpy=by+sin*(noseEdge+beakLen*0.5);
+const bkW=r*0.18;
+g.beginFill(0xd0d8e8, 0.92);
+g.moveTo(bkBx+px*bkW, bkBy+py*bkW);
+g.quadraticCurveTo(bkCpx+px*bkW*0.2, bkCpy+py*bkW*0.2, bkTx, bkTy);
+g.quadraticCurveTo(bkCpx-px*bkW*0.2, bkCpy-py*bkW*0.2, bkBx-px*bkW, bkBy-py*bkW);
 g.closePath();
 g.endFill();
 
-// body: manta ray — cubic bezier leading edges, concave trailing edge
-const noseX=pred.x+cos*r*1.0, noseY=pred.y+sin*r*1.0;
-const wlX=pred.x-cos*r*0.5+px*r*1.5, wlY=pred.y-sin*r*0.5+py*r*1.5;
-const wrX=pred.x-cos*r*0.5-px*r*1.5, wrY=pred.y-sin*r*0.5-py*r*1.5;
-g.beginFill(0xe0e4eb, 0.88);
-g.moveTo(noseX, noseY);
-g.bezierCurveTo(
-  pred.x+cos*r*0.6+px*r*0.7, pred.y+sin*r*0.6+py*r*0.7,
-  pred.x+cos*r*0.1+px*r*1.5, pred.y+sin*r*0.1+py*r*1.5,
-  wlX, wlY);
-g.quadraticCurveTo(pred.x-cos*r*0.15, pred.y-sin*r*0.15, wrX, wrY);
-g.bezierCurveTo(
-  pred.x+cos*r*0.1-px*r*1.5, pred.y+sin*r*0.1-py*r*1.5,
-  pred.x+cos*r*0.6-px*r*0.7, pred.y+sin*r*0.6-py*r*0.7,
-  noseX, noseY);
-g.endFill();
-// highlight spot near nose
-const phlx=pred.x+cos*r*0.35+px*r*0.2, phly=pred.y+sin*r*0.35+py*r*0.2;
-g.beginFill(0xffffff, 0.45); g.drawCircle(phlx,phly,r*0.55); g.endFill();
-
-// dot on back: preferred-family colour
-const dotCol=hexFromCSS(FAMILY_CSS[preferredFamily]||'#ffffff');
-const bdx=pred.x-cos*r*0.35, bdy=pred.y-sin*r*0.35;
-g.beginFill(dotCol, 1.0); g.drawCircle(bdx,bdy,r*0.28); g.endFill();
-
-// eyes: yellow→orange→red with hunger
-const e1x=pred.x+cos*r*0.55+px*r*0.3, e1y=pred.y+sin*r*0.55+py*r*0.3;
-const e2x=pred.x+cos*r*0.55-px*r*0.3, e2y=pred.y+sin*r*0.55-py*r*0.3;
+// ── eyes: yellow→red hunger indicator (same as before) ───────────────────
+const isHungry=(simClock-pred.lastEaten)>FULL_DURATION;
+const eyeFwd=noseEdge*0.55;
+const eyeSpread=r*0.35;
+const eyeR=r*(isHungry?0.30:0.25);
+const e1x=bx+cos*eyeFwd+px*eyeSpread, e1y=by+sin*eyeFwd+py*eyeSpread;
+const e2x=bx+cos*eyeFwd-px*eyeSpread, e2y=by+sin*eyeFwd-py*eyeSpread;
 const hungerRatio=Math.min((simClock-pred.lastEaten)/(FULL_DURATION*2),1);
 const eyeG=Math.round(200*(1-hungerRatio)+20*hungerRatio);
 const eyeB=Math.round(20*hungerRatio);
 const eyeCol=(0xff<<16)|(eyeG<<8)|eyeB;
-const eyeR=r*(isHungry?0.3:0.25); // slightly larger when hungry (replaces glow)
 g.beginFill(eyeCol, 1.0);
 g.drawCircle(e1x,e1y,eyeR); g.drawCircle(e2x,e2y,eyeR);
 g.endFill();
-const eyr=r*0.25;
 g.beginFill(0xffffff, 0.75);
-g.drawCircle(e1x-eyr*0.3,e1y-eyr*0.3,eyr*0.38);
-g.drawCircle(e2x-eyr*0.3,e2y-eyr*0.3,eyr*0.38);
+g.drawCircle(e1x-eyeR*0.3,e1y-eyeR*0.3,eyeR*0.38);
+g.drawCircle(e2x-eyeR*0.3,e2y-eyeR*0.3,eyeR*0.38);
+g.endFill();
+
+// ── preferred-family dot (coloured identifier) ────────────────────────────
+const dotCol=hexFromCSS(FAMILY_CSS[preferredFamily]||'#ffffff');
+g.beginFill(dotCol, 1.0);
+g.drawCircle(bx-cos*r*0.35, by-sin*r*0.35, r*0.28);
 g.endFill();
 }
 }
@@ -2481,8 +2512,12 @@ updateDisease(dt);
 // hide all pooled sprites then re-show only those needed this frame
 _spriteCount=0;
 for(const s of _bodySprites) s.visible=false;
-_gfx.tails.clear(); // forked tail fins — cleared each frame like boids overlay
-_gfx.boids.clear(); // Graphics overlay: glow, eyes, beak, disease, birth ring
+_predSpriteCount=0;
+for(const s of _predBodySprites) s.visible=false;
+_gfx.tails.clear();     // boid forked tail fins
+_gfx.predFin.clear();   // predator trail + tail fin
+_gfx.predators.clear(); // predator beak + eyes overlay
+_gfx.boids.clear();     // boid Graphics overlay: glow, eyes, beak, disease, birth ring
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
