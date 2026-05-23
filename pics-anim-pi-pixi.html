@@ -65,6 +65,10 @@ cursor:pointer; border:2px solid #fff;
 #speedSlider::-webkit-slider-thumb { background:#a29bfe; box-shadow:0 0 8px rgba(162,155,254,0.8); }
 #speedSlider::-moz-range-thumb { background:#a29bfe; }
 #speedVal { color:#000; }
+#sensingSlider { background:linear-gradient(to right,#0a1a1a,#00b894); }
+#sensingSlider::-webkit-slider-thumb { background:#00b894; box-shadow:0 0 8px rgba(0,184,148,0.8); }
+#sensingSlider::-moz-range-thumb { background:#00b894; }
+#sensingVal { color:#000; }
 #singleSlider { background:linear-gradient(to right,#1a1a1a,#aaaaaa); }
 #singleSlider::-webkit-slider-thumb { background:#aaaaaa; box-shadow:0 0 8px rgba(180,180,180,0.8); }
 #singleSlider::-moz-range-thumb { background:#aaaaaa; }
@@ -225,6 +229,11 @@ display:flex; align-items:center; justify-content:center;
 <label>speed</label>
 <input type="range" id="speedSlider" min="1" max="10" value="7" step="1">
 <span class="ctrl-val" id="speedVal">7</span>
+</div>
+<div class="ctrl-row">
+<label>sensing r</label>
+<input type="range" id="sensingSlider" min="30" max="300" value="130" step="10">
+<span class="ctrl-val" id="sensingVal">130</span>
 </div>
 <div class="ctrl-row">
 <label>singles</label>
@@ -562,6 +571,7 @@ SPEED=v*0.45;
 TURN_SPEED=TURN_SPEED_BASE*(SPEED/SPEED_MAX);
 WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
 });
+wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v; });
 wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
 wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
 wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
@@ -586,7 +596,7 @@ const uiH = ui ? ui.offsetHeight + 8 : 0;
 canvas.width  = Math.max(window.innerWidth, 60);
 canvas.height = Math.max(window.innerHeight - uiH, 60);
 if(app) app.renderer.resize(canvas.width, canvas.height);
-SENSING_RADIUS = Math.round(Math.min(canvas.width, canvas.height) * 0.3);
+// SENSING_RADIUS is controlled by the slider — not recalculated on resize
 }
 resize(); // set canvas dims before creating app below
 
@@ -2490,8 +2500,8 @@ resize = function(){
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
   if(app) app.renderer.resize(canvas.width, canvas.height);
-  SENSING_RADIUS = Math.round(Math.min(canvas.width, canvas.height) * 0.3);
 };
+SENSING_RADIUS = ${SENSING_RADIUS};
 window.addEventListener('resize', resize);
 resize();
 startSim();
