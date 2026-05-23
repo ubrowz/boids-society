@@ -452,7 +452,10 @@ const canvas = document.getElementById('c');
 // ── PixiJS initialisation ─────────────────────────────────────────────────────
 // app is created after the first resize() so the canvas already has correct dims
 let app;
-let _idleText = null; // PIXI.Text shown on idle screen, hidden when sim starts
+let _idleText = null;    // PIXI.Text shown on idle screen, hidden when sim starts
+let _boidTexture = null; // Sprite texture loaded from teardrop-v2.png
+const _bodySprites = []; // reusable Sprite pool — one per visible boid per frame
+let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
 const _gfx = {}; // named Graphics layers, populated after app is created
 
 
@@ -596,10 +599,19 @@ resolution: 1,
 });
 app.ticker.stop(); // simulation loop drives rendering manually
 
-['bg','trails','clusters','bondLines','birthRings','boids','splashes','predators'].forEach(k=>{
-_gfx[k] = new PIXI.Graphics();
-app.stage.addChild(_gfx[k]);
+// Graphics layers (z-ordered: first = bottom)
+['bg','trails','clusters','bondLines','birthRings'].forEach(k=>{
+_gfx[k] = new PIXI.Graphics(); app.stage.addChild(_gfx[k]);
 });
+// Sprite container sits between birthRings and the Graphics overlay
+// so eyes/beak/glow are drawn on top of the sprite body
+_gfx.bodySprites = new PIXI.Container();
+app.stage.addChild(_gfx.bodySprites);
+['boids','splashes','predators'].forEach(k=>{
+_gfx[k] = new PIXI.Graphics(); app.stage.addChild(_gfx[k]);
+});
+// Load body sprite texture (PNG must be in same folder as this HTML file)
+_boidTexture = PIXI.Texture.from('teardrop-v2.png');
 
 window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
 
@@ -837,6 +849,17 @@ return(f(0)<<16)|(f(8)<<8)|f(4);
 }
 function boidHex(b){ return hslToHex(b.hue,b.sat*100,50); }
 function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
+
+// Sprite pool — fetch or create the Nth sprite for this frame
+function _getBodySprite(idx){
+if(idx>=_bodySprites.length){
+  const spr=new PIXI.Sprite(_boidTexture);
+  spr.anchor.set(0.5,0.5); // pivot at canvas centre = near body arc centre
+  _gfx.bodySprites.addChild(spr);
+  _bodySprites.push(spr);
+}
+return _bodySprites[idx];
+}
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
 function blendHueSat(a,b){
@@ -1821,38 +1844,21 @@ if(isBonded||fertile){
   g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
 }
 
-// teardrop body: dark silhouette + concentric highlight circles at the lit corner.
-// The circles each add brightness at low individual alpha, so they accumulate
-// into a smooth gradient — no teardrop-step boundaries, no masking needed.
-// The outermost circle bleeds ~0.18r past the nose but is imperceptible on dark bg.
+// Body sprite — positioned, rotated, and tinted to the boid's colour.
+// Scale r/13 makes the shape appear roughly the right display size;
+// tweak this constant if bodies need to be bigger or smaller.
 const ang=Math.atan2(boid.vy,boid.vx);
 const cos=Math.cos(ang), sin=Math.sin(ang);
-const px=-sin, py=cos; // perpendicular (left)
-
-const hDx=cos*0.28+px*0.22, hDy=sin*0.28+py*0.22; // lighting direction ≈ 0.36r from centre
-const _h=boid.hue, _s=boid.sat*100;
+const px=-sin, py=cos; // perpendicular (left) — still needed for beak/eyes below
 const bx=boid.x, by=boid.y;
-const hlx=bx+hDx*r, hly=by+hDy*r; // highlight / lit corner
 
-// helper: teardrop path — caller wraps with beginFill / endFill
-const _td=(cx,cy,rr)=>{
-  const sx=cx+px*rr, sy=cy+py*rr;
-  const tx=cx-cos*rr*1.6, ty=cy-sin*rr*1.6;
-  const cLx=cx-cos*rr*0.35+px*rr*0.75, cLy=cy-sin*rr*0.35+py*rr*0.75;
-  const cRx=cx-cos*rr*0.35-px*rr*0.75, cRy=cy-sin*rr*0.35-py*rr*0.75;
-  g.moveTo(sx,sy); g.arc(cx,cy,rr,ang+Math.PI/2,ang-Math.PI/2,true);
-  g.quadraticCurveTo(cRx,cRy,tx,ty); g.quadraticCurveTo(cLx,cLy,sx,sy); g.closePath();
-};
-
-// 1. Dark shadow base — full silhouette, edge stays dark (27 % lightness)
-g.beginFill(hslToHex(_h,_s,27), baseAlpha); _td(bx,by,r); g.endFill();
-// 2–5. Concentric circles at lit corner: low alpha each, accumulate to smooth gradient
-g.beginFill(hslToHex(_h,_s,54), baseAlpha*0.38); g.drawCircle(hlx,hly,r*0.82); g.endFill();
-g.beginFill(hslToHex(_h,_s,62), baseAlpha*0.36); g.drawCircle(hlx,hly,r*0.58); g.endFill();
-g.beginFill(hslToHex(_h,_s,70), baseAlpha*0.34); g.drawCircle(hlx,hly,r*0.36); g.endFill();
-g.beginFill(hslToHex(_h,_s,77), baseAlpha*0.30); g.drawCircle(hlx,hly,r*0.18); g.endFill();
-// specular pinpoint
-g.beginFill(0xffffff, baseAlpha*0.44); g.drawCircle(hlx,hly,r*0.09); g.endFill();
+const spr=_getBodySprite(_spriteCount++);
+spr.visible=true;
+spr.x=bx; spr.y=by;
+spr.rotation=ang;
+spr.tint=boidHex(boid);
+spr.alpha=baseAlpha;
+spr.scale.set(r/13); // ← adjust this to resize boid bodies
 
 // beak: males only
 if(boid.sex==='M'){
@@ -2353,7 +2359,10 @@ _allDeadTimer=0;
 }
 updateDisease(dt);
 
-_gfx.boids.clear();
+// hide all pooled sprites then re-show only those needed this frame
+_spriteCount=0;
+for(const s of _bodySprites) s.visible=false;
+_gfx.boids.clear(); // Graphics overlay: glow, eyes, beak, disease, birth ring
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
