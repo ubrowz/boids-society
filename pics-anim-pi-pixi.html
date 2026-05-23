@@ -352,6 +352,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="noOverlapLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>bond lines</label>
+<button id="bondLinesBtn" title="Toggle bond lines" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="bondLinesKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+</div>
 </div>
 </div>
 
@@ -545,6 +557,25 @@ if(NO_OVERLAP){
 } else {
   noOverlapBtn.style.background='#555'; noOverlapKnob.style.left='3px';
   noOverlapLabel.textContent='off'; noOverlapLabel.style.color='#555';
+}
+});
+
+// ── bond-lines toggle ─────────────────────────────────────────────────────────
+let SHOW_BOND_LINES = true;
+const bondLinesBtn   = document.getElementById('bondLinesBtn');
+const bondLinesKnob  = document.getElementById('bondLinesKnob');
+const bondLinesLabel = document.getElementById('bondLinesLabel');
+// init UI to ON state
+bondLinesBtn.style.background='#54a0ff'; bondLinesKnob.style.left='25px';
+bondLinesLabel.textContent='on'; bondLinesLabel.style.color='#54a0ff';
+bondLinesBtn.addEventListener('click', () => {
+SHOW_BOND_LINES = !SHOW_BOND_LINES;
+if(SHOW_BOND_LINES){
+  bondLinesBtn.style.background='#54a0ff'; bondLinesKnob.style.left='25px';
+  bondLinesLabel.textContent='on'; bondLinesLabel.style.color='#54a0ff';
+} else {
+  bondLinesBtn.style.background='#555'; bondLinesKnob.style.left='3px';
+  bondLinesLabel.textContent='off'; bondLinesLabel.style.color='#555';
 }
 });
 
@@ -942,6 +973,7 @@ x:PREDATOR_RADIUS+Math.random()*(canvas.width-PREDATOR_RADIUS*2),
 y:PREDATOR_RADIUS+Math.random()*(canvas.height-PREDATOR_RADIUS*2),
 vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
 wanderAngle:ang,
+_drawAngle:ang,
 lastEaten:-FULL_DURATION, // hungry from birth
 noPreyTimer:0,
 alive:true,
@@ -1583,12 +1615,12 @@ const dist=Math.sqrt(dx*dx+dy*dy)||1;
 pred.vx+=(dx/dist*predSpd-pred.vx)*0.08;
 pred.vy+=(dy/dist*predSpd-pred.vy)*0.08;
 } else {
-pred.wanderAngle+=(Math.random()-0.5)*0.25;
+pred.wanderAngle+=(Math.random()-0.5)*0.10;
 pred.vx+=(Math.cos(pred.wanderAngle)*predSpd-pred.vx)*0.06;
 pred.vy+=(Math.sin(pred.wanderAngle)*predSpd-pred.vy)*0.06;
 }
 } else {
-pred.wanderAngle+=(Math.random()-0.5)*0.18;
+pred.wanderAngle+=(Math.random()-0.5)*0.07;
 pred.vx+=(Math.cos(pred.wanderAngle)*predSpd*0.6-pred.vx)*0.05;
 pred.vy+=(Math.sin(pred.wanderAngle)*predSpd*0.6-pred.vy)*0.05;
 }
@@ -1599,10 +1631,10 @@ pred.vx=pred.vx/spd*targetSpd;
 pred.vy=pred.vy/spd*targetSpd;
 pred.x+=pred.vx; pred.y+=pred.vy;
 // hard bounce off edges
-if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
-if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
-if(pred.y<PREDATOR_RADIUS){ pred.y=PREDATOR_RADIUS; pred.vy=Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
-if(pred.y>h-PREDATOR_RADIUS){ pred.y=h-PREDATOR_RADIUS; pred.vy=-Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
+if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
+if(pred.y<PREDATOR_RADIUS){ pred.y=PREDATOR_RADIUS; pred.vy=Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
+if(pred.y>h-PREDATOR_RADIUS){ pred.y=h-PREDATOR_RADIUS; pred.vy=-Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
 // trail
 pred.trail.push({x:pred.x,y:pred.y});
 if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
@@ -1634,7 +1666,12 @@ const g=_gfx.predators; g.clear();
 for(const pred of predators){
 if(!pred.alive) continue;
 const ang=Math.atan2(pred.vy,pred.vx);
-const cos=Math.cos(ang), sin=Math.sin(ang);
+// Smooth the display angle to eliminate jitter (lerp factor 0.18 — slower than boids)
+if(pred._drawAngle===undefined) pred._drawAngle=ang;
+let _pda=ang-pred._drawAngle;
+if(_pda>Math.PI)_pda-=Math.PI*2; else if(_pda<-Math.PI)_pda+=Math.PI*2;
+pred._drawAngle+=_pda*0.18;
+const cos=Math.cos(pred._drawAngle), sin=Math.sin(pred._drawAngle);
 const px=-sin, py=cos;
 const r=PREDATOR_RADIUS;
 const isHungry=(simClock-pred.lastEaten)>FULL_DURATION;
@@ -1752,6 +1789,7 @@ g.beginFill(hexFromCSS(BG_COLOR)); g.drawRect(0,0,canvas.width,canvas.height); g
 
 function drawBondLines(){
 const g=_gfx.bondLines; g.clear();
+if(!SHOW_BOND_LINES) return;
 const drawn=new Set();
 for(const boid of boids){
 if(!boid.alive||boid.partnerId===null) continue;
@@ -2493,6 +2531,22 @@ if(NO_OVERLAP){
   if(btn)  btn.style.background='#54a0ff';
   if(knob) knob.style.left='25px';
   if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
+}
+SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
+// Sync the bond-lines button visual to match the exported SHOW_BOND_LINES state
+{
+  const btn=document.getElementById('bondLinesBtn');
+  const knob=document.getElementById('bondLinesKnob');
+  const lbl=document.getElementById('bondLinesLabel');
+  if(SHOW_BOND_LINES){
+    if(btn)  btn.style.background='#54a0ff';
+    if(knob) knob.style.left='25px';
+    if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
+  } else {
+    if(btn)  btn.style.background='#555';
+    if(knob) knob.style.left='3px';
+    if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
+  }
 }
 BG_COLOR          = '${BG_COLOR}';
 AUTO_DISEASE      = true;
