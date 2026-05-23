@@ -1657,12 +1657,18 @@ if(pred.y>h-PREDATOR_RADIUS){ pred.y=h-PREDATOR_RADIUS; pred.vy=-Math.abs(pred.v
 // trail
 pred.trail.push({x:pred.x,y:pred.y});
 if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
-// eating collision
+// eating collision — triggers when beak tip enters boid body
 if(isHungry){
-const eatR=(PREDATOR_RADIUS+RADIUS)/2, eatR2=eatR*eatR;
-for(const b of _sgNeighbors(pred.x,pred.y,eatR)){
+const pAng=Math.atan2(pred.vy,pred.vx);
+const pCos=Math.cos(pAng), pSin=Math.sin(pAng);
+const noseEdge=PREDATOR_RADIUS*(32/13); // matches drawPredators geometry
+const beakLen=PREDATOR_RADIUS*0.9;
+const tipX=pred.x+pCos*(noseEdge+beakLen);
+const tipY=pred.y+pSin*(noseEdge+beakLen);
+const eatR2=RADIUS*RADIUS;
+for(const b of _sgNeighbors(tipX,tipY,RADIUS)){
 if(b.dying) continue;
-const dx=b.x-pred.x, dy=b.y-pred.y;
+const dx=b.x-tipX, dy=b.y-tipY;
 if(dx*dx+dy*dy<eatR2){
 const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
 const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
