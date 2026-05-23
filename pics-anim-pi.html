@@ -324,6 +324,24 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
 <span class="ctrl-val" id="trailLengthVal">30</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>background</label>
+<input type="color" id="bgColorInput" value="#081828" title="Canvas background colour" style="
+width:44px;height:22px;border:none;padding:1px;cursor:pointer;
+border-radius:4px;background:#222;outline:none;">
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>no overlap</label>
+<button id="noOverlapBtn" title="Toggle body separation" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="noOverlapKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="noOverlapLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+</div>
 </div>
 </div>
 
@@ -488,6 +506,26 @@ if(AURA_GRADIENT){
 } else {
   auraGradBtn.style.background='#f9ca24'; auraGradKnob.style.left='3px';
   auraGradLabel.textContent='flat'; auraGradLabel.style.color='#c8a000';
+}
+});
+
+// ── background colour ─────────────────────────────────────────────────────────
+let BG_COLOR = document.getElementById('bgColorInput').value;
+document.getElementById('bgColorInput').addEventListener('input', e => { BG_COLOR = e.target.value; });
+
+// ── no-overlap toggle ─────────────────────────────────────────────────────────
+let NO_OVERLAP = false;
+const noOverlapBtn   = document.getElementById('noOverlapBtn');
+const noOverlapKnob  = document.getElementById('noOverlapKnob');
+const noOverlapLabel = document.getElementById('noOverlapLabel');
+noOverlapBtn.addEventListener('click', () => {
+NO_OVERLAP = !NO_OVERLAP;
+if(NO_OVERLAP){
+  noOverlapBtn.style.background='#54a0ff'; noOverlapKnob.style.left='25px';
+  noOverlapLabel.textContent='on'; noOverlapLabel.style.color='#54a0ff';
+} else {
+  noOverlapBtn.style.background='#555'; noOverlapKnob.style.left='3px';
+  noOverlapLabel.textContent='off'; noOverlapLabel.style.color='#555';
 }
 });
 
@@ -1065,6 +1103,30 @@ const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
 boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
 }
 
+// ── body separation (no-overlap mode) ────────────────────────────────────────
+const _SEP_D  = RADIUS * 2;       // minimum centre-to-centre distance = one diameter
+const _SEP_D2 = _SEP_D * _SEP_D;
+function separateBoid(boid){
+let fx=0, fy=0;
+for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
+  if(!nb.alive || nb===boid) continue;
+  const dx=boid.x-nb.x, dy=boid.y-nb.y;
+  const d2=dx*dx+dy*dy;
+  if(d2<_SEP_D2){
+    const d=d2>0.25?Math.sqrt(d2):0.5; // guard against near-zero
+    const w=(_SEP_D-d)/_SEP_D;         // 1 at same position, 0 at edge
+    fx+=dx/d*w; fy+=dy/d*w;
+  }
+}
+if(fx!==0||fy!==0){
+  const m=Math.sqrt(fx*fx+fy*fy)||1;
+  // Blend current heading 30% with separation direction 70%
+  boid.vx=boid.vx*0.3+(fx/m)*SPEED*0.7;
+  boid.vy=boid.vy*0.3+(fy/m)*SPEED*0.7;
+  // clampToBounds (called next) will renormalise to SPEED
+}
+}
+
 // ── lifespan feedback ─────────────────────────────────────────────────────────
 function lifespanScale(globalPressure){
 const t=(globalPressure+1)/2;
@@ -1596,10 +1658,8 @@ ctx.restore();
 
 // ── drawing ───────────────────────────────────────────────────────────────────
 function drawBackground(){
-const w=canvas.width,h=canvas.height;
-const grd=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w*0.7);
-grd.addColorStop(0,'#0d2137'); grd.addColorStop(0.6,'#081828'); grd.addColorStop(1,'#050e18');
-ctx.fillStyle=grd; ctx.fillRect(0,0,w,h);
+ctx.fillStyle=BG_COLOR;
+ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
 function drawBondLines(){
@@ -1987,9 +2047,7 @@ const playBtn=document.getElementById('playBtn');
 
 function drawIdle(){
 const w=canvas.width,h=canvas.height;
-const grd=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w*0.7);
-grd.addColorStop(0,'#0d2137'); grd.addColorStop(0.6,'#081828'); grd.addColorStop(1,'#050e18');
-ctx.fillStyle=grd; ctx.fillRect(0,0,w,h);
+ctx.fillStyle=BG_COLOR; ctx.fillRect(0,0,w,h);
 ctx.save();
 const seed=42;
 for(let i=0;i<40;i++){
@@ -2214,6 +2272,7 @@ if(!boid.alive) continue;
 updateBreeding(boid,dt);
 if(!boid.dying){
 avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid); clusterEmigration(boid);
+if(NO_OVERLAP) separateBoid(boid);
 boid.x+=boid.vx; boid.y+=boid.vy;
 clampToBounds(boid);
 boid.trail.push({x:boid.x,y:boid.y});
@@ -2289,6 +2348,8 @@ MAX_TRAIL         = ${MAX_TRAIL};
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
 AURA_GRADIENT     = ${AURA_GRADIENT};
+NO_OVERLAP        = ${NO_OVERLAP};
+BG_COLOR          = '${BG_COLOR}';
 AUTO_DISEASE      = true;
 resize = function(){
   canvas.width  = window.innerWidth;

@@ -756,10 +756,12 @@ PREDATOR_RADIUS = 30    // predator body radius (was 15)</code></pre>
 <tr><td>Emigr. return</td><td>0.0–1.0</td><td>0.4</td><td>Steering strength of the global-centroid pull on lone emigrants with no cluster-mates in range</td></tr>
 <tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales both glow and core trail alpha</td></tr>
 <tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
+<tr><td>Background</td><td>colour picker</td><td>#081828</td><td>Canvas background colour — flat fill applied every frame. Exported. Any colour is valid; dark colours work best with the existing trail glow and boid shading.</td></tr>
+<tr><td>No overlap</td><td>toggle (off/on)</td><td>off</td><td>When on, a body-separation force prevents boid circles from overlapping. Each frame, boids within 2×RADIUS of each other accumulate a push-away impulse (weighted by overlap depth, normalised, then blended 70% into the velocity direction before <code>clampToBounds</code> re-pins speed). Bonded pairs settle at ~2×RADIUS apart. Uses the existing spatial grid — O(N·k). Exported.</td></tr>
 <tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
-<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>.</p>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
 
 <!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
 <h2 id="pyramid">Population Pyramid</h2>
