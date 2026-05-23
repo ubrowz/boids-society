@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Boids Aquarium (PixiJS)</title>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#ffffff; }
+body {
+display:flex; flex-direction:column;
+justify-content:center; align-items:center;
+min-height:100vh; overflow:hidden;
+font-family:'Courier New',monospace;
+gap:4px;
+}
+canvas {
+display:block;
+}
+#controls { display:flex; flex-direction:row; align-items:flex-start; gap:12px; }
+.ctrl-col { display:flex; flex-direction:column; gap:8px; align-items:center; }
+.ctrl-row {
+display:flex; align-items:center; gap:6px;
+color:#000; font-size:10px; letter-spacing:0.5px;
+text-transform:uppercase; user-select:none;
+}
+.ctrl-row label { min-width:82px; text-align:right; }
+.ctrl-val { min-width:40px; text-align:left; font-size:10px; font-weight:700; color:#000; }
+input[type=range] {
+-webkit-appearance:none; appearance:none;
+width:120px; height:3px; border-radius:2px;
+background:linear-gradient(to right,#1a3a5c,#54a0ff);
+outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+-webkit-appearance:none; appearance:none;
+width:16px; height:16px; border-radius:50%;
+background:#54a0ff; box-shadow:0 0 6px rgba(84,160,255,0.8);
+cursor:pointer; border:2px solid #fff;
+}
+input[type=range]::-moz-range-thumb {
+width:16px; height:16px; border-radius:50%;
+background:#54a0ff; box-shadow:0 0 6px rgba(84,160,255,0.8);
+cursor:pointer; border:2px solid #fff;
+}
+#bondSlider { background:linear-gradient(to right,#2a1f00,#ffd32a); }
+#bondSlider::-webkit-slider-thumb { background:#ffd32a; box-shadow:0 0 8px rgba(255,211,42,0.8); }
+#bondSlider::-moz-range-thumb { background:#ffd32a; }
+#bondVal { color:#000; }
+#lifeSlider { background:linear-gradient(to right,#2a0a00,#ff6b6b); }
+#lifeSlider::-webkit-slider-thumb { background:#ff6b6b; box-shadow:0 0 8px rgba(255,107,107,0.8); }
+#lifeSlider::-moz-range-thumb { background:#ff6b6b; }
+#lifeVal { color:#000; }
+#childSlider { background:linear-gradient(to right,#002a10,#0be881); }
+#childSlider::-webkit-slider-thumb { background:#0be881; box-shadow:0 0 8px rgba(11,232,129,0.8); }
+#childSlider::-moz-range-thumb { background:#0be881; }
+#childVal { color:#000; }
+#targetSlider { background:linear-gradient(to right,#002a2a,#00d2d3); }
+#targetSlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
+#targetSlider::-moz-range-thumb { background:#00d2d3; }
+#targetVal { color:#000; }
+#speedSlider { background:linear-gradient(to right,#1a0a2a,#a29bfe); }
+#speedSlider::-webkit-slider-thumb { background:#a29bfe; box-shadow:0 0 8px rgba(162,155,254,0.8); }
+#speedSlider::-moz-range-thumb { background:#a29bfe; }
+#speedVal { color:#000; }
+#singleSlider { background:linear-gradient(to right,#1a1a1a,#aaaaaa); }
+#singleSlider::-webkit-slider-thumb { background:#aaaaaa; box-shadow:0 0 8px rgba(180,180,180,0.8); }
+#singleSlider::-moz-range-thumb { background:#aaaaaa; }
+#singleVal { color:#000; }
+#familySlider { background:linear-gradient(to right,#1a0a2a,#fd79a8); }
+#familySlider::-webkit-slider-thumb { background:#fd79a8; box-shadow:0 0 8px rgba(253,121,168,0.8); }
+#familySlider::-moz-range-thumb { background:#fd79a8; }
+#familyVal { color:#000; }
+#divorceSlider { background:linear-gradient(to right,#1a0800,#e17055); }
+#divorceSlider::-webkit-slider-thumb { background:#e17055; box-shadow:0 0 8px rgba(225,112,85,0.8); }
+#divorceSlider::-moz-range-thumb { background:#e17055; }
+#divorceVal { color:#000; }
+#gaySlider { background:linear-gradient(to right,#1a002a,#a855f7); }
+#gaySlider::-webkit-slider-thumb { background:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.8); }
+#gaySlider::-moz-range-thumb { background:#a855f7; }
+#gayVal { color:#000; }
+#diseaseThreshSlider { background:linear-gradient(to right,#0a0a0a,#444); }
+#diseaseThreshSlider::-webkit-slider-thumb { background:#444; box-shadow:0 0 8px rgba(80,80,80,0.8); }
+#diseaseThreshSlider::-moz-range-thumb { background:#444; }
+#diseaseThreshVal { color:#000; }
+#diseaseDurSlider { background:linear-gradient(to right,#0a0a0a,#888); }
+#diseaseDurSlider::-webkit-slider-thumb { background:#888; box-shadow:0 0 8px rgba(140,140,140,0.8); }
+#diseaseDurSlider::-moz-range-thumb { background:#888; }
+#diseaseDurVal { color:#000; }
+#fatalitySlider { background:linear-gradient(to right,#1a0000,#c0392b); }
+#fatalitySlider::-webkit-slider-thumb { background:#c0392b; box-shadow:0 0 8px rgba(192,57,43,0.8); }
+#fatalitySlider::-moz-range-thumb { background:#c0392b; }
+#fatalityVal { color:#000; }
+#mutationSlider { background:linear-gradient(to right,#0a1a2a,#a855f7); }
+#mutationSlider::-webkit-slider-thumb { background:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.8); }
+#mutationSlider::-moz-range-thumb { background:#a855f7; }
+#mutationVal { color:#000; }
+#familyPullSlider { background:linear-gradient(to right,#0a1a0a,#0be881); }
+#familyPullSlider::-webkit-slider-thumb { background:#0be881; box-shadow:0 0 8px rgba(11,232,129,0.8); }
+#familyPullSlider::-moz-range-thumb { background:#0be881; }
+#familyPullVal { color:#000; }
+#predatorSlider { background:linear-gradient(to right,#0a0000,#cc0000); }
+#predatorSlider::-webkit-slider-thumb { background:#cc0000; box-shadow:0 0 8px rgba(200,0,0,0.8); }
+#predatorSlider::-moz-range-thumb { background:#cc0000; }
+#predatorVal { color:#000; }
+#fullDurSlider { background:linear-gradient(to right,#0a0000,#884400); }
+#fullDurSlider::-webkit-slider-thumb { background:#884400; box-shadow:0 0 8px rgba(136,68,0,0.8); }
+#fullDurSlider::-moz-range-thumb { background:#884400; }
+#fullDurVal { color:#000; }
+#predatorDietSlider { background:linear-gradient(to right,#0a0500,#ff7f00); }
+#predatorDietSlider::-webkit-slider-thumb { background:#ff7f00; box-shadow:0 0 8px rgba(255,127,0,0.8); }
+#predatorDietSlider::-moz-range-thumb { background:#ff7f00; }
+#predatorDietVal { color:#000; }
+#trailOpacitySlider { background:linear-gradient(to right,#0a0a1a,#00d2d3); }
+#trailOpacitySlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
+#trailOpacitySlider::-moz-range-thumb { background:#00d2d3; }
+#trailOpacityVal { color:#000; }
+#trailLengthSlider { background:linear-gradient(to right,#0a0a1a,#48dbfb); }
+#trailLengthSlider::-webkit-slider-thumb { background:#48dbfb; box-shadow:0 0 8px rgba(72,219,251,0.8); }
+#trailLengthSlider::-moz-range-thumb { background:#48dbfb; }
+#trailLengthVal { color:#000; }
+#popCeilSlider { background:linear-gradient(to right,#0a0000,#e84393); }
+#popCeilSlider::-webkit-slider-thumb { background:#e84393; box-shadow:0 0 8px rgba(232,67,147,0.8); }
+#popCeilSlider::-moz-range-thumb { background:#e84393; }
+#popCeilVal { color:#000; }
+#clusterMaxSlider { background:linear-gradient(to right,#0a0a00,#f9ca24); }
+#clusterMaxSlider::-webkit-slider-thumb { background:#f9ca24; box-shadow:0 0 8px rgba(249,202,36,0.8); }
+#clusterMaxSlider::-moz-range-thumb { background:#f9ca24; }
+#clusterMaxVal { color:#000; }
+#minDensitySlider { background:linear-gradient(to right,#0a0800,#e8b423); }
+#minDensitySlider::-webkit-slider-thumb { background:#e8b423; box-shadow:0 0 8px rgba(232,180,35,0.8); }
+#minDensitySlider::-moz-range-thumb { background:#e8b423; }
+#minDensityVal { color:#000; }
+#emigStrSlider { background:linear-gradient(to right,#0a0500,#fd9644); }
+#emigStrSlider::-webkit-slider-thumb { background:#fd9644; box-shadow:0 0 8px rgba(253,150,68,0.8); }
+#emigStrSlider::-moz-range-thumb { background:#fd9644; }
+#emigStrVal { color:#000; }
+#emigReturnSlider { background:linear-gradient(to right,#00120a,#26de81); }
+#emigReturnSlider::-webkit-slider-thumb { background:#26de81; box-shadow:0 0 8px rgba(38,222,129,0.8); }
+#emigReturnSlider::-moz-range-thumb { background:#26de81; }
+#emigReturnVal { color:#000; }
+.ctrl-divider {
+font-size:10px; letter-spacing:2px; color:#000;
+text-transform:uppercase; padding:2px 0 0 0; user-select:none;
+}
+.fb-wrap {
+display:flex; align-items:center; gap:8px;
+color:#000; font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
+}
+.fb-bar { width:120px; height:5px; border-radius:3px; background:rgba(0,0,0,0.1); overflow:hidden; }
+.fb-fill { height:100%; width:50%; border-radius:3px; transition:width 0.35s ease; }
+#nearFill { background:linear-gradient(to right,#1a3a5c,#54a0ff); }
+#lifeFill { background:linear-gradient(to right,#2a0a00,#ff6b6b); }
+#statusBar {
+display:grid; grid-template-columns:150px 120px;
+font-size:11px; letter-spacing:1px; text-transform:uppercase;
+text-align:left;
+}
+#statusBar span { white-space:nowrap; color:#555; font-size:11px; }
+#statusBar span .val { color:#000; font-family:monospace; font-weight:700; }
+.hi { color:#c0392b !important; }
+.lo { color:#27ae60 !important; }
+.ok { color:#000 !important; }
+#playBtn {
+margin-top:2px; align-self:center;
+width:64px; height:64px; border-radius:50%;
+background:rgba(0,210,211,0.12);
+border:2px solid rgba(0,210,211,0.5);
+color:#00d2d3; font-size:26px; line-height:1;
+cursor:pointer; box-shadow:0 0 16px rgba(0,210,211,0.25);
+transition:background 0.2s, box-shadow 0.2s;
+display:flex; align-items:center; justify-content:center;
+}
+#playBtn:hover { background:rgba(0,210,211,0.22); box-shadow:0 0 28px rgba(0,210,211,0.45); }
+#playBtn.running { border-color:rgba(255,107,107,0.6); color:#ff6b6b; background:rgba(255,107,107,0.1); }
+#playBtn.running:hover { background:rgba(255,107,107,0.2); box-shadow:0 0 28px rgba(255,107,107,0.4); }
+#ui { display:flex; flex-direction:row; align-items:flex-start; gap:16px; }
+#rightCol { display:flex; flex-direction:column; align-items:flex-start; gap:7px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+<div id="controls">
+<div class="ctrl-col">
+<div class="ctrl-row">
+<label>target pop</label>
+<input type="range" id="targetSlider" min="2" max="200" value="30">
+<span class="ctrl-val" id="targetVal">30</span>
+</div>
+<div class="ctrl-row">
+<label>pop ceiling</label>
+<input type="range" id="popCeilSlider" min="0" max="150" value="0">
+<span class="ctrl-val" id="popCeilVal">off</span>
+</div>
+<div class="ctrl-row">
+<label>bond after</label>
+<input type="range" id="bondSlider" min="1" max="20" value="1">
+<span class="ctrl-val" id="bondVal">1 hits</span>
+</div>
+<div class="ctrl-row">
+<label>base lifespan</label>
+<input type="range" id="lifeSlider" min="5" max="80" value="80">
+<span class="ctrl-val" id="lifeVal">80 s</span>
+</div>
+<div class="ctrl-row">
+<label>preg. interval</label>
+<input type="range" id="childSlider" min="1" max="20" value="1">
+<span class="ctrl-val" id="childVal">1 s</span>
+</div>
+<div class="ctrl-row">
+<label>family size</label>
+<input type="range" id="familySlider" min="0" max="6" value="4" step="0.1">
+<span class="ctrl-val" id="familyVal">4.0</span>
+</div>
+<div class="ctrl-row">
+<label>divorce rate</label>
+<input type="range" id="divorceSlider" min="0" max="50" value="5" step="5">
+<span class="ctrl-val" id="divorceVal">5%</span>
+</div>
+<div class="ctrl-row">
+<label>speed</label>
+<input type="range" id="speedSlider" min="1" max="10" value="7" step="1">
+<span class="ctrl-val" id="speedVal">7</span>
+</div>
+<div class="ctrl-row">
+<label>singles</label>
+<input type="range" id="singleSlider" min="0" max="80" value="20" step="5">
+<span class="ctrl-val" id="singleVal">20%</span>
+</div>
+<div class="ctrl-row">
+<label>gay %</label>
+<input type="range" id="gaySlider" min="0" max="50" value="10" step="5">
+<span class="ctrl-val" id="gayVal">10%</span>
+</div>
+<div class="ctrl-row">
+<label>mutation %</label>
+<input type="range" id="mutationSlider" min="0" max="50" value="50" step="1">
+<span class="ctrl-val" id="mutationVal">50%</span>
+</div>
+<div class="ctrl-row">
+<label>family pull</label>
+<input type="range" id="familyPullSlider" min="0" max="100" value="60" step="5">
+<span class="ctrl-val" id="familyPullVal">60%</span>
+</div>
+</div>
+<div class="ctrl-col">
+<div class="ctrl-divider">clusters</div>
+<div class="ctrl-row">
+<label>cluster max</label>
+<input type="range" id="clusterMaxSlider" min="2" max="100" value="20">
+<span class="ctrl-val" id="clusterMaxVal">20</span>
+</div>
+<div class="ctrl-row">
+<label>min density</label>
+<input type="range" id="minDensitySlider" min="1" max="8" value="3" step="1">
+<span class="ctrl-val" id="minDensityVal">3</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>aura</label>
+<button id="auraGradBtn" title="Toggle aura gradient" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#35d78a;position:relative;transition:background 0.2s;outline:none;">
+<span id="auraGradKnob" style="
+position:absolute;top:3px;left:25px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
+</div>
+<div class="ctrl-row">
+<label>emigr. push</label>
+<input type="range" id="emigStrSlider" min="0" max="30" value="15" step="1">
+<span class="ctrl-val" id="emigStrVal">1.5</span>
+</div>
+<div class="ctrl-row">
+<label>emigr. return</label>
+<input type="range" id="emigReturnSlider" min="0" max="10" value="4" step="1">
+<span class="ctrl-val" id="emigReturnVal">0.4</span>
+</div>
+<div class="ctrl-divider">disease</div>
+<div class="ctrl-row">
+<label>infect. hits</label>
+<input type="range" id="diseaseThreshSlider" min="1" max="10" value="1" step="1">
+<span class="ctrl-val" id="diseaseThreshVal">1</span>
+</div>
+<div class="ctrl-row">
+<label>infect. dur.</label>
+<input type="range" id="diseaseDurSlider" min="5" max="60" value="10" step="5">
+<span class="ctrl-val" id="diseaseDurVal">10 s</span>
+</div>
+<div class="ctrl-row">
+<label>fatality %</label>
+<input type="range" id="fatalitySlider" min="0" max="80" value="10" step="5">
+<span class="ctrl-val" id="fatalityVal">10%</span>
+<span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#c0392b;letter-spacing:0.5px;"></span>
+</div>
+<div class="ctrl-divider">predators</div>
+<div class="ctrl-row">
+<label>predators</label>
+<input type="range" id="predatorSlider" min="0" max="5" value="0" step="1">
+<span class="ctrl-val" id="predatorVal">0</span>
+</div>
+<div class="ctrl-row">
+<label>full for (s)</label>
+<input type="range" id="fullDurSlider" min="1" max="30" value="10" step="1">
+<span class="ctrl-val" id="fullDurVal">10 s</span>
+</div>
+<div class="ctrl-row">
+<label>prey</label>
+<input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
+<span class="ctrl-val" id="predatorDietVal">other</span>
+</div>
+<div class="ctrl-divider">visuals</div>
+<div class="ctrl-row">
+<label>trail opacity</label>
+<input type="range" id="trailOpacitySlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="trailOpacityVal">40%</span>
+</div>
+<div class="ctrl-row">
+<label>trail length</label>
+<input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
+<span class="ctrl-val" id="trailLengthVal">30</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>background</label>
+<input type="color" id="bgColorInput" value="#081828" title="Canvas background colour" style="
+width:44px;height:22px;border:none;padding:1px;cursor:pointer;
+border-radius:4px;background:#222;outline:none;">
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>no overlap</label>
+<button id="noOverlapBtn" title="Toggle body separation" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="noOverlapKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="noOverlapLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+</div>
+</div>
+</div>
+
+<div id="rightCol">
+<div style="display:flex;gap:12px;align-items:center;">
+<div class="fb-wrap">
+<span>density</span>
+<div class="fb-bar"><div class="fb-fill" id="nearFill"></div></div>
+</div>
+<div class="fb-wrap">
+<span>lifespan</span>
+<div class="fb-bar"><div class="fb-fill" id="lifeFill"></div></div>
+</div>
+</div>
+
+<div id="statusBar">
+<span>population: <span id="popSpan" class="val">—</span></span>
+<span>lifespan: <span id="lifeSpan" class="val">— s</span></span>
+</div>
+<div id="inbreedingWarn" style="display:none;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#ff6b6b;">
+inbreeding: hazard ×<span id="inbreedMult">—</span> · modal −<span id="inbreedDelta">—</span> s
+</div>
+
+<div id="readout" style="
+display:grid; grid-template-columns:repeat(4,auto); gap:1px 10px;
+font-size:11px; letter-spacing:1px; text-transform:uppercase;
+color:#000; line-height:1.7; align-items:baseline;
+">
+<span style="color:#555;">pairs</span> <span id="rdFertile" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">birth</span> <span id="rdBirth" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">death</span> <span id="rdDeath" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">immig.</span> <span id="rdImmig" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">sick</span> <span id="rdSick" style="font-family:monospace;font-weight:700;">0</span>
+<span style="color:#555;">R</span> <span id="rdR" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">div</span> <span id="rdDiv" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">dis.deaths</span> <span id="rdDied" style="font-family:monospace;font-weight:700;">0</span>
+<span style="color:#555;">eff.br.</span> <span id="rdEffBr" style="font-family:monospace;font-weight:700;">—</span>
+<span style="color:#555;">50-rule</span> <span id="rdSmallPop" style="font-family:monospace;font-weight:700;">—</span>
+</div>
+
+<div style="display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
+<span style="color:#555;">target</span>
+<span id="familyDot" style="font-size:16px;line-height:1;">●</span>
+<span id="familyName" style="font-weight:700;min-width:58px;">—</span>
+<span style="color:#555;font-size:9px;">conv.</span>
+<span id="familyConv" style="font-family:monospace;font-weight:700;min-width:32px;">—</span>
+<span id="familyTimer" style="color:#555;font-size:9px;min-width:28px;"></span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
+<div style="display:flex;align-items:center;gap:8px;">
+<span id="viabilityDot"   style="font-size:15px;line-height:1;">●</span>
+<span id="viabilityState" style="font-weight:700;min-width:80px;">—</span>
+<span id="viabilityDetail" style="color:#555;font-size:10px;">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;">
+<span id="bondRiskDot"    style="font-size:15px;line-height:1;">●</span>
+<span id="bondRiskState"  style="font-weight:700;min-width:80px;">—</span>
+<span id="bondRiskDetail" style="color:#555;font-size:10px;">—</span>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#000;user-select:none;">
+<span>immigration</span>
+<button id="immigrationBtn" title="Toggle immigration" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#c0392b;position:relative;transition:background 0.2s;outline:none;">
+<span id="immigrationKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="immigrationLabel" style="color:#c0392b;font-weight:700;">off</span>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#000;user-select:none;">
+<span>disease</span>
+<button id="infectBtn" title="Infect a random boid" style="
+padding:2px 10px;border-radius:4px;border:1px solid #333;cursor:pointer;
+background:#1a1a1a;color:#eee;font-size:10px;letter-spacing:1px;
+text-transform:uppercase;font-family:'Courier New',monospace;outline:none;">infect</button>
+<span id="infectStatus" style="color:#555;font-size:10px;"></span>
+</div>
+
+<button id="playBtn" title="Start simulation">▶</button>
+<button id="exportBtn" title="Export standalone HTML" style="
+padding:0;width:36px;height:36px;border-radius:6px;font-size:16px;line-height:1;
+background:rgba(11,232,129,0.12);border:2px solid rgba(11,232,129,0.5);
+color:#0be881;cursor:pointer;box-shadow:0 0 16px rgba(11,232,129,0.25);
+font-family:'Courier New',monospace;outline:none;">⬇</button>
+</div>
+
+<div id="pyramidCol" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+<div class="ctrl-row" style="gap:6px;">
+<label style="min-width:auto;">refresh</label>
+<input type="range" id="pyramidRefreshSlider" min="1" max="10" value="3" style="width:80px;">
+<span id="pyramidRefreshVal" class="ctrl-val">3 s</span>
+</div>
+<canvas id="popPyramid" width="260" height="200"
+  style="display:block;border:1px solid rgba(0,0,0,0.08);border-radius:4px;background:#fafafa;"></canvas>
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+
+// ── PixiJS initialisation ─────────────────────────────────────────────────────
+// app is created after the first resize() so the canvas already has correct dims
+let app;
+let _idleText = null; // PIXI.Text shown on idle screen, hidden when sim starts
+const _gfx = {}; // named Graphics layers, populated after app is created
+
+
+// ── slider state ──────────────────────────────────────────────────────────────
+let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
+let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
+let CLUSTER_MAX        = parseInt(document.getElementById('clusterMaxSlider').value);
+let MIN_CLUSTER_DENSITY = parseInt(document.getElementById('minDensitySlider').value);
+let AURA_GRADIENT = true;
+let EMIG_PUSH      = parseInt(document.getElementById('emigStrSlider').value) / 10;
+let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
+let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
+let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
+let PREG_INTERVAL = parseInt(document.getElementById('childSlider').value);
+let SINGLE_FRACTION = parseInt(document.getElementById('singleSlider').value) / 100;
+let GAY_FRACTION = parseInt(document.getElementById('gaySlider').value) / 100;
+let FAMILY_SIZE = parseInt(document.getElementById('familySlider').value);
+let DIVORCE_RATE = parseInt(document.getElementById('divorceSlider').value) / 100;
+let immigrationEnabled = false;
+let immigrantEvents = []; // timestamps of actual immigrants spawned
+
+// ── rolling rate tracking (30s window) ───────────────────────────────────────
+const RATE_WINDOW = 30; // seconds
+let birthEvents = []; // timestamps of recent births
+let deathEvents = []; // timestamps of recent deaths
+let simClock = 0; // total sim time in seconds
+let pyramidRefreshInterval = 3;
+let lastPyramidUpdate = -Infinity;
+
+// ── immigration toggle ────────────────────────────────────────────────────────
+const immigrationBtn = document.getElementById('immigrationBtn');
+const immigrationKnob = document.getElementById('immigrationKnob');
+const immigrationLabel = document.getElementById('immigrationLabel');
+
+immigrationBtn.addEventListener('click',()=>{
+immigrationEnabled = !immigrationEnabled;
+if(immigrationEnabled){
+immigrationBtn.style.background = '#27ae60';
+immigrationKnob.style.left = '25px';
+immigrationLabel.textContent = 'on';
+immigrationLabel.style.color = '#27ae60';
+} else {
+immigrationBtn.style.background = '#c0392b';
+immigrationKnob.style.left = '3px';
+immigrationLabel.textContent = 'off';
+immigrationLabel.style.color = '#c0392b';
+}
+});
+const auraGradBtn   = document.getElementById('auraGradBtn');
+const auraGradKnob  = document.getElementById('auraGradKnob');
+const auraGradLabel = document.getElementById('auraGradLabel');
+auraGradBtn.addEventListener('click',()=>{
+AURA_GRADIENT = !AURA_GRADIENT;
+if(AURA_GRADIENT){
+  auraGradBtn.style.background='#35d78a'; auraGradKnob.style.left='25px';
+  auraGradLabel.textContent='gradient'; auraGradLabel.style.color='#35d78a';
+} else {
+  auraGradBtn.style.background='#f9ca24'; auraGradKnob.style.left='3px';
+  auraGradLabel.textContent='flat'; auraGradLabel.style.color='#c8a000';
+}
+});
+
+// ── background colour ─────────────────────────────────────────────────────────
+let BG_COLOR = document.getElementById('bgColorInput').value;
+document.getElementById('bgColorInput').addEventListener('input', e => { BG_COLOR = e.target.value; });
+
+// ── no-overlap toggle ─────────────────────────────────────────────────────────
+let NO_OVERLAP = false;
+const noOverlapBtn   = document.getElementById('noOverlapBtn');
+const noOverlapKnob  = document.getElementById('noOverlapKnob');
+const noOverlapLabel = document.getElementById('noOverlapLabel');
+noOverlapBtn.addEventListener('click', () => {
+NO_OVERLAP = !NO_OVERLAP;
+if(NO_OVERLAP){
+  noOverlapBtn.style.background='#54a0ff'; noOverlapKnob.style.left='25px';
+  noOverlapLabel.textContent='on'; noOverlapLabel.style.color='#54a0ff';
+} else {
+  noOverlapBtn.style.background='#555'; noOverlapKnob.style.left='3px';
+  noOverlapLabel.textContent='off'; noOverlapLabel.style.color='#555';
+}
+});
+
+const M_FERTILE_FROM = 0.20; // males fertile from 20% of lifespan
+const M_FERTILE_FOR = 0.70; // males fertile for 70% of lifespan
+const F_FERTILE_FROM = 0.20; // females fertile from 20% of lifespan
+const F_FERTILE_FOR = 0.50; // females fertile for 50% of lifespan
+
+function wire(id, valId, parse, fmt, onSet) {
+const el=document.getElementById(id), vl=document.getElementById(valId);
+el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.value); });
+}
+wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
+wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
+wire('clusterMaxSlider',  'clusterMaxVal',   v=>parseInt(v), v=>v, v=>{ CLUSTER_MAX=v; });
+wire('minDensitySlider',  'minDensityVal',   v=>parseInt(v), v=>v, v=>{ MIN_CLUSTER_DENSITY=v; });
+wire('emigStrSlider',    'emigStrVal',     v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_PUSH=v/10; });
+wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
+wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
+wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
+wire('childSlider', 'childVal', v=>parseInt(v), v=>v+' s', v=>{ PREG_INTERVAL=v; updateViability(); });
+wire('speedSlider', 'speedVal', v=>parseInt(v), v=>v, v=>{
+SPEED=v*0.45;
+TURN_SPEED=TURN_SPEED_BASE*(SPEED/SPEED_MAX);
+WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
+});
+wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
+wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
+wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
+wire('divorceSlider',      'divorceVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DIVORCE_RATE=v/100; });
+wire('diseaseThreshSlider','diseaseThreshVal', v=>parseInt(v),   v=>v,      v=>{ DISEASE_THRESHOLD=v; });
+wire('diseaseDurSlider',   'diseaseDurVal',    v=>parseInt(v),   v=>v+' s', v=>{ DISEASE_DURATION=v; });
+wire('fatalitySlider',     'fatalityVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DISEASE_FATALITY=v/100; });
+wire('mutationSlider',     'mutationVal',      v=>parseInt(v),   v=>v+'%',  v=>{ MUTATION_RATE=v/100; });
+wire('familyPullSlider',   'familyPullVal',    v=>parseInt(v),   v=>v+'%',  v=>{ FAMILY_PULL=v/100; });
+wire('predatorSlider',     'predatorVal',      v=>parseInt(v),   v=>v,       v=>{ syncPredatorCount(v); });
+wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>{ FULL_DURATION=v; });
+wire('predatorDietSlider', 'predatorDietVal',  v=>parseInt(v),   v=>['','any','favored','other'][v], v=>{ PREDATOR_DIET=v; });
+wire('trailOpacitySlider', 'trailOpacityVal',  v=>parseInt(v),   v=>v+'%',  v=>{ TRAIL_OPACITY=v/100; });
+wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
+wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
+
+// ── canvas sizing ─────────────────────────────────────────────────────────────
+let SENSING_RADIUS = 130;
+function resize() {
+const ui = document.getElementById('ui');
+const uiH = ui ? ui.offsetHeight + 8 : 0;
+canvas.width  = Math.max(window.innerWidth, 60);
+canvas.height = Math.max(window.innerHeight - uiH, 60);
+if(app) app.renderer.resize(canvas.width, canvas.height);
+SENSING_RADIUS = Math.round(Math.min(canvas.width, canvas.height) * 0.3);
+}
+resize(); // set canvas dims before creating app below
+
+// ── PixiJS app + graphic layers ───────────────────────────────────────────────
+app = new PIXI.Application({
+view: canvas,
+width: canvas.width, height: canvas.height,
+backgroundAlpha: 0,  // background drawn by gBg each frame
+antialias: true,
+resolution: 1,
+});
+app.ticker.stop(); // simulation loop drives rendering manually
+
+['bg','trails','clusters','bondLines','birthRings','boids','splashes','predators'].forEach(k=>{
+_gfx[k] = new PIXI.Graphics();
+app.stage.addChild(_gfx[k]);
+});
+
+window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
+
+// ── constants ─────────────────────────────────────────────────────────────────
+// ── colour family cycle ───────────────────────────────────────────────────────
+const COLOR_FAMILY_CYCLE = ['red','yellow','green','cyan','blue','magenta'];
+const FAMILY_HUE = {red:0, yellow:60, green:120, cyan:180, blue:240, magenta:300};
+const FAMILY_CSS = {red:'#ff4444', yellow:'#ffd32a', green:'#0be881', cyan:'#00d2d3', blue:'#54a0ff', magenta:'#d980fa'};
+let preferredFamilyIdx = 0;
+let preferredFamily    = COLOR_FAMILY_CYCLE[0];
+let familyConvergedTimer = 0;
+const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
+const RADIUS = 20;
+let MAX_TRAIL = 30;
+const SPEED_MAX = 10 * 0.45;   // slider ceiling × conversion factor = 4.5
+let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
+const TURN_SPEED_BASE = 0.07;   // heading-change cap per steerToward call at max speed
+const WANDER_STR_BASE = 0.12;   // wander-angle jitter amplitude at max speed
+let TURN_SPEED = TURN_SPEED_BASE * (SPEED / SPEED_MAX);
+let WANDER_STR = WANDER_STR_BASE * (SPEED / SPEED_MAX);
+const WALL_MARGIN = 80;
+const BOND_DIST = 90;
+const BOND_STRENGTH = 3.0;
+const COOLDOWN_FRAMES = 30;
+const FADE_DURATION = 2.0;
+const BIRTH_DURATION = 1.5;
+const BASE_NEARNESS = 4.0;
+const MIN_NEARNESS = 0.05;
+const LIFESPAN_SCALE_MAX = 1.25; // at base 80s → ceiling of 100s
+const LIFESPAN_SCALE_MIN = 0.4;
+const MAX_LIFESPAN = 100; // hard biological ceiling in seconds
+const WARMUP_DURATION = 15.0;    // seconds to ramp nearness from 0 to full strength
+let DISEASE_DURATION = 20.0;     // seconds a boid stays infectious
+let DISEASE_THRESHOLD = 3;       // exposure hits from infected boids to catch disease
+let DISEASE_FATALITY = parseInt(document.getElementById('fatalitySlider').value) / 100;
+let MUTATION_RATE    = parseInt(document.getElementById('mutationSlider').value)  / 100;
+let FAMILY_PULL      = parseInt(document.getElementById('familyPullSlider').value)  / 100;
+let N_PREDATORS      = parseInt(document.getElementById('predatorSlider').value);
+let FULL_DURATION    = parseInt(document.getElementById('fullDurSlider').value);
+let PREDATOR_DIET    = parseInt(document.getElementById('predatorDietSlider').value);
+let AUTO_DISEASE     = false;
+let _allDeadTimer    = 0;
+let _autoDisTimer    = 30 + Math.random()*60;
+const PREDATOR_RADIUS   = 30;
+const PREDATOR_SENSE    = 200; // sensing radius — only pursues boids within this range
+const STARVATION_TIME   = 45; // seconds hungry with no prey before dying
+let predators = [];
+let deathSplashes = [];
+let TRAIL_OPACITY    = parseInt(document.getElementById('trailOpacitySlider').value) / 100;
+const DISEASE_COOLDOWN = 1.5;    // seconds before same pair can register another hit
+
+let smoothPressure = 0.5;
+let smoothGlobalPressure = 0.0;
+let nextId = 0;
+let _cachedDiversity = 0.3;        // updated each frame in updateStatus; used by disease & hazard
+let _cachedEffectiveBreeders = 0;  // fertile bonded M+F pairs × 2; updated each frame
+
+// ── disease ───────────────────────────────────────────────────────────────────
+const diseaseCooldown = new Map(); // pairKey → expiry simClock time
+let rHistory = [];                 // infectCount of each recovered/dead diseased boid
+let diseaseDeathEvents = [];       // simClock timestamps of disease fatalities
+
+// ── boidMap + spatial grid (Pi perf) ─────────────────────────────────────────
+let boidMap = new Map(); // id → boid; rebuilt each frame
+let _sgGrid = null;
+let _sgCellSize = 1;
+
+function _buildSpatialGrid(){
+_sgCellSize = Math.max(SENSING_RADIUS, RADIUS * 2);
+_sgGrid = new Map();
+for(const b of boids){
+  if(!b.alive) continue;
+  const cx = Math.floor(b.x / _sgCellSize);
+  const cy = Math.floor(b.y / _sgCellSize);
+  const key = cx * 10000 + cy;
+  let cell = _sgGrid.get(key);
+  if(!cell){ cell=[]; _sgGrid.set(key, cell); }
+  cell.push(b);
+}
+}
+
+function _sgNeighbors(x, y, radius){
+const cs = _sgCellSize;
+const cx0 = Math.floor((x - radius) / cs);
+const cx1 = Math.floor((x + radius) / cs);
+const cy0 = Math.floor((y - radius) / cs);
+const cy1 = Math.floor((y + radius) / cs);
+const out = [];
+for(let cx = cx0; cx <= cx1; cx++){
+  for(let cy = cy0; cy <= cy1; cy++){
+    const cell = _sgGrid.get(cx * 10000 + cy);
+    if(cell) for(const b of cell) out.push(b);
+  }
+}
+return out;
+}
+
+// ── cluster detection ─────────────────────────────────────────────────────────
+const CLUSTER_RADIUS = BOND_DIST;
+const _cr2 = CLUSTER_RADIUS * CLUSTER_RADIUS;
+let _clusterIdCounter = 0;
+let _prevClusters = []; // [{cx,cy,id}] from previous frame for stable colour assignment
+
+function updateClusters(){
+for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; b.clusterBoundR=0; b._isCore=false; }
+
+// Step 1: classify core boids — need >= MIN_CLUSTER_DENSITY neighbours within CLUSTER_RADIUS
+for(const boid of boids){
+  if(!boid.alive||boid.dying) continue;
+  let n=0;
+  for(const nb of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+    if(!nb.alive||nb.dying||nb===boid) continue;
+    const dx=nb.x-boid.x, dy=nb.y-boid.y;
+    if(dx*dx+dy*dy<_cr2) n++;
+  }
+  boid._isCore = n>=MIN_CLUSTER_DENSITY;
+}
+
+// Step 2: BFS through core boids only — thin chains and bridge boids don't propagate
+const rawClusters=[];
+for(const boid of boids){
+  if(!boid.alive||boid.dying||!boid._isCore||boid.clusterId!==-1) continue;
+  const ri=rawClusters.length;
+  const coreMembers=[boid];
+  boid.clusterId=ri;
+  for(let qi=0;qi<coreMembers.length;qi++){
+    const b=coreMembers[qi];
+    for(const nb of _sgNeighbors(b.x,b.y,CLUSTER_RADIUS)){
+      if(!nb.alive||nb.dying||!nb._isCore||nb.clusterId!==-1) continue;
+      const dx=nb.x-b.x, dy=nb.y-b.y;
+      if(dx*dx+dy*dy<_cr2){ nb.clusterId=ri; coreMembers.push(nb); }
+    }
+  }
+  rawClusters.push({allMembers:[...coreMembers], ri});
+}
+
+// Step 3: attach border boids to their nearest core neighbour
+for(const boid of boids){
+  if(!boid.alive||boid.dying||boid._isCore) continue;
+  let bestD2=Infinity, bestRi=-1;
+  for(const nb of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+    if(!nb.alive||nb.dying||!nb._isCore||nb.clusterId===-1) continue;
+    const dx=nb.x-boid.x, dy=nb.y-boid.y;
+    const d2=dx*dx+dy*dy;
+    if(d2<_cr2&&d2<bestD2){ bestD2=d2; bestRi=nb.clusterId; }
+  }
+  if(bestRi>=0){ boid.clusterId=bestRi; rawClusters[bestRi].allMembers.push(boid); }
+}
+
+// Step 4: compute centroids and bounding radii
+for(const rc of rawClusters){
+  let cx=0,cy=0;
+  for(const m of rc.allMembers){ cx+=m.x; cy+=m.y; }
+  cx/=rc.allMembers.length; cy/=rc.allMembers.length;
+  let boundR=RADIUS*2;
+  for(const m of rc.allMembers){
+    const dx=m.x-cx, dy=m.y-cy;
+    const d=Math.sqrt(dx*dx+dy*dy)+RADIUS*1.5;
+    if(d>boundR) boundR=d;
+  }
+  rc.cx=cx; rc.cy=cy; rc.boundR=boundR;
+}
+
+// Step 5: stable colour IDs — match to nearest previous cluster centroid
+const matchThresh2=(CLUSTER_RADIUS*2)*(CLUSTER_RADIUS*2);
+const usedPrev=new Set();
+for(const rc of rawClusters){
+  let bestId=-1, bestD2=Infinity;
+  for(const prev of _prevClusters){
+    if(usedPrev.has(prev.id)) continue;
+    const dx=rc.cx-prev.cx, dy=rc.cy-prev.cy;
+    const d2=dx*dx+dy*dy;
+    if(d2<matchThresh2&&d2<bestD2){ bestD2=d2; bestId=prev.id; }
+  }
+  if(bestId>=0){ rc.stableId=bestId; usedPrev.add(bestId); }
+  else{ rc.stableId=_clusterIdCounter++; }
+}
+
+// Step 6: write back to boids
+for(const rc of rawClusters){
+  const sz=rc.allMembers.length;
+  for(const m of rc.allMembers){
+    m.clusterId=rc.stableId; m.clusterSize=sz;
+    m.clusterCx=rc.cx; m.clusterCy=rc.cy; m.clusterBoundR=rc.boundR;
+  }
+}
+_prevClusters=rawClusters.map(rc=>({cx:rc.cx,cy:rc.cy,id:rc.stableId}));
+}
+
+function clusterEmigration(boid){
+if(boid.clusterSize<=CLUSTER_MAX) return;
+// local centre of mass from neighbours within CLUSTER_RADIUS
+let lx=0,ly=0,lc=0;
+for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+  if(!o.alive||o.dying||o===boid) continue;
+  const dx=o.x-boid.x, dy=o.y-boid.y;
+  if(dx*dx+dy*dy<_cr2){ lx+=o.x; ly+=o.y; lc++; }
+}
+if(lc===0) return;
+const lcx=lx/lc, lcy=ly/lc;
+const awayX=boid.x-lcx, awayY=boid.y-lcy;
+// periphery fraction: 0 at local centre → 1 at CLUSTER_RADIUS edge
+// interior boids feel no push; only the outer ring is shed gradually
+const peripheryFrac=Math.min(Math.sqrt(awayX*awayX+awayY*awayY)/CLUSTER_RADIUS,1);
+if(peripheryFrac<0.01) return;
+const overload=Math.min((boid.clusterSize-CLUSTER_MAX)/CLUSTER_MAX,1);
+steerToward(boid, boid.x+awayX, boid.y+awayY, overload*peripheryFrac*EMIG_PUSH);
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function gaussianRandom(mean, std){
+const u=1-Math.random(), v=Math.random();
+return mean + std * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+// ── colour helpers (hue/sat representation) ───────────────────────────────────
+function hueToFamily(hue){
+if(hue<30||hue>=330) return 'red';
+if(hue<90)  return 'yellow';
+if(hue<150) return 'green';
+if(hue<210) return 'cyan';
+if(hue<270) return 'blue';
+return 'magenta';
+}
+function boidColorStr(b){ return `hsl(${b.hue.toFixed(1)},${Math.round(b.sat*100)}%,50%)`; }
+function boidColorAlpha(b,a){ return `hsla(${b.hue.toFixed(1)},${Math.round(b.sat*100)}%,50%,${a})`; }
+// ── PixiJS colour helpers ─────────────────────────────────────────────────────
+function hslToHex(h,s,l){
+// Returns a PixiJS integer colour 0xRRGGBB from HSL (h:0-360, s:0-100, l:0-100)
+s/=100; l/=100;
+const k=n=>(n+h/30)%12;
+const a=s*Math.min(l,1-l);
+const f=n=>Math.round(Math.max(0,Math.min(1,l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1))))*255);
+return(f(0)<<16)|(f(8)<<8)|f(4);
+}
+function boidHex(b){ return hslToHex(b.hue,b.sat*100,50); }
+function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
+function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
+function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
+function blendHueSat(a,b){
+let dh=b.hue-a.hue;
+if(dh>180) dh-=360; if(dh<-180) dh+=360;
+return {hue:(a.hue+dh/2+360)%360, sat:(a.sat+b.sat)/2};
+}
+function mixHue(h1,h2){
+let d=h2-h1;
+if(Math.abs(d)>180) d-=Math.sign(d)*360;
+return (h1+d*0.5+360)%360;
+}
+function biasedHue(h1,h2,preferredHue){
+let child=mixHue(h1,h2);
+let d=preferredHue-child;
+if(Math.abs(d)>180) d-=Math.sign(d)*360;
+return (child+0.3*d+360)%360;
+}
+function mutateHueSat(hue,sat){
+if(Math.random()>=MUTATION_RATE) return {hue,sat};
+return {hue:(hue+(Math.random()-0.5)*30+360)%360,
+        sat:Math.max(0.2,Math.min(1.0,sat+(Math.random()-0.5)*0.2))};
+}
+function randomColorInFamily(family){
+const segs={red:[[0,30],[330,360]],yellow:[[30,90]],green:[[90,150]],cyan:[[150,210]],blue:[[210,270]],magenta:[[270,330]]};
+const r=segs[family]||segs.red;
+const seg=r[Math.floor(Math.random()*r.length)];
+return {hue:seg[0]+Math.random()*(seg[1]-seg[0]), sat:0.6+Math.random()*0.3};
+}
+function inheritColor(parentA,parentB){
+const aIn=boidInPreferredFamily(parentA), bIn=boidInPreferredFamily(parentB);
+if(aIn||bIn){
+  const donor=aIn?parentA:parentB;
+  let childHue=(donor.hue+(Math.random()-0.5)*20+360)%360;
+  if(hueToFamily(childHue)!==preferredFamily) childHue=donor.hue;
+  const childSat=Math.max(0.2,Math.min(1.0,(parentA.sat+parentB.sat)/2+(Math.random()-0.5)*0.1));
+  return {hue:childHue, sat:childSat};
+}
+const prefHue=FAMILY_HUE[preferredFamily]??0;
+const childHue=biasedHue(parentA.hue,parentB.hue,prefHue);
+const childSat=(parentA.sat+parentB.sat)/2;
+return mutateHueSat(childHue,childSat);
+}
+// beakGene: 8-bit value → multiplier in [0.2, 3.0]. Default gene≈73 → multiplier≈1.0
+const BEAK_GENE_DEFAULT = 73;
+function beakMultiplier(gene){ return 0.2 + (gene / 255) * 2.8; }
+function mutateBeakGene(gene){
+if(Math.random() >= MUTATION_RATE) return gene;
+const bit = Math.floor(Math.random() * 8);
+return (gene ^ (1 << bit)) & 0xFF;
+}
+// eyeGene: 8-bit value → eye radius as fraction of r in [0.1, 0.65]. Default gene≈64 → r*0.25
+const EYE_GENE_DEFAULT = 64;
+function eyeRadius(gene, r){ return r * (0.1 + (gene / 255) * 0.55); }
+function mutateEyeGene(gene){
+if(Math.random() >= MUTATION_RATE) return gene;
+const bit = Math.floor(Math.random() * 8);
+return (gene ^ (1 << bit)) & 0xFF;
+}
+// ── predator helpers ──────────────────────────────────────────────────────────
+function makePredator(){
+const ang=Math.random()*Math.PI*2;
+const spd=SPEED*1.2;
+return {
+x:PREDATOR_RADIUS+Math.random()*(canvas.width-PREDATOR_RADIUS*2),
+y:PREDATOR_RADIUS+Math.random()*(canvas.height-PREDATOR_RADIUS*2),
+vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+wanderAngle:ang,
+lastEaten:-FULL_DURATION, // hungry from birth
+noPreyTimer:0,
+alive:true,
+trail:[]
+};
+}
+function syncPredatorCount(n){
+N_PREDATORS=n;
+if(!running) return;
+while(predators.filter(p=>p.alive).length < N_PREDATORS) predators.push(makePredator());
+const alive=predators.filter(p=>p.alive);
+while(alive.length > N_PREDATORS){ alive[alive.length-1].alive=false; alive.pop(); }
+}
+function spawnDeathSplash(x,y,hue,sat){
+const s=Math.round(sat*100);
+deathSplashes.push({
+x, y, age:0, duration:0.85, hue, s,
+particles: Array.from({length:12},()=>{
+const ang=Math.random()*Math.PI*2;
+return {cx:Math.cos(ang),cy:Math.sin(ang),spd:80+Math.random()*200,r:6+Math.random()*10};
+})
+});
+}
+
+// ── boid factory ──────────────────────────────────────────────────────────────
+function makeBoid(x,y,color,isChild,parentA,parentB){
+const angle = Math.random()*Math.PI*2;
+const familyKey = (parentA!==undefined && parentB!==undefined)
+? Math.min(parentA.id,parentB.id)+':'+Math.max(parentA.id,parentB.id) : null;
+const parentIds = (parentA!==undefined && parentB!==undefined)
+? new Set([parentA.id, parentB.id]) : new Set();
+// sex: biased toward minority sex
+const males = boids.filter(b=>b.alive&&b.sex==='M').length;
+const females = boids.filter(b=>b.alive&&b.sex==='F').length;
+const total = males + females;
+const pFemale = total > 0 ? males / total : 0.5;
+const sex = Math.random() < pFemale ? 'F' : 'M';
+const chosenColor = color || pickBoidColor();
+const {hue: chosenHue, sat: chosenSat} = chosenColor;
+// immigrant generation tracking
+let immigrantGeneration = -1;
+if(parentA!==undefined && parentB!==undefined){
+const pa=parentA.immigrantGeneration, pb=parentB.immigrantGeneration;
+if(pa>=0||pb>=0){
+immigrantGeneration = Math.max(pa>=0?pa:-1, pb>=0?pb:-1) + 1;
+}
+}
+// singles never bond — assigned probabilistically at birth
+const isSingle = Math.random() < SINGLE_FRACTION;
+const isGay = !isSingle && Math.random() < GAY_FRACTION;
+return {
+id:nextId++, x: x!==undefined?x:RADIUS+Math.random()*(canvas.width-RADIUS*2),
+y: y!==undefined?y:RADIUS+Math.random()*(canvas.height-RADIUS*2),
+vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED, _sa:angle,
+hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
+age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
+partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
+isChild:!!isChild, localPressure:0, globalPressure:0, popPressure:0,
+effectiveLifespan:BASE_LIFESPAN,
+maxLifespan:Math.max(BASE_LIFESPAN*0.3, gaussianRandom(BASE_LIFESPAN, BASE_LIFESPAN*0.2)),
+parentIds, familyKey, sex,
+beakGene: (parentA!==undefined && parentB!==undefined)
+? mutateBeakGene(Math.round((parentA.beakGene + parentB.beakGene) / 2))
+: BEAK_GENE_DEFAULT,
+eyeGene: (parentA!==undefined && parentB!==undefined)
+? mutateEyeGene(Math.round((parentA.eyeGene + parentB.eyeGene) / 2))
+: EYE_GENE_DEFAULT,
+immigrantGeneration, isSingle, isGay, pairFamilyTarget:0,
+diseased:false, immune:false, diseaseTimer:0, diseaseHits:0, infectCount:0,
+clusterId:-1, clusterSize:0, clusterCx:0, clusterCy:0, clusterBoundR:0,
+trail:[]
+};
+}
+
+let boids = [];
+let birthRings = [];
+
+// ── pair maps ─────────────────────────────────────────────────────────────────
+const hits=new Map(), cooldown=new Map();
+function pairKey(a,b){ return Math.min(a,b)+'-'+Math.max(a,b); }
+function getHits(a,b) { return hits.get(pairKey(a,b))||0; }
+function getCool(a,b) { return cooldown.get(pairKey(a,b))||0; }
+function setHits(a,b,v) { hits.set(pairKey(a,b),v); }
+function setCool(a,b,v) { cooldown.set(pairKey(a,b),v); }
+function clearPair(a,b) { const k=pairKey(a,b); hits.delete(k); cooldown.delete(k); }
+
+// ── fertility ─────────────────────────────────────────────────────────────────
+function isFertile(boid){
+const life = boid.maxLifespan;
+const from = boid.sex==='M' ? M_FERTILE_FROM : F_FERTILE_FROM;
+const dur = boid.sex==='M' ? M_FERTILE_FOR : F_FERTILE_FOR;
+return boid.age >= life*from && boid.age <= life*(from+dur);
+}
+
+// ── pressure ──────────────────────────────────────────────────────────────────
+// fertile counts are global — compute once per frame before the per-boid loop
+let _fertileMales=0, _fertileFemales=0;
+function updateFertileCounts(){
+_fertileMales = boids.filter(b=>b.alive&&!b.dying&&b.sex==='M'&&isFertile(b)).length;
+_fertileFemales = boids.filter(b=>b.alive&&!b.dying&&b.sex==='F'&&isFertile(b)).length;
+}
+
+// effective breeders: fertile bonded M+F pairs × 2 (the 50/500 rule denominator)
+function updateEffectiveBreeders(){
+const boidMap = new Map(boids.map(b=>[b.id,b]));
+const seen = new Set();
+let eb = 0;
+for(const b of boids){
+if(!b.alive||b.dying||b.partnerId===null||seen.has(b.id)) continue;
+const partner = boidMap.get(b.partnerId);
+if(!partner||!partner.alive) continue;
+if(b.sex!==partner.sex&&isFertile(b)&&isFertile(partner)){
+eb+=2; seen.add(b.id); seen.add(partner.id);
+}
+}
+_cachedEffectiveBreeders = eb;
+}
+
+// below 50 effective breeders: up to 1.2× extra hazard (trajectory risk of genetic drift)
+// stacks with inbreedingHazardMultiplier() which responds to observed diversity
+function smallPopHazardMultiplier(){
+if(_cachedEffectiveBreeders >= 50) return 1;
+const t = 1 - _cachedEffectiveBreeders / 50;
+return 1 + t * 0.2;
+}
+
+function computePressure(boid){
+let n=0;
+const _sr2=SENSING_RADIUS*SENSING_RADIUS;
+for(const o of _sgNeighbors(boid.x,boid.y,SENSING_RADIUS)){
+if(!o.alive||o===boid) continue;
+const dx=o.x-boid.x, dy=o.y-boid.y;
+if(dx*dx+dy*dy<_sr2) n++;
+}
+boid.localPressure = Math.min(n / Math.max(TARGET_POP * 0.4, 1), 1);
+
+// globalPressure: fertile pair signal — drives lifespan and breeding
+const fertilePairs = Math.min(_fertileMales, _fertileFemales);
+const avgFertileFrac = Math.min(M_FERTILE_FOR, F_FERTILE_FOR);
+const targetPairs = (TARGET_POP/2) * avgFertileFrac;
+const pairRatio = fertilePairs / Math.max(targetPairs,1);
+const rawPressure = Math.min(Math.max(pairRatio-1,-1),1);
+boid.globalPressure = boids.length < 4 ? -1 : rawPressure;
+
+// popPressure: raw headcount signal — drives nearness/dispersion only
+// +1 when 2× over target, 0 at target, -1 when at half target
+boid.popPressure = Math.min(Math.max((boids.length / Math.max(TARGET_POP,1)) - 1, -1), 1);
+}
+
+// ── steering ──────────────────────────────────────────────────────────────────
+function steerToward(boid,tx,ty,strength){
+const dx=tx-boid.x, dy=ty-boid.y;
+const len=Math.sqrt(dx*dx+dy*dy)||1;
+const desired=Math.atan2(dy/len,dx/len);
+const current=Math.atan2(boid.vy,boid.vx);
+let diff=desired-current;
+while(diff> Math.PI) diff-=Math.PI*2;
+while(diff<-Math.PI) diff+=Math.PI*2;
+const turn=Math.max(-TURN_SPEED*strength,Math.min(TURN_SPEED*strength,diff));
+const angle=current+turn;
+boid.vx=Math.cos(angle)*SPEED; boid.vy=Math.sin(angle)*SPEED;
+}
+
+function wander(boid){
+boid.wanderAngle+=(Math.random()-0.5)*WANDER_STR*2*Math.PI;
+const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
+const nx=boid.vx/spd, ny=boid.vy/spd;
+const cx=boid.x+nx*30, cy=boid.y+ny*30;
+steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*20,1);
+}
+
+function nearnessBehavior(boid){
+const thresholdScale = 1.0+(BOND_THRESHOLD-1)*0.24;
+
+// combine local density and raw population overshoot
+// when population > target, popPressure > 0, reducing/reversing attraction
+const combinedPressure = Math.min(boid.localPressure + Math.max(boid.popPressure,0), 1);
+const warmup = Math.min(simClock / WARMUP_DURATION, 1);
+const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
+
+// cohesion radius = CLUSTER_RADIUS so nearness never pulls across cluster boundaries
+let cx=0,cy=0,count=0;
+for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+if(!o.alive||o===boid) continue;
+const dx=o.x-boid.x, dy=o.y-boid.y;
+if(dx*dx+dy*dy<_cr2){ cx+=o.x; cy+=o.y; count++; }
+}
+if(count===0){
+// lone emigrant — weak pull toward nearest other boid so they don't get permanently lost
+let gx=0,gy=0,gc=0;
+for(const o of boids){ if(o.alive&&!o.dying&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
+if(gc>0) steerToward(boid,gx/gc,gy/gc,EMIG_RETURN);
+return;
+}
+
+if(strength >= 0){
+steerToward(boid,cx/count,cy/count,strength);
+} else {
+// repulsion: steer away from flock centre
+steerToward(boid,2*boid.x-cx/count,2*boid.y-cy/count,-strength);
+}
+}
+
+function bondAttraction(boid){
+if(boid.partnerId===null) return;
+const partner=boidMap.get(boid.partnerId);
+if(!partner||!partner.alive) return;
+const dx=partner.x-boid.x, dy=partner.y-boid.y;
+const dist=Math.sqrt(dx*dx+dy*dy);
+if(dist>BOND_DIST){
+// too far — pull toward partner
+steerToward(boid,partner.x,partner.y,BOND_STRENGTH);
+} else if(dist < BOND_DIST * 0.4){
+// too close — steer away to maintain natural separation
+steerToward(boid,boid.x-dx,boid.y-dy,BOND_STRENGTH*0.8);
+}
+}
+
+function avoidWalls(boid){
+const w=canvas.width,h=canvas.height;
+let px=0,py=0;
+if(boid.x<WALL_MARGIN) px+=(WALL_MARGIN-boid.x)/WALL_MARGIN;
+if(boid.x>w-WALL_MARGIN) px-=(boid.x-(w-WALL_MARGIN))/WALL_MARGIN;
+if(boid.y<WALL_MARGIN) py+=(WALL_MARGIN-boid.y)/WALL_MARGIN;
+if(boid.y>h-WALL_MARGIN) py-=(boid.y-(h-WALL_MARGIN))/WALL_MARGIN;
+if(px===0&&py===0) return;
+steerToward(boid,boid.x+px*100,boid.y+py*100,2.0);
+}
+
+function clampToBounds(boid){
+const w=canvas.width,h=canvas.height;
+let bounced=false;
+if(boid.x<RADIUS) {boid.x=RADIUS; boid.vx= Math.abs(boid.vx); bounced=true;}
+if(boid.x>w-RADIUS) {boid.x=w-RADIUS; boid.vx=-Math.abs(boid.vx); bounced=true;}
+if(boid.y<RADIUS) {boid.y=RADIUS; boid.vy= Math.abs(boid.vy); bounced=true;}
+if(boid.y>h-RADIUS) {boid.y=h-RADIUS; boid.vy=-Math.abs(boid.vy); bounced=true;}
+const spd=Math.sqrt(boid.vx*boid.vx+boid.vy*boid.vy)||1;
+boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
+if(bounced) boid._sa=Math.atan2(boid.vy,boid.vx); // keep smooth angle in sync after wall bounce
+}
+
+// ── body separation (no-overlap mode) ────────────────────────────────────────
+const _SEP_D  = RADIUS * 2;       // minimum centre-to-centre distance = one diameter
+const _SEP_D2 = _SEP_D * _SEP_D;
+function separateBoid(boid){
+let fx=0, fy=0;
+for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
+  if(!nb.alive || nb===boid) continue;
+  const dx=boid.x-nb.x, dy=boid.y-nb.y;
+  const d2=dx*dx+dy*dy;
+  if(d2<_SEP_D2){
+    const d=d2>0.25?Math.sqrt(d2):0.5; // guard against near-zero
+    const w=(_SEP_D-d)/_SEP_D;         // 1 at same position, 0 at edge
+    fx+=dx/d*w; fy+=dy/d*w;
+  }
+}
+if(fx!==0||fy!==0){
+  const m=Math.sqrt(fx*fx+fy*fy)||1;
+  // steerToward respects the TURN_SPEED cap; smooth-angle clamp applies afterwards
+  steerToward(boid, boid.x+fx/m*100, boid.y+fy/m*100, 8);
+}
+}
+
+// ── lifespan feedback ─────────────────────────────────────────────────────────
+function lifespanScale(globalPressure){
+const t=(globalPressure+1)/2;
+return LIFESPAN_SCALE_MAX+(LIFESPAN_SCALE_MIN-LIFESPAN_SCALE_MAX)*t;
+}
+
+// Gompertz hazard: mode pinned to BASE_LIFESPAN × pressureScale.
+// beta controls spread (SD ≈ 1.28/beta); swap beta here to tune senescence steepness.
+function hazardRate(boid, pressureScale){
+const modalAge = BASE_LIFESPAN * pressureScale;
+const beta = 3 / modalAge;
+const alpha = beta * Math.exp(-beta * modalAge);
+return alpha * Math.exp(beta * boid.age) * inbreedingHazardMultiplier() * smallPopHazardMultiplier();
+}
+
+function effectiveLifespanFor(boid){
+return Math.min(BASE_LIFESPAN * lifespanScale(boid.globalPressure), MAX_LIFESPAN);
+}
+
+function updateLifespan(boid,dt){
+if(!boid.alive) return;
+if(boid.birthTimer>0) boid.birthTimer=Math.max(0,boid.birthTimer-dt);
+if(boid.dying){ boid.fadeTimer+=dt; if(boid.fadeTimer>=FADE_DURATION) killBoid(boid); return; }
+boid.effectiveLifespan=effectiveLifespanFor(boid); // display/fertility only
+boid.age+=dt;
+const scale=lifespanScale(boid.globalPressure);
+if(boid.age>=boid.maxLifespan || Math.random()<hazardRate(boid,scale)*dt) boid.dying=true;
+}
+
+function killBoid(boid){
+boid.alive=false;
+if(boid.diseased){ rHistory.push(boid.infectCount); if(rHistory.length>30) rHistory.shift(); }
+deathEvents.push(simClock);
+if(boid.partnerId!==null){
+const partner=boidMap.get(boid.partnerId);
+if(partner&&partner.alive){
+partner.partnerId=null;
+partner.breedTimer=PREG_INTERVAL*(0.5+Math.random());
+for(const o of boids) clearPair(partner.id,o.id);
+}
+clearPairChildren(boid.id,boid.partnerId);
+boid.partnerId=null;
+}
+for(const o of boids) clearPair(boid.id,o.id);
+}
+
+// ── breeding ──────────────────────────────────────────────────────────────────
+const toSpawn=[];
+const pairChildren=new Map();
+const spawnFlashPairs=new Map(); // pairKey → seconds remaining
+function getPairChildren(a,b) { return pairChildren.get(pairKey(a,b))||0; }
+function setPairChildren(a,b,v) { pairChildren.set(pairKey(a,b),v); }
+function clearPairChildren(a,b) { pairChildren.delete(pairKey(a,b)); }
+
+function updateBreeding(boid,dt){
+if(!boid.alive||boid.dying||boid.partnerId===null) return;
+const partner=boidMap.get(boid.partnerId);
+if(!partner||!partner.alive||boid.id>partner.id) return;
+if(boid.sex===partner.sex) return;
+if(!isFertile(boid)||!isFertile(partner)) return;
+const female=boid.sex==='F'?boid:partner;
+const gp=(boid.globalPressure+partner.globalPressure)/2;
+const t=(gp+1)/2;
+
+// biological ceiling: how many children fit in the fertile window
+const fertileWindow = female.maxLifespan * F_FERTILE_FOR;
+const bioCeiling = Math.floor(fertileWindow / PREG_INTERVAL);
+
+// family size is the ceiling — pressure can only reduce below it, never exceed it
+// at target (t=0.5): desiredMax = pairFamilyTarget
+// at crisis (t=0): desiredMax = pairFamilyTarget (no bonus)
+// overpop (t=1): desiredMax = 0 (breeding stops)
+const desiredMax = Math.ceil(boid.pairFamilyTarget * (1 - Math.max(t - 0.5, 0) * 2));
+const effectiveMax = Math.min(desiredMax, bioCeiling);
+const born=getPairChildren(boid.id,partner.id);
+if(born>=effectiveMax) return;
+boid.breedTimer-=dt;
+if(boid.breedTimer<=0){
+// birth timing: random between PREG_INTERVAL and 2×PREG_INTERVAL, modulated by pressure
+const intervalScale=Math.pow(3.0,gp);
+boid.breedTimer=PREG_INTERVAL*intervalScale*(0.8+Math.random()*0.8);
+setPairChildren(boid.id,partner.id,born+1);
+spawnFlashPairs.set(pairKey(boid.id,partner.id),2.0);
+birthEvents.push(simClock);
+const mx=(boid.x+partner.x)/2+(Math.random()-0.5)*20;
+const my=(boid.y+partner.y)/2+(Math.random()-0.5)*20;
+const childColor=inheritColor(boid,partner);
+birthRings.push({x:mx,y:my,hue:childColor.hue,sat:childColor.sat,age:0,duration:1.2});
+const child=makeBoid(mx,my,childColor,true,boid,partner);
+toSpawn.push(child);
+}
+}
+
+// ── genetic distance ──────────────────────────────────────────────────────────
+function genomeDiversity(){
+const alive=boids.filter(b=>b.alive&&!b.dying);
+if(alive.length<2) return 0;
+let sum=0,count=0;
+for(let i=0;i<alive.length;i++)
+for(let j=i+1;j<alive.length;j++){
+sum+=geneticDistance(alive[i],alive[j]); count++;
+}
+return sum/count;
+}
+
+function geneticDistance(a,b){
+let dh=Math.abs(a.hue-b.hue);
+if(dh>180) dh=360-dh;
+return dh/180; // 0..1, circular hue distance
+}
+
+// ── collision & bonding ───────────────────────────────────────────────────────
+function updateCollisions(){
+const r2=RADIUS*2*RADIUS*2;
+for(const a of boids){
+if(!a.alive||a.dying) continue;
+for(const b of _sgNeighbors(a.x,a.y,RADIUS*2)){
+if(b.id<=a.id||!b.alive||b.dying) continue;
+const c=getCool(a.id,b.id);
+if(c>0){setCool(a.id,b.id,c-1);continue;}
+const dx=b.x-a.x,dy=b.y-a.y;
+if(dx*dx+dy*dy>=r2) continue;
+if(a.partnerId!==null||b.partnerId!==null) continue;
+if(a.isSingle||b.isSingle) continue;
+if(a.isGay!==b.isGay) continue; // gay only bonds with gay, straight with straight
+const compatible = a.isGay ? (a.sex===b.sex) : (a.sex!==b.sex);
+if(!compatible) continue;
+const aIsParentOfB=b.parentIds.has(a.id), bIsParentOfA=a.parentIds.has(b.id);
+const areSiblings=a.familyKey!==null&&a.familyKey===b.familyKey;
+if(aIsParentOfB||bIsParentOfA||areSiblings) continue;
+const aIn=boidInPreferredFamily(a), bIn=boidInPreferredFamily(b);
+const matchScore=(aIn?0.5:0)+(bIn?0.5:0); // 0, 0.5, or 1
+let hitProb=1-(1-matchScore)*FAMILY_PULL*0.85;
+// morphological preference: M attracted to big-eyed F; F attracted to long-beaked M
+if(!a.isGay){
+const male=a.sex==='M'?a:b, female=a.sex==='M'?b:a;
+const eyeMult  = 0.75+(female.eyeGene/255)*0.5; // 0.75..1.25, independent of beak
+const beakMult = 0.75+(male.beakGene/255) *0.5; // 0.75..1.25, independent of eyes
+hitProb=Math.min(1, hitProb*eyeMult*beakMult);  // combined 0.56..1.56
+}
+if(Math.random()>hitProb) continue;
+const h=getHits(a.id,b.id)+1;
+const genDist=geneticDistance(a,b);
+const genScale=2.0-1.5*genDist;
+const coolFrames=Math.max(5,Math.round(COOLDOWN_FRAMES/Math.sqrt(BOND_THRESHOLD)*genScale));
+setHits(a.id,b.id,h); setCool(a.id,b.id,coolFrames);
+if(h>=BOND_THRESHOLD){
+a.partnerId=b.id; b.partnerId=a.id;
+a.breedTimer=PREG_INTERVAL*(0.5+Math.random());
+b.breedTimer=PREG_INTERVAL*(0.5+Math.random());
+// per-pair family target: drawn from Normal(FAMILY_SIZE, 0.8), min 0
+const raw = FAMILY_SIZE + (Math.random()+Math.random()-1)*0.8;
+const target = Math.max(0, Math.round(raw));
+a.pairFamilyTarget = target;
+b.pairFamilyTarget = target;
+}
+}
+}
+}
+
+// ── divorce ───────────────────────────────────────────────────────────────────
+function updateDivorce(dt){
+if(DIVORCE_RATE===0) return;
+const seen=new Set();
+for(const boid of boids){
+if(!boid.alive||boid.dying||boid.partnerId===null||seen.has(boid.id)) continue;
+const partner=boidMap.get(boid.partnerId);
+if(!partner||!partner.alive) continue;
+seen.add(boid.id); seen.add(partner.id);
+if(Math.random() < DIVORCE_RATE * dt){
+// split the pair
+clearPairChildren(boid.id, partner.id);
+clearPair(boid.id, partner.id);
+boid.partnerId = null;
+partner.partnerId = null;
+boid.pairFamilyTarget = 0;
+partner.pairFamilyTarget = 0;
+boid.breedTimer = PREG_INTERVAL*(0.5+Math.random());
+partner.breedTimer = PREG_INTERVAL*(0.5+Math.random());
+}
+}
+}
+// ── disease ───────────────────────────────────────────────────────────────────
+// Above HIGH diversity: no penalty on either mechanism.
+// Models two independent pathways of inbreeding depression:
+//   - HLA collapse → weaker immune response → higher disease fatality (up to 3×)
+//   - General fitness reduction → elevated Gompertz hazard → shorter lives (up to 1.5×)
+const DIVERSITY_HIGH = 0.3, DIVERSITY_LOW = 0.05;
+function _diversityT(){
+return 1 - Math.max(0, Math.min(1, (_cachedDiversity - DIVERSITY_LOW) / (DIVERSITY_HIGH - DIVERSITY_LOW)));
+}
+function diversityFatalityMultiplier(){ return 1 + _diversityT() * 2; }
+function inbreedingHazardMultiplier(){  return 1 + _diversityT() * 0.5; }
+
+function infectBoid(boid){
+if(boid.diseased||boid.immune||boid.dying||!boid.alive) return;
+boid.diseased=true;
+boid.diseaseTimer=DISEASE_DURATION;
+boid.infectCount=0;
+}
+
+function updateDisease(dt){
+const effFatality = Math.min(0.9999, DISEASE_FATALITY * diversityFatalityMultiplier());
+const h = effFatality > 0 ? -Math.log(1 - effFatality) / DISEASE_DURATION : 0;
+for(const boid of boids){
+if(!boid.alive||!boid.diseased) continue;
+boid.diseaseTimer-=dt;
+// fatality roll — only while not already dying
+if(h > 0 && !boid.dying && Math.random() < h * dt){
+boid.dying = true;
+diseaseDeathEvents.push(simClock);
+// killBoid will record infectCount to rHistory since boid.diseased is still true
+continue;
+}
+if(boid.diseaseTimer<=0 && !boid.dying){
+boid.diseased=false;
+boid.immune=true;
+rHistory.push(boid.infectCount);
+if(rHistory.length>30) rHistory.shift();
+}
+}
+}
+
+function updateDiseaseCollisions(){
+// collision-based transmission (physical overlap required)
+const r2=RADIUS*2*RADIUS*2;
+for(const a of boids){
+if(!a.alive||a.dying) continue;
+for(const b of _sgNeighbors(a.x,a.y,RADIUS*2)){
+if(b.id<=a.id||!b.alive||b.dying) continue;
+const aD=a.diseased, bD=b.diseased;
+if(!aD&&!bD) continue;
+if(aD&&bD) continue;
+const infected=aD?a:b, healthy=aD?b:a;
+if(healthy.immune) continue;
+const dx=b.x-a.x, dy=b.y-a.y;
+if(dx*dx+dy*dy>=r2) continue;
+const k=pairKey(infected.id,healthy.id);
+if((diseaseCooldown.get(k)||0)>simClock) continue;
+diseaseCooldown.set(k,simClock+DISEASE_COOLDOWN);
+healthy.diseaseHits++;
+if(healthy.diseaseHits>=DISEASE_THRESHOLD){ infectBoid(healthy); infected.infectCount++; }
+}
+}
+// bonded-partner transmission (slow trickle — no overlap required)
+for(const boid of boids){
+if(!boid.alive||boid.dying||!boid.diseased||boid.partnerId===null) continue;
+const partner=boidMap.get(boid.partnerId);
+if(!partner||!partner.alive||partner.dying||partner.immune||partner.diseased) continue;
+const k='b'+pairKey(boid.id,partner.id);
+if((diseaseCooldown.get(k)||0)>simClock) continue;
+diseaseCooldown.set(k,simClock+DISEASE_COOLDOWN*3);
+partner.diseaseHits++;
+if(partner.diseaseHits>=DISEASE_THRESHOLD){ infectBoid(partner); boid.infectCount++; }
+}
+}
+
+let immigrationTimer=10;
+
+function hasValidPairs(){
+const candidates=boids.filter(b=>b.alive&&!b.dying&&b.partnerId===null&&isFertile(b)&&!b.isSingle&&!b.isGay);
+const males=candidates.filter(b=>b.sex==='M');
+const females=candidates.filter(b=>b.sex==='F');
+for(const m of males){
+for(const f of females){
+const aIsParent=f.parentIds.has(m.id)||m.parentIds.has(f.id);
+const siblings=m.familyKey!==null&&m.familyKey===f.familyKey;
+if(!aIsParent&&!siblings) return true;
+}
+}
+return false;
+}
+
+function updateImmigration(dt){
+if(!immigrationEnabled) return;
+if(boids.length>=TARGET_POP*1.2) return;
+
+const deadlocked = !hasValidPairs();
+
+// combine fertile pair deficit (globalPressure) AND raw headcount deficit
+// so immigration continues until BOTH are satisfied
+const popDeficit = Math.max(1 - boids.length / Math.max(TARGET_POP,1), 0); // 0..1
+const fertileDeficit = Math.max(-smoothGlobalPressure, 0); // 0..1
+const pressure = Math.max(popDeficit, fertileDeficit); // worst of the two
+
+if(pressure <= 0 && !deadlocked) return;
+
+immigrationTimer -= dt;
+if(immigrationTimer > 0) return;
+
+const interval = deadlocked && pressure <= 0
+? 10 + Math.random()*5
+: (5 / Math.max(pressure, 0.05)) * (0.8 + Math.random()*0.4);
+immigrationTimer = interval;
+
+const males = boids.filter(b=>b.alive&&b.sex==='M').length;
+const females = boids.filter(b=>b.alive&&b.sex==='F').length;
+const sex = males<=females?'M':'F';
+const imm = makeBoid(undefined,undefined,undefined,false);
+imm.sex = sex;
+imm.isSingle = false;
+imm.isGay = false;
+imm.immigrantGeneration = 0;
+immigrantEvents.push(simClock);
+imm.age = imm.effectiveLifespan * F_FERTILE_FROM;
+imm.birthTimer= 0;
+toSpawn.push(imm);
+}
+
+// ── predator update ───────────────────────────────────────────────────────────
+function updatePredators(dt){
+const aliveBoids = boids.filter(b=>b.alive&&!b.dying);
+const predSpd = SPEED*1.2;
+const w=canvas.width, h=canvas.height;
+for(const pred of predators){
+if(!pred.alive) continue;
+// starvation: only when no prey at all
+if(aliveBoids.length===0){
+pred.noPreyTimer+=dt;
+if(pred.noPreyTimer>STARVATION_TIME){ pred.alive=false; continue; }
+} else {
+pred.noPreyTimer=0;
+}
+const isHungry = (simClock-pred.lastEaten)>FULL_DURATION;
+const veryHungry = (simClock-pred.lastEaten)>FULL_DURATION*2;
+// wall avoidance — steer away before hitting
+const margin=WALL_MARGIN*1.5;
+let wx=0, wy=0;
+if(pred.x<margin) wx+=(margin-pred.x)/margin;
+if(pred.x>w-margin) wx-=(pred.x-(w-margin))/margin;
+if(pred.y<margin) wy+=(margin-pred.y)/margin;
+if(pred.y>h-margin) wy-=(pred.y-(h-margin))/margin;
+if(wx!==0||wy!==0){
+const wm=Math.sqrt(wx*wx+wy*wy)||1;
+pred.vx+=(wx/wm)*predSpd*0.18;
+pred.vy+=(wy/wm)*predSpd*0.18;
+pred.wanderAngle=Math.atan2(pred.vy,pred.vx);
+}
+// target seeking or wander
+if(isHungry && aliveBoids.length>0){
+let target=null, bestDist=Infinity;
+for(const b of _sgNeighbors(pred.x,pred.y,PREDATOR_SENSE)){
+if(b.dying) continue;
+const dx=b.x-pred.x, dy=b.y-pred.y;
+const dist=Math.sqrt(dx*dx+dy*dy);
+if(dist>PREDATOR_SENSE) continue;
+const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
+if(edible && dist<bestDist){ bestDist=dist; target=b; }
+}
+if(target){
+const dx=target.x-pred.x, dy=target.y-pred.y;
+const dist=Math.sqrt(dx*dx+dy*dy)||1;
+pred.vx+=(dx/dist*predSpd-pred.vx)*0.08;
+pred.vy+=(dy/dist*predSpd-pred.vy)*0.08;
+} else {
+pred.wanderAngle+=(Math.random()-0.5)*0.25;
+pred.vx+=(Math.cos(pred.wanderAngle)*predSpd-pred.vx)*0.06;
+pred.vy+=(Math.sin(pred.wanderAngle)*predSpd-pred.vy)*0.06;
+}
+} else {
+pred.wanderAngle+=(Math.random()-0.5)*0.18;
+pred.vx+=(Math.cos(pred.wanderAngle)*predSpd*0.6-pred.vx)*0.05;
+pred.vy+=(Math.sin(pred.wanderAngle)*predSpd*0.6-pred.vy)*0.05;
+}
+// normalise speed
+const spd=Math.sqrt(pred.vx*pred.vx+pred.vy*pred.vy)||1;
+const targetSpd=isHungry?predSpd:predSpd*0.6;
+pred.vx=pred.vx/spd*targetSpd;
+pred.vy=pred.vy/spd*targetSpd;
+pred.x+=pred.vx; pred.y+=pred.vy;
+// hard bounce off edges
+if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.y<PREDATOR_RADIUS){ pred.y=PREDATOR_RADIUS; pred.vy=Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+if(pred.y>h-PREDATOR_RADIUS){ pred.y=h-PREDATOR_RADIUS; pred.vy=-Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); }
+// trail
+pred.trail.push({x:pred.x,y:pred.y});
+if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
+// eating collision
+if(isHungry){
+const eatR=(PREDATOR_RADIUS+RADIUS)/2, eatR2=eatR*eatR;
+for(const b of _sgNeighbors(pred.x,pred.y,eatR)){
+if(b.dying) continue;
+const dx=b.x-pred.x, dy=b.y-pred.y;
+if(dx*dx+dy*dy<eatR2){
+const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
+const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
+if(edible){
+// eat it
+b.alive=false;
+spawnDeathSplash(b.x,b.y,b.hue,b.sat);
+pred.lastEaten=simClock;
+break;
+}
+}
+}
+}
+}
+predators=predators.filter(p=>p.alive);
+}
+
+function drawPredators(){
+const g=_gfx.predators; g.clear();
+for(const pred of predators){
+if(!pred.alive) continue;
+const ang=Math.atan2(pred.vy,pred.vx);
+const cos=Math.cos(ang), sin=Math.sin(ang);
+const px=-sin, py=cos;
+const r=PREDATOR_RADIUS;
+const isHungry=(simClock-pred.lastEaten)>FULL_DURATION;
+
+// trail — two-pass white lines, width/alpha fading by position
+if(pred.trail.length>=2){
+const n=pred.trail.length;
+for(let i=1;i<n;i++){
+  const t=Math.pow(i/(n-1),0.6);
+  g.lineStyle(t*36+2, 0xffffff, t*0.28*TRAIL_OPACITY);
+  g.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
+  g.lineTo(pred.trail[i].x,pred.trail[i].y);
+}
+for(let i=1;i<n;i++){
+  const t=Math.pow(i/(n-1),0.5);
+  g.lineStyle(t*7+0.8, 0xffffff, t*0.85*TRAIL_OPACITY);
+  g.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
+  g.lineTo(pred.trail[i].x,pred.trail[i].y);
+}
+g.lineStyle(0);
+}
+
+// tail — tapered white shape (gradient approximated as flat alpha)
+const tailLen=r*1.4, baseW=r*0.38;
+const tbx=pred.x-cos*r*0.65, tby=pred.y-sin*r*0.65;
+const ttx=pred.x-cos*(r+tailLen), tty=pred.y-sin*(r+tailLen);
+const cpx=pred.x-cos*(r+tailLen*0.5), cpy=pred.y-sin*(r+tailLen*0.5);
+g.beginFill(0xffffff, 0.5);
+g.moveTo(tbx+px*baseW, tby+py*baseW);
+g.quadraticCurveTo(cpx+px*baseW*0.25, cpy+py*baseW*0.25, ttx, tty);
+g.quadraticCurveTo(cpx-px*baseW*0.25, cpy-py*baseW*0.25, tbx-px*baseW, tby-py*baseW);
+g.closePath();
+g.endFill();
+
+// body: manta ray — cubic bezier leading edges, concave trailing edge
+const noseX=pred.x+cos*r*1.0, noseY=pred.y+sin*r*1.0;
+const wlX=pred.x-cos*r*0.5+px*r*1.5, wlY=pred.y-sin*r*0.5+py*r*1.5;
+const wrX=pred.x-cos*r*0.5-px*r*1.5, wrY=pred.y-sin*r*0.5-py*r*1.5;
+g.beginFill(0xe0e4eb, 0.88);
+g.moveTo(noseX, noseY);
+g.bezierCurveTo(
+  pred.x+cos*r*0.6+px*r*0.7, pred.y+sin*r*0.6+py*r*0.7,
+  pred.x+cos*r*0.1+px*r*1.5, pred.y+sin*r*0.1+py*r*1.5,
+  wlX, wlY);
+g.quadraticCurveTo(pred.x-cos*r*0.15, pred.y-sin*r*0.15, wrX, wrY);
+g.bezierCurveTo(
+  pred.x+cos*r*0.1-px*r*1.5, pred.y+sin*r*0.1-py*r*1.5,
+  pred.x+cos*r*0.6-px*r*0.7, pred.y+sin*r*0.6-py*r*0.7,
+  noseX, noseY);
+g.endFill();
+// highlight spot near nose
+const phlx=pred.x+cos*r*0.35+px*r*0.2, phly=pred.y+sin*r*0.35+py*r*0.2;
+g.beginFill(0xffffff, 0.45); g.drawCircle(phlx,phly,r*0.55); g.endFill();
+
+// dot on back: preferred-family colour
+const dotCol=hexFromCSS(FAMILY_CSS[preferredFamily]||'#ffffff');
+const bdx=pred.x-cos*r*0.35, bdy=pred.y-sin*r*0.35;
+g.beginFill(dotCol, 1.0); g.drawCircle(bdx,bdy,r*0.28); g.endFill();
+
+// eyes: yellow→orange→red with hunger
+const e1x=pred.x+cos*r*0.55+px*r*0.3, e1y=pred.y+sin*r*0.55+py*r*0.3;
+const e2x=pred.x+cos*r*0.55-px*r*0.3, e2y=pred.y+sin*r*0.55-py*r*0.3;
+const hungerRatio=Math.min((simClock-pred.lastEaten)/(FULL_DURATION*2),1);
+const eyeG=Math.round(200*(1-hungerRatio)+20*hungerRatio);
+const eyeB=Math.round(20*hungerRatio);
+const eyeCol=(0xff<<16)|(eyeG<<8)|eyeB;
+const eyeR=r*(isHungry?0.3:0.25); // slightly larger when hungry (replaces glow)
+g.beginFill(eyeCol, 1.0);
+g.drawCircle(e1x,e1y,eyeR); g.drawCircle(e2x,e2y,eyeR);
+g.endFill();
+const eyr=r*0.25;
+g.beginFill(0xffffff, 0.75);
+g.drawCircle(e1x-eyr*0.3,e1y-eyr*0.3,eyr*0.38);
+g.drawCircle(e2x-eyr*0.3,e2y-eyr*0.3,eyr*0.38);
+g.endFill();
+}
+}
+
+function drawDeathSplashes(){
+const g=_gfx.splashes; g.clear();
+for(const s of deathSplashes){
+const t=s.age/s.duration;
+const alpha=1-t;
+const h=s.hue, sat=s.s;
+// outer ring (stroke only — no fill)
+g.lineStyle(12*(1-t), hslToHex(h,sat,38), alpha*0.8);
+g.drawCircle(s.x,s.y,t*220);
+// second ring
+g.lineStyle(6*(1-t), hslToHex(h,sat,58), alpha*0.6);
+g.drawCircle(s.x,s.y,t*140);
+g.lineStyle(0);
+// inner flash
+if(t<0.4){
+  const ft=t/0.4;
+  g.beginFill(hslToHex(h,sat,75),(1-ft)*0.8);
+  g.drawCircle(s.x,s.y,(1-ft)*84);
+  g.endFill();
+}
+// particles
+const pCol=hslToHex(h,sat,45);
+for(const p of s.particles){
+  const bx=s.x+p.cx*p.spd*t, by=s.y+p.cy*p.spd*t, pr=p.r*(1-t*0.3);
+  g.beginFill(pCol, alpha*0.9);
+  g.drawCircle(bx,by,pr);
+  g.endFill();
+}
+}
+}
+
+// ── drawing (PixiJS) ──────────────────────────────────────────────────────────
+function drawBackground(){
+const g=_gfx.bg; g.clear();
+g.beginFill(hexFromCSS(BG_COLOR)); g.drawRect(0,0,canvas.width,canvas.height); g.endFill();
+}
+
+function drawBondLines(){
+const g=_gfx.bondLines; g.clear();
+const drawn=new Set();
+for(const boid of boids){
+if(!boid.alive||boid.partnerId===null) continue;
+const partner=boidMap.get(boid.partnerId);
+if(!partner||!partner.alive) continue;
+const key=Math.min(boid.id,partner.id)+'-'+Math.max(boid.id,partner.id);
+if(drawn.has(key)) continue; drawn.add(key);
+const alpha=Math.min(
+  boid.dying?1-(boid.fadeTimer/FADE_DURATION):1,
+  partner.dying?1-(partner.fadeTimer/FADE_DURATION):1
+);
+const fertile=isFertile(boid)&&isFertile(partner)&&boid.sex!==partner.sex;
+const flashTime=spawnFlashPairs.get(key)||0;
+let color,lw;
+if(flashTime>0){        color=0xff3030; lw=18; }
+else if(fertile){       color=0xffd32a; lw=14; }
+else {
+  // blend hue of the two partners (circular average)
+  let dh=partner.hue-boid.hue;
+  if(dh>180)dh-=360; else if(dh<-180)dh+=360;
+  color=hslToHex((boid.hue+dh*0.5+360)%360,70,55); lw=6;
+}
+g.lineStyle(lw,color,alpha*0.75);
+g.moveTo(boid.x,boid.y); g.lineTo(partner.x,partner.y);
+}
+g.lineStyle(0);
+}
+
+function drawTrails(){
+const g=_gfx.trails; g.clear();
+for(const boid of boids){
+if(!boid.alive||boid.trail.length<2) continue;
+let bAlpha=1;
+if(boid.birthTimer>0) bAlpha=1-(boid.birthTimer/BIRTH_DURATION);
+if(boid.dying)        bAlpha=1-(boid.fadeTimer/FADE_DURATION);
+bAlpha=Math.max(0,bAlpha);
+const n=boid.trail.length;
+const col=boidHex(boid);
+for(let i=1;i<n;i++){
+  const t=Math.pow(i/(n-1),0.5);
+  g.lineStyle(t*7+0.8, col, t*0.85*bAlpha*TRAIL_OPACITY);
+  g.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
+  g.lineTo(boid.trail[i].x,  boid.trail[i].y);
+}
+}
+g.lineStyle(0);
+}
+
+function drawBirthRings(){
+const g=_gfx.birthRings; g.clear();
+for(const ring of birthRings){
+const t = ring.age / ring.duration;
+if(t >= 1) continue;
+const col = hslToHex(ring.hue, Math.round(ring.sat*100), 50);
+
+// soft bloom — large filled circle, fades fast
+const tBloom = Math.min(t * 3, 1);
+const bloomA = Math.pow(1 - tBloom, 1.8) * 0.35;
+if(bloomA > 0.01){
+  g.beginFill(col, bloomA);
+  g.drawCircle(ring.x, ring.y, tBloom * 110);
+  g.endFill();
+}
+
+// outer ring — slow, thick (stroke only)
+const r1 = t * 150;
+const a1 = Math.pow(1 - t, 1.2) * 0.95;
+g.lineStyle((1 - t) * 9 + 1, col, a1);
+g.drawCircle(ring.x, ring.y, r1);
+
+// inner ring — faster, tighter
+const t2 = Math.min(t * 2, 1);
+const r2 = t2 * 80;
+const a2 = Math.pow(1 - t2, 1.0);
+g.lineStyle((1 - t2) * 6 + 1, col, a2);
+g.drawCircle(ring.x, ring.y, r2);
+g.lineStyle(0);
+
+// central flash — bright burst at origin
+if(t < 0.25){
+  const tf = t / 0.25;
+  const flashA = Math.pow(1 - tf, 0.8);
+  g.beginFill(col, flashA);
+  g.drawCircle(ring.x, ring.y, tf * 28);
+  g.endFill();
+}
+}
+}
+
+function drawHitProgress(){
+const alive=boids.filter(b=>b.alive&&!b.dying&&b.partnerId===null);
+for(let i=0;i<alive.length;i++){
+for(let j=i+1;j<alive.length;j++){
+const h=getHits(alive[i].id,alive[j].id);
+if(h===0) continue;
+const progress=Math.min(h/BOND_THRESHOLD,1);
+[alive[i],alive[j]].forEach(boid=>{
+ctx.beginPath();
+ctx.arc(boid.x,boid.y,RADIUS+8,-Math.PI/2,-Math.PI/2+progress*Math.PI*2);
+ctx.strokeStyle=`rgba(255,211,42,${0.4+progress*0.5})`;
+ctx.lineWidth=4; ctx.stroke();
+});
+}
+}
+}
+
+function drawBoid(boid){
+// NOTE: caller must do _gfx.boids.clear() once before the per-boid loop
+const g=_gfx.boids;
+let alpha=1;
+if(boid.birthTimer>0) alpha=1-(boid.birthTimer/BIRTH_DURATION);
+if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
+alpha=Math.max(0,Math.min(1,alpha));
+if(alpha<=0) return;
+
+const isBonded = boid.partnerId!==null;
+const fertile = isFertile(boid);
+const r = boid.isSingle ? RADIUS*0.7 : RADIUS;
+const baseAlpha = alpha * (fertile ? 1.0 : 0.55);
+
+// glow — three concentric circles approximate radial gradient
+if(isBonded||fertile){
+  const glowR=RADIUS*2.0;
+  const glowCol = isBonded ? 0xffcc44 : boidHex(boid);
+  g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
+  g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
+  g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
+}
+
+// teardrop body: half-circle arc + two quadratic curves to tail tip
+const ang=Math.atan2(boid.vy,boid.vx);
+const cos=Math.cos(ang), sin=Math.sin(ang);
+const px=-sin, py=cos; // perpendicular (left)
+const arcStartX=boid.x+px*r, arcStartY=boid.y+py*r; // left edge = arc start
+const tipx=boid.x-cos*r*1.6, tipy=boid.y-sin*r*1.6;
+const cpLx=boid.x-cos*r*0.35+px*r*0.75, cpLy=boid.y-sin*r*0.35+py*r*0.75;
+const cpRx=boid.x-cos*r*0.35-px*r*0.75, cpRy=boid.y-sin*r*0.35-py*r*0.75;
+const bodyCol = boidHex(boid);
+g.beginFill(bodyCol, baseAlpha);
+g.moveTo(arcStartX, arcStartY);
+g.arc(boid.x, boid.y, r, ang+Math.PI/2, ang-Math.PI/2, true); // CCW front-half arc
+g.quadraticCurveTo(cpRx, cpRy, tipx, tipy);   // right edge → tail tip
+g.quadraticCurveTo(cpLx, cpLy, arcStartX, arcStartY); // tail tip → left edge
+g.closePath();
+g.endFill();
+
+// 3D highlight spot (white oval offset toward upper-front)
+const hlx=boid.x+cos*r*0.28+px*r*0.22, hly=boid.y+sin*r*0.28+py*r*0.22;
+g.beginFill(0xffffff, baseAlpha*0.38); g.drawCircle(hlx,hly,r*0.48); g.endFill();
+
+// beak: males only
+if(boid.sex==='M'){
+  const beakLen=r*(0.3+boid.beakGene/255*1.7);
+  const bkBx=boid.x+cos*r*0.88, bkBy=boid.y+sin*r*0.88;
+  const bkTx=boid.x+cos*(r+beakLen), bkTy=boid.y+sin*(r+beakLen);
+  const bkCpx=boid.x+cos*(r+beakLen*0.5), bkCpy=boid.y+sin*(r+beakLen*0.5);
+  const bkW=r*0.2;
+  const beakCol=hslToHex(boid.hue, boid.sat*100, 56);
+  g.beginFill(beakCol, baseAlpha);
+  g.moveTo(bkBx+px*bkW, bkBy+py*bkW);
+  g.quadraticCurveTo(bkCpx+px*bkW*0.2, bkCpy+py*bkW*0.2, bkTx, bkTy);
+  g.quadraticCurveTo(bkCpx-px*bkW*0.2, bkCpy-py*bkW*0.2, bkBx-px*bkW, bkBy-py*bkW);
+  g.closePath();
+  g.endFill();
+}
+
+// eyes on the upper dome, spread sideways
+const er=r*(0.15+(boid.eyeGene/255)*0.4);
+const eyeSpread=r*0.44+er*0.5;
+const elx=boid.x+cos*r*0.58+px*eyeSpread, ely=boid.y+sin*r*0.58+py*eyeSpread;
+const erx=boid.x+cos*r*0.58-px*eyeSpread, ery=boid.y+sin*r*0.58-py*eyeSpread;
+g.beginFill(0x000000, baseAlpha*0.85);
+g.drawCircle(elx,ely,er); g.drawCircle(erx,ery,er);
+g.endFill();
+g.beginFill(0xffffff, baseAlpha*0.70);
+g.drawCircle(elx-er*0.3,ely-er*0.3,er*0.38);
+g.drawCircle(erx-er*0.3,ery-er*0.3,er*0.38);
+g.endFill();
+
+// disease spot — always clearly visible (ignores fertility dimming)
+if(boid.diseased){
+  g.beginFill(0xffffff, alpha*0.95);
+  g.drawCircle(boid.x,boid.y,r*0.28);
+  g.endFill();
+}
+
+// birth ring (boid-level: expanding ring as newborn fades in)
+if(boid.birthTimer>0){
+  const bt=boid.birthTimer/BIRTH_DURATION;
+  g.lineStyle(bt*8, boidHex(boid), bt*bt*0.9);
+  g.drawCircle(boid.x,boid.y,RADIUS*(1+(1-bt)*4));
+  g.lineStyle(0);
+}
+}
+
+// ── status ────────────────────────────────────────────────────────────────────
+const popSpan = document.getElementById('popSpan');
+const lifeSpan = document.getElementById('lifeSpan');
+const nearFill = document.getElementById('nearFill');
+const lifeFill = document.getElementById('lifeFill');
+
+function updateStatus(){
+const n=boids.length;
+popSpan.textContent = n;
+popSpan.className = 'val' + (n>TARGET_POP*1.3?' hi':n<TARGET_POP*0.7?' lo':'');
+
+const avgLocal = n===0?0.5:boids.reduce((s,b)=>s+b.localPressure,0)/n;
+const avgGlobal = n===0?0.0:boids.reduce((s,b)=>s+b.globalPressure,0)/n;
+smoothPressure += (avgLocal - smoothPressure) * 0.05;
+smoothGlobalPressure+= (avgGlobal - smoothGlobalPressure)* 0.05;
+nearFill.style.width=(smoothPressure*100).toFixed(1)+'%';
+const t=(smoothGlobalPressure+1)/2;
+const effLife=BASE_LIFESPAN*(LIFESPAN_SCALE_MAX+(LIFESPAN_SCALE_MIN-LIFESPAN_SCALE_MAX)*t);
+const lifeRange=BASE_LIFESPAN*(LIFESPAN_SCALE_MAX-LIFESPAN_SCALE_MIN);
+lifeFill.style.width=((effLife-BASE_LIFESPAN*LIFESPAN_SCALE_MIN)/lifeRange*100).toFixed(1)+'%';
+lifeSpan.textContent=effLife.toFixed(1)+' s';
+
+// ── live readout ──
+const cutoff = simClock - RATE_WINDOW;
+birthEvents = birthEvents.filter(ev=>ev>cutoff);
+deathEvents = deathEvents.filter(ev=>ev>cutoff);
+const birthRate = (birthEvents.length / RATE_WINDOW * 60).toFixed(1);
+const deathRate = (deathEvents.length / RATE_WINDOW * 60).toFixed(1);
+
+// count bonded pairs (total) and fertile bonded M+F pairs
+const seen = new Set();
+let totalBondedPairs = 0;
+let fertilePairs = 0;
+for(const b of boids){
+if(!b.alive||b.dying||b.partnerId===null||seen.has(b.id)) continue;
+const partner=boidMap.get(b.partnerId);
+if(!partner||!partner.alive) continue;
+seen.add(b.id); seen.add(partner.id);
+totalBondedPairs++;
+if(b.sex!==partner.sex && isFertile(b) && isFertile(partner)) fertilePairs++;
+}
+
+document.getElementById('rdFertile').textContent = totalBondedPairs+':'+fertilePairs;
+document.getElementById('rdBirth').textContent = birthRate +' /min';
+document.getElementById('rdDeath').textContent = deathRate +' /min';
+immigrantEvents = immigrantEvents.filter(ev=>ev>cutoff);
+let immigText;
+if(!immigrationEnabled){
+immigText = 'off';
+} else {
+const popDeficit = Math.max(1 - boids.length / Math.max(TARGET_POP,1), 0);
+const fertileDeficit = Math.max(-smoothGlobalPressure, 0);
+const pressure = Math.max(popDeficit, fertileDeficit);
+const deadlocked = !hasValidPairs();
+if(deadlocked){
+immigText = 'deadlock';
+} else if(pressure <= 0){
+immigText = 'stable';
+} else if(pressure < 0.3){
+immigText = 'slow';
+} else if(pressure < 0.7){
+immigText = 'moderate';
+} else {
+immigText = 'crisis';
+}
+}
+document.getElementById('rdImmig').textContent = immigText;
+
+const sickCount = boids.filter(b=>b.alive&&b.diseased).length;
+document.getElementById('rdSick').textContent = sickCount;
+const rVal = rHistory.length===0 ? '—' : (rHistory.reduce((s,v)=>s+v,0)/rHistory.length).toFixed(2);
+document.getElementById('rdR').textContent = rVal;
+_cachedDiversity = boids.length < 2 ? 0.3 : genomeDiversity();
+document.getElementById('rdDiv').textContent = boids.length < 2 ? '—' : _cachedDiversity.toFixed(2);
+const effFat = Math.min(0.9999, DISEASE_FATALITY * diversityFatalityMultiplier());
+const effFatEl = document.getElementById('fatalityEffVal');
+effFatEl.textContent = effFat > DISEASE_FATALITY + 0.005 ? `→ ${(effFat*100).toFixed(0)}%` : '';
+
+const ihm = inbreedingHazardMultiplier();
+const inbreedWarn = document.getElementById('inbreedingWarn');
+if(ihm > 1.02){
+const scale = lifespanScale(smoothGlobalPressure);
+const modalAge = BASE_LIFESPAN * scale;
+const beta = 3 / modalAge;
+const delta = Math.log(ihm) / beta;
+document.getElementById('inbreedMult').textContent = ihm.toFixed(2);
+document.getElementById('inbreedDelta').textContent = delta.toFixed(1);
+inbreedWarn.style.display = '';
+} else {
+inbreedWarn.style.display = 'none';
+}
+diseaseDeathEvents = diseaseDeathEvents.filter(ev=>ev>cutoff);
+document.getElementById('rdDied').textContent = diseaseDeathEvents.length;
+
+// ── family indicator ──
+const aliveFF=boids.filter(b=>b.alive&&!b.dying);
+const inFamFF=aliveFF.filter(b=>boidInPreferredFamily(b)).length;
+const convPct=aliveFF.length>0?Math.round(inFamFF/aliveFF.length*100):0;
+document.getElementById('familyDot').style.color=FAMILY_CSS[preferredFamily]||'#fff';
+document.getElementById('familyName').style.color=FAMILY_CSS[preferredFamily]||'#fff';
+document.getElementById('familyName').textContent=preferredFamily;
+document.getElementById('familyConv').textContent=convPct+'%';
+const holdLeft=familyConvergedTimer>0?(FAMILY_CONVERGE_HOLD-familyConvergedTimer).toFixed(1)+'s':'';
+document.getElementById('familyTimer').textContent=holdLeft;
+
+const eb = _cachedEffectiveBreeders;
+const rdEffBr = document.getElementById('rdEffBr');
+rdEffBr.textContent = eb;
+rdEffBr.style.color = eb < 50 ? '#ff6b6b' : eb < 500 ? '#ffd32a' : '#0be881';
+const rdSmallPop = document.getElementById('rdSmallPop');
+if(eb < 50){
+rdSmallPop.textContent = 'critical'; rdSmallPop.style.color = '#ff6b6b';
+} else if(eb < 500){
+rdSmallPop.textContent = 'at risk';  rdSmallPop.style.color = '#ffd32a';
+} else {
+rdSmallPop.textContent = 'ok';       rdSmallPop.style.color = '#0be881';
+}
+}
+
+// ── viability check ───────────────────────────────────────────────────────────
+function updateViability(){
+// ── structural check ──
+const bioCeiling = Math.floor(BASE_LIFESPAN * F_FERTILE_FOR / PREG_INTERVAL);
+const effectiveCap = Math.min(FAMILY_SIZE, bioCeiling);
+const ratio = effectiveCap * (1 - SINGLE_FRACTION) * (1 - GAY_FRACTION);
+
+let color, label;
+if(bioCeiling === 0){
+color='#c0392b'; label='impossible';
+} else if(ratio < 2){
+color='#ff6b6b'; label='not viable';
+} else if(ratio < 2.5){
+color='#ffd32a'; label='marginal';
+} else {
+color='#0be881'; label='viable';
+}
+document.getElementById('viabilityDot').style.color   = color;
+document.getElementById('viabilityState').style.color = color;
+document.getElementById('viabilityState').textContent = label;
+document.getElementById('viabilityDetail').textContent =
+`ratio ${ratio.toFixed(2)} · ceiling ${bioCeiling}`;
+
+// ── bonding timing check ──
+// lower-bound time to bond: BOND_THRESHOLD hits × cooldown per hit (at 60 fps)
+const coolPerHit = Math.max(5, Math.floor(COOLDOWN_FRAMES / Math.sqrt(BOND_THRESHOLD))) / 60;
+const minBondTime = BOND_THRESHOLD * coolPerHit;
+const fertileWindowSec = F_FERTILE_FOR * BASE_LIFESPAN;
+const effFertileWindow = Math.max(0, fertileWindowSec - minBondTime);
+const effBioCeiling = Math.floor(effFertileWindow / PREG_INTERVAL);
+const effCap = Math.min(FAMILY_SIZE, effBioCeiling);
+const effRatio = effCap * (1 - SINGLE_FRACTION) * (1 - GAY_FRACTION);
+
+let bColor, bLabel;
+if(bioCeiling === 0){
+bColor='#555'; bLabel='n/a';
+} else if(effBioCeiling === 0){
+bColor='#c0392b'; bLabel='bond critical';
+} else if(effRatio < 2){
+bColor='#ff6b6b'; bLabel='bond high';
+} else if(effRatio < 2.5){
+bColor='#ffd32a'; bLabel='bond moderate';
+} else {
+bColor='#0be881'; bLabel='bond low';
+}
+document.getElementById('bondRiskDot').style.color    = bColor;
+document.getElementById('bondRiskState').style.color  = bColor;
+document.getElementById('bondRiskState').textContent  = bLabel;
+document.getElementById('bondRiskDetail').textContent = bioCeiling === 0
+? '—'
+: `≥${minBondTime.toFixed(1)} s lost · eff. ceiling ${effBioCeiling}`;
+}
+
+// ── play / pause ──────────────────────────────────────────────────────────────
+let running=false, rafId=null, lastTime=null;
+const playBtn=document.getElementById('playBtn');
+
+function drawIdle(){
+const w=canvas.width, h=canvas.height;
+// background
+const gb=_gfx.bg; gb.clear();
+gb.beginFill(hexFromCSS(BG_COLOR)); gb.drawRect(0,0,w,h); gb.endFill();
+// scattered dust dots
+const gd=_gfx.boids; gd.clear();
+const seed=42;
+for(let i=0;i<40;i++){
+  const dpx=((Math.sin(i*127.1+seed)*43758.5)%1+1)%1*w;
+  const dpy=((Math.sin(i*311.7+seed)*43758.5)%1+1)%1*h;
+  const dr=0.5+((Math.sin(i*91.3)*43758.5)%1+1)%1*1.5;
+  const da=0.15+((Math.sin(i*53.1)*43758.5)%1+1)%1*0.25;
+  gd.beginFill(0x54a0ff, da); gd.drawCircle(dpx,dpy,dr); gd.endFill();
+}
+// centred prompt text — created once, reused on resize
+if(!_idleText){
+  _idleText=new PIXI.Text('set parameters · press play',{
+    fontFamily:'Courier New', fontSize:13, fill:'#00d2d3'
+  });
+  _idleText.alpha=0.45;
+  _idleText.anchor.set(0.5,0.5);
+  app.stage.addChild(_idleText);
+}
+_idleText.x=w/2; _idleText.y=h/2; _idleText.visible=true;
+app.renderer.render(app.stage);
+}
+
+function startSim(){
+if(_idleText) _idleText.visible=false;
+nextId=0; boids=[]; predators=[]; deathSplashes=[];
+preferredFamilyIdx=0; preferredFamily=COLOR_FAMILY_CYCLE[0]; familyConvergedTimer=0;
+hits.clear(); cooldown.clear(); pairChildren.clear(); spawnFlashPairs.clear(); diseaseCooldown.clear(); birthRings=[];
+smoothPressure=0.5; smoothGlobalPressure=0.0; lastTime=null; immigrationTimer=10;
+birthEvents=[]; deathEvents=[]; immigrantEvents=[]; simClock=0; rHistory=[]; diseaseDeathEvents=[]; lastPyramidUpdate=-Infinity; _cachedDiversity=0.3; _cachedEffectiveBreeders=0;
+for(let i=0;i<N_PREDATORS;i++) predators.push(makePredator());
+for(let i=0;i<TARGET_POP;i++){
+const b=makeBoid();
+b.age=Math.random()*b.maxLifespan*0.9;
+b.birthTimer=0;
+boids.push(b);
+}
+running=true;
+playBtn.innerHTML='&#9646;&#9646;';
+playBtn.classList.add('running');
+playBtn.title='Pause simulation';
+rafId=requestAnimationFrame(loop);
+}
+
+function pauseSim(){
+running=false;
+if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+playBtn.innerHTML='&#9654;';
+playBtn.classList.remove('running');
+playBtn.title='Resume simulation';
+}
+
+playBtn.addEventListener('click',()=>{ if(!running) startSim(); else pauseSim(); });
+
+document.getElementById('infectBtn').addEventListener('click',()=>{
+const candidates=boids.filter(b=>b.alive&&!b.dying&&!b.diseased&&!b.immune);
+const statusEl=document.getElementById('infectStatus');
+if(!running){ statusEl.textContent='not running'; return; }
+if(candidates.length===0){ statusEl.textContent='no healthy boids'; return; }
+const target=candidates[Math.floor(Math.random()*candidates.length)];
+infectBoid(target);
+statusEl.textContent='';
+});
+
+drawIdle();
+updateViability();
+
+// ── family cycle ─────────────────────────────────────────────────────────────
+function updateFamilyCycle(dt){
+const alive=boids.filter(b=>b.alive&&!b.dying);
+if(alive.length<3){ familyConvergedTimer=0; return; }
+const inFam=alive.filter(b=>boidInPreferredFamily(b)).length;
+if(inFam/alive.length>=0.9){
+  familyConvergedTimer+=dt;
+  if(familyConvergedTimer>=FAMILY_CONVERGE_HOLD){
+    familyConvergedTimer=0;
+    preferredFamilyIdx=(preferredFamilyIdx+1)%COLOR_FAMILY_CYCLE.length;
+    preferredFamily=COLOR_FAMILY_CYCLE[preferredFamilyIdx];
+  }
+} else {
+  familyConvergedTimer=0;
+}
+}
+
+// ── cluster aura drawing ──────────────────────────────────────────────────────
+const CLUSTER_PALETTE=[
+[255,100, 80],  // coral
+[ 70,190,255],  // sky blue
+[120,255, 90],  // lime
+[255,175, 35],  // amber
+[195, 75,255],  // violet
+[ 35,215,170],  // teal
+];
+
+function drawClusters(){
+const g=_gfx.clusters; g.clear();
+const seen=new Set();
+for(const b of boids){
+  if(!b.alive||b.dying||b.clusterSize<2||seen.has(b.clusterId)) continue;
+  seen.add(b.clusterId);
+  const [r,gr,bl]=CLUSTER_PALETTE[b.clusterId%CLUSTER_PALETTE.length];
+  const col=(r<<16)|(gr<<8)|bl;
+  const auraR=b.clusterBoundR*1.3;
+  // Approximate gradient: two concentric circles (inner slightly brighter)
+  g.beginFill(col,0.06); g.drawCircle(b.clusterCx,b.clusterCy,auraR);      g.endFill();
+  g.beginFill(col,0.05); g.drawCircle(b.clusterCx,b.clusterCy,auraR*0.55); g.endFill();
+}
+}
+
+// ── population pyramid ────────────────────────────────────────────────────────
+function drawPopPyramid() {
+const pc = document.getElementById('popPyramid');
+if (!pc) return;
+const pctx = pc.getContext('2d');
+const W = pc.width, H = pc.height;
+const BAND = 5;
+
+const alive = boids.filter(b => b.alive && !b.dying);
+
+let maxAge = BASE_LIFESPAN;
+for (const b of alive) if (b.age > maxAge) maxAge = b.age;
+const numBands = Math.max(1, Math.ceil(maxAge / BAND));
+
+const maleCounts   = new Array(numBands).fill(0);
+const femaleCounts = new Array(numBands).fill(0);
+for (const b of alive) {
+  const bi = Math.min(Math.floor(b.age / BAND), numBands - 1);
+  if (b.sex === 'M') maleCounts[bi]++;
+  else               femaleCounts[bi]++;
+}
+const maxCount = Math.max(1, Math.ceil(TARGET_POP / 4));
+
+pctx.clearRect(0, 0, W, H);
+
+const padT = 18, padB = 4, padL = 4, padR = 4;
+const labelW = 30;
+const halfW  = (W - padL - padR - labelW) / 2;
+const totalH = H - padT - padB;
+const rowH   = totalH / numBands;
+const centerX = padL + halfW + labelW / 2;
+const fontSize = Math.max(7, Math.min(9, Math.floor(rowH * 0.75)));
+
+// alternating row tint (youngest at bottom → band 0 drawn at bottom row)
+for (let i = 0; i < numBands; i++) {
+  const rowIdx = numBands - 1 - i;
+  const y = padT + rowIdx * rowH;
+  if (i % 2 === 0) {
+    pctx.fillStyle = 'rgba(0,0,0,0.03)';
+    pctx.fillRect(0, y, W, rowH);
+  }
+}
+
+// bars + age labels
+pctx.textAlign = 'center';
+pctx.textBaseline = 'middle';
+for (let i = 0; i < numBands; i++) {
+  const rowIdx = numBands - 1 - i;
+  const y = padT + rowIdx * rowH;
+  const mBar = Math.min((maleCounts[i]   / maxCount) * halfW, halfW);
+  const fBar = Math.min((femaleCounts[i] / maxCount) * halfW, halfW);
+
+  pctx.fillStyle = 'rgba(84,160,255,0.8)';
+  pctx.fillRect(centerX - labelW / 2 - mBar, y + 1, mBar, rowH - 2);
+
+  pctx.fillStyle = 'rgba(253,121,168,0.8)';
+  pctx.fillRect(centerX + labelW / 2,        y + 1, fBar, rowH - 2);
+
+  pctx.fillStyle = '#888';
+  pctx.font = `${fontSize}px Courier New`;
+  pctx.fillText(`${i * BAND}`, centerX, y + rowH / 2);
+}
+
+// center dividers
+pctx.strokeStyle = 'rgba(0,0,0,0.12)';
+pctx.lineWidth = 1;
+pctx.beginPath();
+pctx.moveTo(centerX - labelW / 2, padT); pctx.lineTo(centerX - labelW / 2, H - padB);
+pctx.moveTo(centerX + labelW / 2, padT); pctx.lineTo(centerX + labelW / 2, H - padB);
+pctx.stroke();
+
+// headers
+pctx.font = 'bold 10px Courier New';
+pctx.textBaseline = 'middle';
+pctx.fillStyle = 'rgba(84,160,255,0.9)';
+pctx.fillText('♂', padL + halfW / 2, padT / 2);
+pctx.fillStyle = '#aaa';
+pctx.fillText('age', centerX, padT / 2);
+pctx.fillStyle = 'rgba(253,121,168,0.9)';
+pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
+}
+
+// ── main loop ─────────────────────────────────────────────────────────────────
+const TARGET_FPS = 30;
+const FRAME_MIN_MS = 1000 / TARGET_FPS;
+function loop(ts){
+if(!running) return;
+rafId=requestAnimationFrame(loop);
+if(lastTime!==null && ts-lastTime < FRAME_MIN_MS) return;
+const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
+lastTime=ts;
+simClock+=dt;
+for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
+
+boidMap.clear(); for(const b of boids) if(b.alive) boidMap.set(b.id, b);
+_buildSpatialGrid();
+updateClusters();
+
+updateFertileCounts();
+updateEffectiveBreeders();
+for(const boid of boids) if(boid.alive) computePressure(boid);
+
+drawBackground();
+drawTrails();
+drawClusters();
+drawBondLines();
+drawBirthRings();
+updateCollisions();
+updatePredators(dt);
+
+for(const boid of boids){
+if(!boid.alive) continue;
+updateLifespan(boid,dt);
+if(!boid.alive) continue;
+updateBreeding(boid,dt);
+if(!boid.dying){
+avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid); clusterEmigration(boid);
+if(NO_OVERLAP) separateBoid(boid);
+// Smooth-angle cap: all forces above produce a desired heading; the boid can
+// only actually rotate toward it by at most TURN_SPEED×6 per frame, preventing
+// multi-force compounding and sudden snaps from any single force.
+let _da=Math.atan2(boid.vy,boid.vx)-boid._sa;
+if(_da>Math.PI)_da-=Math.PI*2; else if(_da<-Math.PI)_da+=Math.PI*2;
+const _cap=TURN_SPEED*6;
+boid._sa+=Math.max(-_cap,Math.min(_cap,_da));
+boid.vx=Math.cos(boid._sa)*SPEED; boid.vy=Math.sin(boid._sa)*SPEED;
+boid.x+=boid.vx; boid.y+=boid.vy;
+clampToBounds(boid);
+boid.trail.push({x:boid.x,y:boid.y});
+if(boid.trail.length>MAX_TRAIL) boid.trail.shift();
+} else if(boid.trail.length>0){
+boid.trail.shift(); // shed one position per frame so trail dissipates during fade
+}
+}
+
+if(toSpawn.length){ boids.push(...toSpawn); toSpawn.length=0; }
+for(let i=birthRings.length-1;i>=0;i--){ birthRings[i].age+=dt; if(birthRings[i].age>=birthRings[i].duration) birthRings.splice(i,1); }
+boids=boids.filter(b=>b.alive);
+if(POP_CEILING>0){
+const living=boids.filter(b=>!b.dying);
+if(living.length>POP_CEILING)
+living[Math.floor(Math.random()*living.length)].dying=true;
+}
+updateDivorce(dt);
+updateImmigration(dt);
+updateFamilyCycle(dt);
+updateDiseaseCollisions();
+if(AUTO_DISEASE){
+_autoDisTimer-=dt;
+if(_autoDisTimer<=0){
+_autoDisTimer=30+Math.random()*60;
+const candidates=boids.filter(b=>b.alive&&!b.dying&&!b.diseased&&!b.immune);
+if(candidates.length>0) infectBoid(candidates[Math.floor(Math.random()*candidates.length)]);
+}
+// kickstart: if everything is dead, restart after a brief pause
+if(boids.length===0 && predators.every(p=>!p.alive)){
+_allDeadTimer+=dt;
+if(_allDeadTimer>=3){ _allDeadTimer=0; startSim(); return; }
+} else {
+_allDeadTimer=0;
+}
+}
+updateDisease(dt);
+
+_gfx.boids.clear();
+for(const boid of boids) drawBoid(boid);
+drawDeathSplashes();
+drawPredators();
+updateStatus();
+if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
+lastPyramidUpdate = simClock;
+drawPopPyramid();
+}
+// age death splashes
+for(let i=deathSplashes.length-1;i>=0;i--){
+deathSplashes[i].age+=dt;
+if(deathSplashes[i].age>=deathSplashes[i].duration) deathSplashes.splice(i,1);
+}
+
+app.renderer.render(app.stage);
+}
+
+// ── export ────────────────────────────────────────────────────────────────────
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+// Sync current slider positions → HTML attributes so outerHTML captures them
+document.querySelectorAll('input[type="range"]').forEach(el => el.setAttribute('value', el.value));
+
+let html = document.documentElement.outerHTML;
+
+// 1. Inject CSS at the very start of <head> — applied before any rendering, no flash
+const exportCSS = `<style>
+#ui { display:none !important; }
+body { margin:0; padding:0; overflow:hidden; background:#050e18; }
+canvas#c { position:fixed; top:0; left:0; display:block; }
+</style>`;
+html = html.replace('<head>', '<head>\n' + exportCSS);
+
+// 2. Boot script at end of body — all inline scripts already done, startSim available
+const bootScript = `<script>
+(function(){
+MAX_TRAIL         = ${MAX_TRAIL};
+TRAIL_OPACITY     = ${TRAIL_OPACITY};
+immigrationEnabled= ${immigrationEnabled};
+AURA_GRADIENT     = ${AURA_GRADIENT};
+NO_OVERLAP        = ${NO_OVERLAP};
+BG_COLOR          = '${BG_COLOR}';
+AUTO_DISEASE      = true;
+resize = function(){
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  if(app) app.renderer.resize(canvas.width, canvas.height);
+  SENSING_RADIUS = Math.round(Math.min(canvas.width, canvas.height) * 0.3);
+};
+window.addEventListener('resize', resize);
+resize();
+startSim();
+})();
+<\/script>`;
+
+const idx = html.lastIndexOf('</body>');
+html = idx !== -1
+  ? html.slice(0, idx) + bootScript + '\n</body></html>'
+  : html + bootScript;
+
+const blob = new Blob([html], {type:'text/html'});
+const url  = URL.createObjectURL(blob);
+const a    = document.createElement('a');
+a.href = url; a.download = 'boids-aquarium.html';
+document.body.appendChild(a); a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+});
+</script>
+
+</body>
+</html>
