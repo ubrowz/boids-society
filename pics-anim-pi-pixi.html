@@ -1821,26 +1821,44 @@ if(isBonded||fertile){
   g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
 }
 
-// teardrop body: half-circle arc + two quadratic curves to tail tip
+// teardrop body: 4 nested layers simulating the original radial-gradient 3D shading.
+// Each layer is a full teardrop shape (arc + 2 quadraticCurveTo), progressively
+// smaller and brighter, shifted toward the lit side — so every layer stays
+// completely inside the one beneath it; no clipping or bleeding needed.
 const ang=Math.atan2(boid.vy,boid.vx);
 const cos=Math.cos(ang), sin=Math.sin(ang);
 const px=-sin, py=cos; // perpendicular (left)
-const arcStartX=boid.x+px*r, arcStartY=boid.y+py*r; // left edge = arc start
-const tipx=boid.x-cos*r*1.6, tipy=boid.y-sin*r*1.6;
-const cpLx=boid.x-cos*r*0.35+px*r*0.75, cpLy=boid.y-sin*r*0.35+py*r*0.75;
-const cpRx=boid.x-cos*r*0.35-px*r*0.75, cpRy=boid.y-sin*r*0.35-py*r*0.75;
-const bodyCol = boidHex(boid);
-g.beginFill(bodyCol, baseAlpha);
-g.moveTo(arcStartX, arcStartY);
-g.arc(boid.x, boid.y, r, ang+Math.PI/2, ang-Math.PI/2, true); // CCW front-half arc
-g.quadraticCurveTo(cpRx, cpRy, tipx, tipy);   // right edge → tail tip
-g.quadraticCurveTo(cpLx, cpLy, arcStartX, arcStartY); // tail tip → left edge
-g.closePath();
-g.endFill();
 
-// 3D highlight spot (white oval offset toward upper-front)
-const hlx=boid.x+cos*r*0.28+px*r*0.22, hly=boid.y+sin*r*0.28+py*r*0.22;
-g.beginFill(0xffffff, baseAlpha*0.38); g.drawCircle(hlx,hly,r*0.48); g.endFill();
+// lighting direction: same offset used by the original radial gradient highlight
+const hDx=cos*0.28+px*0.22, hDy=sin*0.28+py*0.22; // ≈ 0.356 r from center
+
+// inline helper — draw teardrop path at world position (cx,cy), radius rr
+const _td=(cx,cy,rr)=>{
+  const sx=cx+px*rr, sy=cy+py*rr;          // arc start (left edge)
+  const tx=cx-cos*rr*1.6, ty=cy-sin*rr*1.6; // tail tip
+  const cLx=cx-cos*rr*0.35+px*rr*0.75, cLy=cy-sin*rr*0.35+py*rr*0.75;
+  const cRx=cx-cos*rr*0.35-px*rr*0.75, cRy=cy-sin*rr*0.35-py*rr*0.75;
+  g.moveTo(sx,sy);
+  g.arc(cx,cy,rr,ang+Math.PI/2,ang-Math.PI/2,true);
+  g.quadraticCurveTo(cRx,cRy,tx,ty);
+  g.quadraticCurveTo(cLx,cLy,sx,sy);
+  g.closePath();
+};
+
+const _h=boid.hue, _s=boid.sat*100;
+const bx=boid.x, by=boid.y;
+
+// layer 1 — dark shadow edge (full size, forms silhouette)
+g.beginFill(hslToHex(_h,_s,27), baseAlpha);         _td(bx,by,r);                              g.endFill();
+// layer 2 — mid-dark (85% size, nudged toward lit side)
+g.beginFill(hslToHex(_h,_s,44), baseAlpha*0.88);    _td(bx+hDx*r*0.04,by+hDy*r*0.04, r*0.85); g.endFill();
+// layer 3 — mid-bright (65% size, more offset)
+g.beginFill(hslToHex(_h,_s,62), baseAlpha*0.78);    _td(bx+hDx*r*0.12,by+hDy*r*0.12, r*0.65); g.endFill();
+// layer 4 — bright lit core (42% size, near highlight zone)
+g.beginFill(hslToHex(_h,_s,76), baseAlpha*0.62);    _td(bx+hDx*r*0.22,by+hDy*r*0.22, r*0.42); g.endFill();
+// specular — tiny white pinpoint
+const hlx=bx+hDx*r, hly=by+hDy*r;
+g.beginFill(0xffffff, baseAlpha*0.45); g.drawCircle(hlx,hly,r*0.13); g.endFill();
 
 // beak: males only
 if(boid.sex==='M'){
