@@ -547,7 +547,11 @@ wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10)
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
 wire('childSlider', 'childVal', v=>parseInt(v), v=>v+' s', v=>{ PREG_INTERVAL=v; updateViability(); });
-wire('speedSlider', 'speedVal', v=>parseInt(v), v=>v, v=>{ SPEED=v*0.45; });
+wire('speedSlider', 'speedVal', v=>parseInt(v), v=>v, v=>{
+SPEED=v*0.45;
+TURN_SPEED=TURN_SPEED_BASE*(SPEED/SPEED_MAX);
+WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
+});
 wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
 wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
 wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
@@ -587,9 +591,12 @@ let familyConvergedTimer = 0;
 const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
 const RADIUS = 20;
 let MAX_TRAIL = 30;
+const SPEED_MAX = 10 * 0.45;   // slider ceiling × conversion factor = 4.5
 let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
-const TURN_SPEED = 0.07;
-const WANDER_STR = 0.12;
+const TURN_SPEED_BASE = 0.07;   // heading-change cap per steerToward call at max speed
+const WANDER_STR_BASE = 0.12;   // wander-angle jitter amplitude at max speed
+let TURN_SPEED = TURN_SPEED_BASE * (SPEED / SPEED_MAX);
+let WANDER_STR = WANDER_STR_BASE * (SPEED / SPEED_MAX);
 const WALL_MARGIN = 80;
 const BOND_DIST = 90;
 const BOND_STRENGTH = 3.0;
