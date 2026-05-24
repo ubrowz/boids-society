@@ -366,35 +366,24 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
 <span class="ctrl-val" id="predatorDietVal">other</span>
 </div>
+<div class="ctrl-divider">body image</div>
+<div class="ctrl-row">
+<label>shape</label>
+<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
+<button id="bodyImgBtn" title="Load a PNG to replace the body sprite" style="font-size:9px;padding:2px 8px;background:#1a2a3a;color:#54a0ff;border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;">load</button>
+<span id="bodyImgName" style="font-size:9px;color:#666;white-space:nowrap;">default</span>
+</div>
+<div class="ctrl-row">
+<label title="Pixels from image centre to nose tip">nose px</label>
+<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1" style="width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
+</div>
+<div class="ctrl-row">
+<label title="Sprite scale = r ÷ this value">body scale</label>
+<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5" style="width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
+</div>
 </div><!-- end second ctrl-col -->
 </div><!-- end #ctrl-cols -->
 
-<!-- body image strip — sits below both slider columns -->
-<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:2px 0 0 2px;">
-<span style="font-size:10px;letter-spacing:2px;color:#000;text-transform:uppercase;user-select:none;">body image</span>
-<div style="display:flex;align-items:center;gap:6px;">
-  <input type="file" id="bodyImgFile" accept="image/*" style="display:none">
-  <button id="bodyImgBtn" title="Load a PNG to replace the body sprite" style="
-  font-size:9px;padding:2px 8px;background:#1a2a3a;color:#54a0ff;
-  border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;
-  letter-spacing:0.5px;white-space:nowrap;">load</button>
-  <span id="bodyImgName" style="font-size:9px;color:#666;white-space:nowrap;">default</span>
-</div>
-<div style="display:flex;align-items:center;gap:5px;">
-  <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#000;white-space:nowrap;"
-         title="Pixels from image centre to nose tip">nose px</label>
-  <input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1" style="
-  width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
-  border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
-</div>
-<div style="display:flex;align-items:center;gap:5px;">
-  <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#000;white-space:nowrap;"
-         title="Sprite scale = r ÷ this value">body scale</label>
-  <input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5" style="
-  width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
-  border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
-</div>
-</div>
 
 </div><!-- end #controls -->
 
@@ -1663,6 +1652,22 @@ imm.birthTimer= 0;
 toSpawn.push(imm);
 }
 
+// ── predator steering helper — same angle-limited turn as steerToward() ──────
+// Steers pred toward (tx,ty) with a capped angular turn; always normalises to spd.
+function _predSteer(pred, spd, tx, ty, strength){
+const dx=tx-pred.x, dy=ty-pred.y;
+const len=Math.sqrt(dx*dx+dy*dy)||1;
+const desired=Math.atan2(dy/len,dx/len);
+const current=Math.atan2(pred.vy,pred.vx);
+let diff=desired-current;
+while(diff> Math.PI) diff-=Math.PI*2;
+while(diff<-Math.PI) diff+=Math.PI*2;
+const ts=TURN_SPEED_BASE*(spd/SPEED_MAX);
+const turn=Math.max(-ts*strength,Math.min(ts*strength,diff));
+const ang=current+turn;
+pred.vx=Math.cos(ang)*spd; pred.vy=Math.sin(ang)*spd;
+}
+
 // ── predator update ───────────────────────────────────────────────────────────
 function updatePredators(dt){
 const aliveBoids = boids.filter(b=>b.alive&&!b.dying);
@@ -1679,20 +1684,10 @@ pred.noPreyTimer=0;
 }
 const isHungry = (simClock-pred.lastEaten)>FULL_DURATION;
 const veryHungry = (simClock-pred.lastEaten)>FULL_DURATION*2;
-// wall avoidance — steer away before hitting
-const margin=WALL_MARGIN*1.5;
-let wx=0, wy=0;
-if(pred.x<margin) wx+=(margin-pred.x)/margin;
-if(pred.x>w-margin) wx-=(pred.x-(w-margin))/margin;
-if(pred.y<margin) wy+=(margin-pred.y)/margin;
-if(pred.y>h-margin) wy-=(pred.y-(h-margin))/margin;
-if(wx!==0||wy!==0){
-const wm=Math.sqrt(wx*wx+wy*wy)||1;
-pred.vx+=(wx/wm)*predSpd*0.18;
-pred.vy+=(wy/wm)*predSpd*0.18;
-pred.wanderAngle=Math.atan2(pred.vy,pred.vx);
-}
-// target seeking or wander
+const huntSpd   = predSpd;
+const cruiseSpd = predSpd * 0.6;
+const curSpd    = isHungry ? huntSpd : cruiseSpd;
+// target seeking or wander — angle-capped turns, same physics as boids
 if(isHungry && aliveBoids.length>0){
 let target=null, bestDist=Infinity;
 for(const b of _sgNeighbors(pred.x,pred.y,PREDATOR_SENSE)){
@@ -1704,27 +1699,32 @@ const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b
 if(edible && dist<bestDist){ bestDist=dist; target=b; }
 }
 if(target){
-const dx=target.x-pred.x, dy=target.y-pred.y;
-const dist=Math.sqrt(dx*dx+dy*dy)||1;
-pred.vx+=(dx/dist*predSpd-pred.vx)*0.08;
-pred.vy+=(dy/dist*predSpd-pred.vy)*0.08;
+_predSteer(pred, huntSpd, target.x, target.y, 1.0);
+pred.wanderAngle=Math.atan2(pred.vy,pred.vx); // keep wander synced to heading
 } else {
-pred.wanderAngle+=(Math.random()-0.5)*0.10;
-pred.vx+=(Math.cos(pred.wanderAngle)*predSpd-pred.vx)*0.06;
-pred.vy+=(Math.sin(pred.wanderAngle)*predSpd-pred.vy)*0.06;
+// wander: same geometry as boid wander() — project ahead then add random offset
+pred.wanderAngle+=(Math.random()-0.5)*WANDER_STR*2*Math.PI;
+const s0=Math.sqrt(pred.vx*pred.vx+pred.vy*pred.vy)||1;
+const nx=pred.vx/s0, ny=pred.vy/s0;
+_predSteer(pred, huntSpd, pred.x+nx*30+Math.cos(pred.wanderAngle)*20, pred.y+ny*30+Math.sin(pred.wanderAngle)*20, 1.0);
 }
 } else {
-pred.wanderAngle+=(Math.random()-0.5)*0.07;
-pred.vx+=(Math.cos(pred.wanderAngle)*predSpd*0.6-pred.vx)*0.05;
-pred.vy+=(Math.sin(pred.wanderAngle)*predSpd*0.6-pred.vy)*0.05;
+// not hungry — cruise wander at 0.6× speed
+pred.wanderAngle+=(Math.random()-0.5)*WANDER_STR*2*Math.PI;
+const s0=Math.sqrt(pred.vx*pred.vx+pred.vy*pred.vy)||1;
+const nx=pred.vx/s0, ny=pred.vy/s0;
+_predSteer(pred, cruiseSpd, pred.x+nx*30+Math.cos(pred.wanderAngle)*20, pred.y+ny*30+Math.sin(pred.wanderAngle)*20, 0.7);
 }
-// normalise speed
-const spd=Math.sqrt(pred.vx*pred.vx+pred.vy*pred.vy)||1;
-const targetSpd=isHungry?predSpd:predSpd*0.6;
-pred.vx=pred.vx/spd*targetSpd;
-pred.vy=pred.vy/spd*targetSpd;
+// wall avoidance — angle-based steer (same as avoidWalls for boids), applied after so it takes priority
+const margin=WALL_MARGIN*1.5;
+let px=0, py=0;
+if(pred.x<margin) px+=(margin-pred.x)/margin;
+if(pred.x>w-margin) px-=(pred.x-(w-margin))/margin;
+if(pred.y<margin) py+=(margin-pred.y)/margin;
+if(pred.y>h-margin) py-=(pred.y-(h-margin))/margin;
+if(px!==0||py!==0) _predSteer(pred, curSpd, pred.x+px*100, pred.y+py*100, 2.0);
 pred.x+=pred.vx; pred.y+=pred.vy;
-// hard bounce off edges
+// hard bounce at edges — snap drawAngle (same as clampToBounds for boids)
 if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
 if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
 if(pred.y<PREDATOR_RADIUS){ pred.y=PREDATOR_RADIUS; pred.vy=Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
