@@ -56,8 +56,25 @@ Visible flickering almost always originates from one of these lower-level mechan
 
 ---
 
+---
+
+## Quick Win: Black Background
+
+Setting the canvas background to black (`#000000`) reduces flicker significantly in practice.
+
+**Why it works:** black pixels mean the LED is off — PWM duty cycle is 0. With most of the panel
+dark (as in the boids simulation, where only boids, trails and effects are lit), the driver has
+far fewer high-duty-cycle PWM cycles to process. Less switching activity → cleaner GPIO timing →
+less visible flicker. No configuration changes needed; works immediately.
+
+Use the **background** colour picker in the controls and set it to `#000000`. The setting is
+exported to standalone files.
+
+---
+
 ## Summary
 
 The flickering is a **hardware driver tuning problem**, not an animation speed problem.
-The fix is in the `rpi-rgb-led-matrix` configuration (GPIO slowdown, PWM bits, CPU isolation),
-not in the boids simulation frame rate.
+The quickest fix is a **black background** (reduces active PWM load on the panel).
+Further tuning via `rpi-rgb-led-matrix` configuration (GPIO slowdown, PWM bits, CPU isolation)
+can reduce it further if needed.
