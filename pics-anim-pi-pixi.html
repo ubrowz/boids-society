@@ -19,7 +19,8 @@ gap:4px;
 canvas {
 display:block;
 }
-#controls { display:flex; flex-direction:row; align-items:flex-start; gap:12px; }
+#controls { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+#ctrl-cols { display:flex; flex-direction:row; align-items:flex-start; gap:12px; }
 .ctrl-col { display:flex; flex-direction:column; gap:8px; align-items:center; }
 .ctrl-row {
 display:flex; align-items:center; gap:6px;
@@ -189,6 +190,7 @@ display:flex; align-items:center; justify-content:center;
 
 <div id="ui">
 <div id="controls">
+<div id="ctrl-cols">
 <div class="ctrl-col">
 <div class="ctrl-row">
 <label>target pop</label>
@@ -364,30 +366,37 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-<div class="ctrl-divider">body image</div>
-<div class="ctrl-row" style="gap:8px;align-items:center;">
-<label>shape</label>
-<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
-<button id="bodyImgBtn" title="Load a PNG to replace the body sprite" style="
-font-size:9px;padding:2px 8px;background:#1a2a3a;color:#54a0ff;
-border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;
-letter-spacing:0.5px;white-space:nowrap;">load</button>
-<span id="bodyImgName" style="font-size:9px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px;">default</span>
+</div><!-- end second ctrl-col -->
+</div><!-- end #ctrl-cols -->
+
+<!-- body image strip — sits below both slider columns -->
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:2px 0 0 2px;">
+<span style="font-size:10px;letter-spacing:2px;color:#000;text-transform:uppercase;user-select:none;">body image</span>
+<div style="display:flex;align-items:center;gap:6px;">
+  <input type="file" id="bodyImgFile" accept="image/*" style="display:none">
+  <button id="bodyImgBtn" title="Load a PNG to replace the body sprite" style="
+  font-size:9px;padding:2px 8px;background:#1a2a3a;color:#54a0ff;
+  border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;
+  letter-spacing:0.5px;white-space:nowrap;">load</button>
+  <span id="bodyImgName" style="font-size:9px;color:#666;white-space:nowrap;">default</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
-<label title="Pixels from image centre to nose tip">nose px</label>
-<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1" style="
-width:44px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
-border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
+<div style="display:flex;align-items:center;gap:5px;">
+  <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#000;white-space:nowrap;"
+         title="Pixels from image centre to nose tip">nose px</label>
+  <input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1" style="
+  width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
+  border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
 </div>
-<div class="ctrl-row" style="gap:8px;">
-<label title="Body-radius calibration: sprite scale = r ÷ this value">body scale</label>
-<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5" style="
-width:44px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
-border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
+<div style="display:flex;align-items:center;gap:5px;">
+  <label style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#000;white-space:nowrap;"
+         title="Sprite scale = r ÷ this value">body scale</label>
+  <input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5" style="
+  width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
+  border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
 </div>
 </div>
-</div>
+
+</div><!-- end #controls -->
 
 <div id="rightCol">
 <div style="display:flex;gap:12px;align-items:center;">
