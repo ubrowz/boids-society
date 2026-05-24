@@ -323,6 +323,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>circles</label>
+<button id="clusterCircBtn" title="Toggle cluster circles" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="clusterCircKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="clusterCircLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+</div>
 <div class="ctrl-row">
 <label>emigr. push</label>
 <input type="range" id="emigStrSlider" min="0" max="30" value="15" step="1">
@@ -602,6 +614,23 @@ if(SHOW_BOND_LINES){
 } else {
   bondLinesBtn.style.background='#555'; bondLinesKnob.style.left='3px';
   bondLinesLabel.textContent='off'; bondLinesLabel.style.color='#555';
+}
+});
+
+// ── cluster circles toggle ────────────────────────────────────────────────────
+let SHOW_CLUSTERS = false;
+const clusterCircBtn   = document.getElementById('clusterCircBtn');
+const clusterCircKnob  = document.getElementById('clusterCircKnob');
+const clusterCircLabel = document.getElementById('clusterCircLabel');
+// init UI to OFF state (default: no circles)
+clusterCircBtn.addEventListener('click', () => {
+SHOW_CLUSTERS = !SHOW_CLUSTERS;
+if(SHOW_CLUSTERS){
+  clusterCircBtn.style.background='#f9ca24'; clusterCircKnob.style.left='25px';
+  clusterCircLabel.textContent='on'; clusterCircLabel.style.color='#f9ca24';
+} else {
+  clusterCircBtn.style.background='#555'; clusterCircKnob.style.left='3px';
+  clusterCircLabel.textContent='off'; clusterCircLabel.style.color='#555';
 }
 });
 
@@ -2413,6 +2442,7 @@ const CLUSTER_PALETTE=[
 
 function drawClusters(){
 const g=_gfx.clusters; g.clear();
+if(!SHOW_CLUSTERS) return;
 const seen=new Set();
 for(const b of boids){
   if(!b.alive||b.dying||b.clusterSize<2||seen.has(b.clusterId)) continue;
@@ -2658,6 +2688,22 @@ SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
     if(btn)  btn.style.background='#54a0ff';
     if(knob) knob.style.left='25px';
     if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
+  } else {
+    if(btn)  btn.style.background='#555';
+    if(knob) knob.style.left='3px';
+    if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
+  }
+}
+SHOW_CLUSTERS     = ${SHOW_CLUSTERS};
+// Sync the cluster-circles button visual to match the exported SHOW_CLUSTERS state
+{
+  const btn=document.getElementById('clusterCircBtn');
+  const knob=document.getElementById('clusterCircKnob');
+  const lbl=document.getElementById('clusterCircLabel');
+  if(SHOW_CLUSTERS){
+    if(btn)  btn.style.background='#f9ca24';
+    if(knob) knob.style.left='25px';
+    if(lbl){ lbl.textContent='on'; lbl.style.color='#f9ca24'; }
   } else {
     if(btn)  btn.style.background='#555';
     if(knob) knob.style.left='3px';

@@ -591,18 +591,23 @@ function biasedHue(h1, h2, preferredHue):
   <li><strong>Eyes</strong> — two circles at <code>noseEdge × 0.55</code> forward; colour transitions yellow (full) → orange → red (very hungry); each has a small white highlight dot; size increases slightly when hungry</li>
   <li><strong>Back dot</strong> — small filled circle on the rear of the body, coloured in the current protected family's CSS colour</li>
 </ul>
-<p>Predators also maintain a <code>_drawAngle</code> with lerp factor 0.18, snapped immediately on wall bounces — same smoothing approach as boids. Wander perturbation is reduced to ±0.10 rad/frame (hunting, no target) and ±0.07 rad/frame (full) to limit left-right oscillation.</p>
+<p>Predators maintain a <code>_drawAngle</code> with lerp factor 0.18, snapped immediately on wall bounces — same smoothing approach as boids.</p>
 
 <h3>Movement</h3>
-<p>Speed = <code>SPEED × 1.2</code> (20% faster than boids at the same speed setting).</p>
+<p>Speed = <code>SPEED × 1.2</code> (20% faster than boids at the same speed setting). Predators use the same angle-capped steering as boids via the <code>_predSteer(pred, spd, tx, ty, strength)</code> helper:</p>
+<pre><code>ts   = TURN_SPEED_BASE × (spd / SPEED_MAX)
+turn = clamp(angleDiff, −ts×strength, +ts×strength)
+pred.vx = cos(currentAngle + turn) × spd
+pred.vy = sin(currentAngle + turn) × spd</code></pre>
+<p>This is structurally identical to <code>steerToward()</code> used by boids — no velocity lerp, no per-frame speed normalisation. The heading changes by at most one smooth step per frame, giving the same movement quality as a regular boid.</p>
 <p><strong>When hungry</strong> (time since last meal &gt; <code>FULL_DURATION</code>):</p>
 <ol>
   <li>Scan all living boids within <code>PREDATOR_SENSE = 200 px</code></li>
   <li>Target the nearest boid that does <em>not</em> belong to the current protected colour family; if none found within range, wander</li>
   <li>If <code>veryHungry</code> (&gt; 2× <code>FULL_DURATION</code> without a meal), target any boid regardless of family</li>
-  <li>Steer toward target with a soft turn (<code>vx += (desired − vx) × 0.08</code>)</li>
+  <li>Steer toward target via <code>_predSteer(pred, huntSpd, target.x, target.y, 1.0)</code></li>
 </ol>
-<p><strong>When full</strong>: wander at 60% speed with slow random heading changes. Wall behaviour: soft steering away from walls + hard velocity bounce. Predators do <strong>not</strong> wrap around.</p>
+<p><strong>When full</strong>: wander at 60% speed. Wander uses identical geometry to the boid <code>wander()</code> function — a target is projected 30 px ahead along the current heading, shifted by a 20 px random-walk offset, then steered toward at strength 0.7. <strong>Wall avoidance</strong>: angle-based steer (same pattern as <code>avoidWalls()</code> for boids), strength 2.0, applied after wander/seek so walls always take priority. Hard velocity bounce at canvas edges snaps <code>_drawAngle</code>. Predators do <strong>not</strong> wrap around.</p>
 
 <h3>Colour families and eating</h3>
 <p>Boid hues are partitioned into five named families. A boid counts as belonging to a family only if its saturation ≥ 0.15 (non-grey).</p>
@@ -684,10 +689,15 @@ steerStrength    = overload × peripheryFrac × EMIG_PUSH</code></pre>
 <tr><td>5</td><td>Teal <code>rgb(35,215,170)</code></td></tr>
 </tbody>
 </table>
-<p>Aura radius = <code>clusterBoundR × 1.3</code> where <code>clusterBoundR</code> = max member distance from centroid + <code>RADIUS × 1.5</code>. Two rendering modes switchable via the <strong>aura</strong> toggle:</p>
+<p>Aura radius = <code>clusterBoundR × 1.3</code> where <code>clusterBoundR</code> = max member distance from centroid + <code>RADIUS × 1.5</code>. Two independent toggles control rendering:</p>
 <ul>
-  <li><strong>Gradient</strong> (default): radial gradient, 0.13 alpha at centre → 0 at edge. Soft nebula effect; one gradient per cluster (cheap — O(clusters), not O(boids)).</li>
-  <li><strong>Flat</strong>: solid fill at 0.07 alpha, no gradient computation. Recommended if frame rate drops on Pi with large clusters. Toggle state is exported to the standalone file.</li>
+  <li><strong>Circles toggle</strong> (<code>SHOW_CLUSTERS</code>, default <strong>off</strong>): master switch for cluster aura rendering. When off, <code>drawClusters()</code> returns after clearing the layer — zero overdraw. Toggle state is exported to standalone files.</li>
+  <li><strong>Aura toggle</strong> (gradient / flat): only has effect when circles are on.
+    <ul>
+      <li><strong>Gradient</strong> (default): two concentric filled circles approximating a radial glow (outer 0.06 alpha, inner 0.05 alpha). One draw per cluster — O(clusters), not O(boids).</li>
+      <li><strong>Flat</strong>: single solid fill at reduced alpha, no gradient computation. Recommended when frame rate drops on Pi with large clusters. Toggle state is exported to the standalone file.</li>
+    </ul>
+  </li>
 </ul>
 
 <!-- ───────────────────────────── EXPORT ─────────────────────────────────── -->
@@ -746,7 +756,7 @@ else:
 <pre><code>RADIUS          = 20    // boid body radius (was 10)
 WALL_MARGIN     = 80    // wall repulsion zone (was 40)
 BOND_DIST       = 90    // bond attraction range (was 45)
-PREDATOR_RADIUS = 30    // predator body radius (was 15)</code></pre>
+PREDATOR_RADIUS = RADIUS = 20    // predator is same size as a regular boid</code></pre>
 <p>Bond line widths are also doubled (6 / 14 / 18 px for normal / fertile / spawn-flash) to remain legible on the low-resolution display.</p>
 
 <!-- ───────────────────────────── CONTROLS ───────────────────────────────── -->
@@ -782,10 +792,14 @@ PREDATOR_RADIUS = 30    // predator body radius (was 15)</code></pre>
 <tr><td>Background</td><td>colour picker</td><td>#081828</td><td>Canvas background colour — flat fill applied every frame. Exported. Any colour is valid; dark colours work best with the existing trail glow and boid shading.</td></tr>
 <tr><td>No overlap</td><td>toggle (off/on)</td><td>off</td><td>When on, a body-separation force prevents boid circles from overlapping. Each frame, boids within 2×RADIUS of each other receive a position nudge (8% of overlap depth) plus a <code>steerToward</code> impulse (strength 5). Bonded pairs settle at ~2×RADIUS apart. Uses the existing spatial grid — O(N·k). Exported.</td></tr>
 <tr><td>Bond lines</td><td>toggle (on/off)</td><td>on</td><td>Show or hide bond lines between paired boids (thin coloured line; thick amber when fertile; brief red flash at birth). Turning off removes all bond line rendering without affecting simulation logic. Exported.</td></tr>
+<tr><td>Circles</td><td>toggle (off/on)</td><td>off</td><td>Show or hide cluster aura circles. When off, <code>drawClusters()</code> clears the layer and returns immediately — no overdraw from cluster rendering. Exported.</td></tr>
+<tr><td>Body image — shape</td><td>file picker + label</td><td>default (teardrop-v2.png)</td><td>Load a PNG to replace the body sprite texture for both boids and predators. The PNG is read as a data URL and swapped live via <code>_swapBodyTexture()</code>; all pooled sprites are updated immediately. The data URL is embedded in exported files so the custom image persists.</td></tr>
+<tr><td>Body image — nose px</td><td>number (1–500)</td><td>32</td><td>Pixels from the image centre to the nose tip in the source PNG. Used to compute <code>noseEdge</code> for beak placement, eye placement, and eating-collision geometry: <code>noseEdge = r × (nosePx / bodyScale)</code>.</td></tr>
+<tr><td>Body image — body scale</td><td>number (0.5–200)</td><td>13</td><td>Sprite scale divisor: <code>sprite.scale = r / bodyScale</code>. Increase to shrink the sprite relative to the boid radius; decrease to enlarge it. Default 13 is calibrated for teardrop-v2.png at RADIUS = 20.</td></tr>
 <tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
-<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>circles toggle</strong> (shows/hides cluster aura circles, default off), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
 
 <!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
 <h2 id="pyramid">Population Pyramid</h2>
