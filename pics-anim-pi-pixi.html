@@ -364,6 +364,28 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
+<div class="ctrl-divider">body image</div>
+<div class="ctrl-row" style="gap:8px;align-items:center;">
+<label>shape</label>
+<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
+<button id="bodyImgBtn" title="Load a PNG to replace the body sprite" style="
+font-size:9px;padding:2px 8px;background:#1a2a3a;color:#54a0ff;
+border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;
+letter-spacing:0.5px;white-space:nowrap;">load</button>
+<span id="bodyImgName" style="font-size:9px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px;">default</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label title="Pixels from image centre to nose tip">nose px</label>
+<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1" style="
+width:44px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
+border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label title="Body-radius calibration: sprite scale = r ÷ this value">body scale</label>
+<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5" style="
+width:44px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);
+border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
+</div>
 </div>
 </div>
 
@@ -481,6 +503,10 @@ let _spriteCount = 0;    // sprites used this frame; reset at start of each fram
 const _predBodySprites = []; // predator sprite pool — same texture, white tint
 let _predSpriteCount = 0;
 const _gfx = {}; // named Graphics layers, populated after app is created
+// ── body image calibration (user-adjustable) ──────────────────────────────────
+let _noseOffset = 32;   // pixels from image centre to nose tip (teardrop-v2: pixel 72, anchor 40 → 32)
+let _bodyScale  = 13;   // body-radius calibration: spr.scale = r/_bodyScale
+let _customBoidPNG = null; // data URL of user-loaded body image, or null for default
 
 
 // ── slider state ──────────────────────────────────────────────────────────────
@@ -579,6 +605,40 @@ if(SHOW_BOND_LINES){
   bondLinesBtn.style.background='#555'; bondLinesKnob.style.left='3px';
   bondLinesLabel.textContent='off'; bondLinesLabel.style.color='#555';
 }
+});
+
+// ── body image loader ─────────────────────────────────────────────────────────
+document.getElementById('bodyImgBtn').addEventListener('click', () => {
+document.getElementById('bodyImgFile').click();
+});
+document.getElementById('bodyImgFile').addEventListener('change', e => {
+const file = e.target.files[0];
+if(!file) return;
+const reader = new FileReader();
+reader.onload = ev => {
+  const dataURL = ev.target.result;
+  _customBoidPNG = dataURL;
+  // Create new PixiJS texture from data URL and swap all pooled sprites
+  const tex = PIXI.Texture.from(dataURL);
+  if(tex.baseTexture.valid){
+    _swapBodyTexture(tex);
+  } else {
+    tex.baseTexture.on('loaded', () => _swapBodyTexture(tex));
+    tex.baseTexture.on('error',  () => { _customBoidPNG=null; console.warn('Body image failed to load'); });
+  }
+  // Show filename (truncated, no extension)
+  document.getElementById('bodyImgName').textContent =
+    file.name.replace(/\.[^.]+$/,'').substring(0,14);
+};
+reader.readAsDataURL(file);
+});
+document.getElementById('noseOffsetInput').addEventListener('input', e => {
+const v = parseFloat(e.target.value);
+if(v > 0) _noseOffset = v;
+});
+document.getElementById('bodyScaleInput').addEventListener('input', e => {
+const v = parseFloat(e.target.value);
+if(v > 0) _bodyScale = v;
 });
 
 const M_FERTILE_FROM = 0.20; // males fertile from 20% of lifespan
@@ -923,6 +983,12 @@ if(idx>=_predBodySprites.length){
   _predBodySprites.push(spr);
 }
 return _predBodySprites[idx];
+}
+// Swap body texture on all pooled sprites — called when user loads a new image
+function _swapBodyTexture(tex){
+  _boidTexture=tex;
+  for(const s of _bodySprites)    s.texture=tex;
+  for(const s of _predBodySprites) s.texture=tex;
 }
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
@@ -1661,7 +1727,7 @@ if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
 if(isHungry){
 const pAng=Math.atan2(pred.vy,pred.vx);
 const pCos=Math.cos(pAng), pSin=Math.sin(pAng);
-const noseEdge=PREDATOR_RADIUS*(32/13); // matches drawPredators geometry
+const noseEdge=PREDATOR_RADIUS*(_noseOffset/_bodyScale); // matches drawPredators geometry
 const beakLen=PREDATOR_RADIUS*0.9;
 const tipX=pred.x+pCos*(noseEdge+beakLen);
 const tipY=pred.y+pSin*(noseEdge+beakLen);
@@ -1744,10 +1810,10 @@ spr.x=bx; spr.y=by;
 spr.rotation=pred._drawAngle;
 spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
 spr.alpha=0.92;
-spr.scale.set(r/13); // same scale formula as boids; 13 is the PNG body calibration constant
+spr.scale.set(r/_bodyScale); // scale: r/_bodyScale; adjust _bodyScale if body looks too big/small
 
 // ── beak (always present on predator — light grey) ───────────────────────
-const noseEdge=r*(32/13); // same PNG geometry as boid
+const noseEdge=r*(_noseOffset/_bodyScale); // same geometry as boid; calibrated by _noseOffset/_bodyScale
 const beakLen=r*0.9;
 const bkBx=bx+cos*noseEdge*0.93, bkBy=by+sin*noseEdge*0.93;
 const bkTx=bx+cos*(noseEdge+beakLen), bkTy=by+sin*(noseEdge+beakLen);
@@ -1979,7 +2045,7 @@ spr.x=bx; spr.y=by;
 spr.rotation=boid._drawAngle;
 spr.tint=boidHex(boid);
 spr.alpha=baseAlpha;
-spr.scale.set(r/13); // ← adjust this to resize boid bodies
+spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
 
 // ── forked tail fin (drawn in _gfx.tails, below the sprite so it peeks out behind) ──
 // Sprite tail tip is at (35/13)*r ≈ 2.69r behind boid centre.
@@ -2013,7 +2079,7 @@ spr.scale.set(r/13); // ← adjust this to resize boid bodies
 // teardrop-v2.png (v2): shape bbox left=5 right=72 top=22 bottom=56
 // Nose (right/forward) at pixel 72 → 32px ahead of anchor.
 // In world coords at scale r/13: nose is (32/13)*r ≈ 2.46r ahead of boid centre.
-const noseEdge = r * (32/13);
+const noseEdge = r * (_noseOffset / _bodyScale);
 
 // beak: males only — attaches at the sprite nose edge, points further forward
 if(boid.sex==='M'){
@@ -2597,6 +2663,13 @@ resize = function(){
   if(app) app.renderer.resize(canvas.width, canvas.height);
 };
 SENSING_RADIUS = ${SENSING_RADIUS};
+_noseOffset    = ${_noseOffset};
+_bodyScale     = ${_bodyScale};
+${_customBoidPNG ? `(function(){
+  const _ct=PIXI.Texture.from(${JSON.stringify(_customBoidPNG)});
+  function _sw(t){_boidTexture=t;for(const s of _bodySprites)s.texture=t;for(const s of _predBodySprites)s.texture=t;}
+  if(_ct.baseTexture.valid) _sw(_ct); else _ct.baseTexture.on('loaded',()=>_sw(_ct));
+})();` : '// no custom body image'}
 window.addEventListener('resize', resize);
 resize();
 startSim();
