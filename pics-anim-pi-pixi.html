@@ -709,7 +709,7 @@ let PREDATOR_DIET    = parseInt(document.getElementById('predatorDietSlider').va
 let AUTO_DISEASE     = false;
 let _allDeadTimer    = 0;
 let _autoDisTimer    = 30 + Math.random()*60;
-const PREDATOR_RADIUS   = 30;
+const PREDATOR_RADIUS   = RADIUS; // same visual size as a regular boid
 const PREDATOR_SENSE    = 200; // sensing radius — only pursues boids within this range
 const STARVATION_TIME   = 45; // seconds hungry with no prey before dying
 let predators = [];
@@ -1744,7 +1744,7 @@ spr.x=bx; spr.y=by;
 spr.rotation=pred._drawAngle;
 spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
 spr.alpha=0.92;
-spr.scale.set(r/13); // same scale formula as boids (PREDATOR_RADIUS=30 vs RADIUS=13)
+spr.scale.set(r/13); // same scale formula as boids; 13 is the PNG body calibration constant
 
 // ── beak (always present on predator — light grey) ───────────────────────
 const noseEdge=r*(32/13); // same PNG geometry as boid
