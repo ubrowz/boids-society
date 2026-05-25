@@ -1824,6 +1824,8 @@ const tipY=pred.y+pSin*(noseEdge+beakLen);
 const eatR2=RADIUS*RADIUS;
 for(const b of _sgNeighbors(tipX,tipY,RADIUS)){
 if(b.dying) continue;
+// in lock mode, only the locked target can be eaten — ignore bystanders
+if(HUNT_MODE==='lock' && pred.lockedBoidId!==null && b.id!==pred.lockedBoidId) continue;
 const dx=b.x-tipX, dy=b.y-tipY;
 if(dx*dx+dy*dy<eatR2){
 const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
