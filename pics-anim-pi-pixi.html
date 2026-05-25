@@ -2411,6 +2411,7 @@ const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
 const _fpsEl = document.getElementById('fpsDisplay');
 let _fpsFrameCount = 0, _fpsWindowStart = 0;
+let _statusThrottle = 0; // updateStatus runs every 5th frame (~6fps) — it's O(N²)
 function loop(ts){
 if(!running) return;
 rafId=requestAnimationFrame(loop);
@@ -2469,11 +2470,17 @@ boid.trail.shift(); // shed one position per frame so trail dissipates during fa
 
 if(toSpawn.length){ boids.push(...toSpawn); toSpawn.length=0; }
 for(let i=birthRings.length-1;i>=0;i--){ birthRings[i].age+=dt; if(birthRings[i].age>=birthRings[i].duration) birthRings.splice(i,1); }
-boids=boids.filter(b=>b.alive);
+// Remove dead boids in-place — avoids creating a new array every frame
+for(let i=boids.length-1;i>=0;i--){ if(!boids[i].alive) boids.splice(i,1); }
 if(POP_CEILING>0){
-const living=boids.filter(b=>!b.dying);
-if(living.length>POP_CEILING)
-living[Math.floor(Math.random()*living.length)].dying=true;
+// Count living boids without allocating an array
+let livingCount=0;
+for(const b of boids) if(!b.dying) livingCount++;
+if(livingCount>POP_CEILING){
+  // pick a random living boid to cull
+  let skip=Math.floor(Math.random()*livingCount);
+  for(const b of boids){ if(!b.dying){ if(skip===0){b.dying=true;break;} skip--; } }
+}
 }
 updateDivorce(dt);
 updateImmigration(dt);
@@ -2511,7 +2518,6 @@ if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==nu
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
-updateStatus();
 if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
 drawPopPyramid();
@@ -2523,6 +2529,9 @@ if(deathSplashes[i].age>=deathSplashes[i].duration) deathSplashes.splice(i,1);
 }
 
 app.renderer.render(app.stage);
+// Status panel: update at ~6fps — genomeDiversity is O(N²) and DOM writes are expensive
+_statusThrottle++;
+if(_statusThrottle >= 5){ _statusThrottle=0; updateStatus(); }
 }
 
 // ── export ────────────────────────────────────────────────────────────────────
