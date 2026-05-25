@@ -779,12 +779,13 @@ let diseaseDeathEvents = [];       // simClock timestamps of disease fatalities
 
 // ── boidMap + spatial grid (Pi perf) ─────────────────────────────────────────
 let boidMap = new Map(); // id → boid; rebuilt each frame
-let _sgGrid = null;
+let _sgGrid = new Map(); // reused every frame via .clear()
 let _sgCellSize = 1;
+const _sgBuf = []; // reusable neighbor buffer — never allocates
 
 function _buildSpatialGrid(){
 _sgCellSize = Math.max(SENSING_RADIUS, RADIUS * 2);
-_sgGrid = new Map();
+_sgGrid.clear(); // reuse the Map — avoid GC churn from new Map() each frame
 for(const b of boids){
   if(!b.alive) continue;
   const cx = Math.floor(b.x / _sgCellSize);
@@ -797,19 +798,20 @@ for(const b of boids){
 }
 
 function _sgNeighbors(x, y, radius){
+// Returns shared _sgBuf — safe as long as callers don't nest _sgNeighbors calls
+_sgBuf.length = 0;
 const cs = _sgCellSize;
 const cx0 = Math.floor((x - radius) / cs);
 const cx1 = Math.floor((x + radius) / cs);
 const cy0 = Math.floor((y - radius) / cs);
 const cy1 = Math.floor((y + radius) / cs);
-const out = [];
 for(let cx = cx0; cx <= cx1; cx++){
   for(let cy = cy0; cy <= cy1; cy++){
     const cell = _sgGrid.get(cx * 10000 + cy);
-    if(cell) for(const b of cell) out.push(b);
+    if(cell) for(const b of cell) _sgBuf.push(b);
   }
 }
-return out;
+return _sgBuf;
 }
 
 
@@ -1035,21 +1037,25 @@ return boid.age >= life*from && boid.age <= life*(from+dur);
 // fertile counts are global — compute once per frame before the per-boid loop
 let _fertileMales=0, _fertileFemales=0;
 function updateFertileCounts(){
-_fertileMales = boids.filter(b=>b.alive&&!b.dying&&b.sex==='M'&&isFertile(b)).length;
-_fertileFemales = boids.filter(b=>b.alive&&!b.dying&&b.sex==='F'&&isFertile(b)).length;
+_fertileMales = 0; _fertileFemales = 0;
+for(const b of boids){
+  if(!b.alive||b.dying) continue;
+  if(b.sex==='M'&&isFertile(b)) _fertileMales++;
+  else if(b.sex==='F'&&isFertile(b)) _fertileFemales++;
+}
 }
 
 // effective breeders: fertile bonded M+F pairs × 2 (the 50/500 rule denominator)
+const _ebSeen = new Set(); // reused — no per-frame allocation
 function updateEffectiveBreeders(){
-const boidMap = new Map(boids.map(b=>[b.id,b]));
-const seen = new Set();
+_ebSeen.clear();
 let eb = 0;
 for(const b of boids){
-if(!b.alive||b.dying||b.partnerId===null||seen.has(b.id)) continue;
-const partner = boidMap.get(b.partnerId);
+if(!b.alive||b.dying||b.partnerId===null||_ebSeen.has(b.id)) continue;
+const partner = boidMap.get(b.partnerId); // uses global boidMap (already rebuilt this frame)
 if(!partner||!partner.alive) continue;
 if(b.sex!==partner.sex&&isFertile(b)&&isFertile(partner)){
-eb+=2; seen.add(b.id); seen.add(partner.id);
+eb+=2; _ebSeen.add(b.id); _ebSeen.add(partner.id);
 }
 }
 _cachedEffectiveBreeders = eb;
