@@ -2217,7 +2217,7 @@ if(boid.diseased){
 // immigrants always get a white ring so they stand out from natural births
 if(boid.birthTimer>0){
   const bt=boid.birthTimer/BIRTH_DURATION;
-  const ringCol = boid.immigrantGeneration>=0 ? 0xffffff : boidHex(boid);
+  const ringCol = boid.immigrantGeneration===0 ? 0xffffff : boidHex(boid);
   g.lineStyle(bt*8, ringCol, bt*bt*0.9);
   g.drawCircle(boid.x,boid.y,RADIUS*(1+(1-bt)*4));
   g.lineStyle(0);
