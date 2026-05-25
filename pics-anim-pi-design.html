@@ -192,9 +192,9 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 <!-- ───────────────────────────── APPEARANCE ─────────────────────────────── -->
 <h2 id="appearance">Boid Appearance</h2>
 <h3>Both sexes — body sprite</h3>
-<p>Rendered as a <strong>PixiJS Sprite</strong> using the embedded PNG texture <em>teardrop-v2.png</em> (80×80 px RGBA, anchor at pixel 40,40). The sprite is scaled to <code>RADIUS / 13</code> and tinted to the boid's colour via PixiJS's multiplicative tint. The PNG encodes shape and greyscale shading; the tint supplies hue. Nose (forward) is at pixel 72 (+32 px from anchor → 2.46r ahead in world space); tail base is at pixel 5 (−35 px → 2.69r behind).</p>
+<p>Rendered as a <strong>PixiJS Sprite</strong> using the embedded PNG texture <em>teardrop-v3.png</em> (80×80 px RGBA, anchor at pixel 40,40). The sprite is scaled to <code>RADIUS / 13</code> and tinted to the boid's colour via PixiJS's multiplicative tint. The PNG encodes shape and greyscale shading; the tint supplies hue. Nose (forward) is at pixel 72 (+32 px from anchor → 2.46r ahead in world space); tail base is at pixel 5 (−35 px → 2.69r behind).</p>
 <h3>Both sexes — forked tail fin</h3>
-<p>A <strong>V-shaped forked tail</strong> is drawn behind each boid as a <code>PIXI.Graphics</code> polygon in the <code>tails</code> layer (below the sprite layer), so it visually peeks out from behind the body. The fill colour is the boid's hue at lightness 68% (lighter than the 50% body). Key geometry constants:</p>
+<p>A <strong>V-shaped forked tail</strong> is drawn behind each boid as a <code>PIXI.Graphics</code> polygon in the <code>tails</code> layer (below the sprite layer), so it visually peeks out from behind the body. The fill colour is the boid's hue at lightness 68% (lighter than the 50% body) — <strong>except</strong> when the boid is the locked target of a predator in <em>lock</em> hunt mode, in which case the tail fin is drawn <strong>white</strong> as a targeting indicator. Key geometry constants:</p>
 <pre><code>junction   = 1.70r back  (where the fork starts, inside sprite tail)
 notch      = 2.70r back  (centre indent between the two lobes)
 tip        = 3.00r back  (furthest point of each lobe)
@@ -434,7 +434,7 @@ cooldownScale   = 2.0 − 1.5 × geneticDistance</code></pre>
 fertileDeficit = max(−smoothGlobalPressure, 0)
 pressure       = max(popDeficit, fertileDeficit)</code></pre>
 <p>Immigration also triggers on genetic deadlock: when no valid unrelated straight M+F fertile non-single pairs exist. The spawn interval shortens as pressure increases (minimum ~5 s at full crisis). Immigration is suppressed entirely when population exceeds 120% of target.</p>
-<p>Immigrants arrive with a fresh random colour and genome, at mid-fertile-age, assigned the sex most needed for balance. Never singles, always straight.</p>
+<p>Immigrants arrive with a fresh random colour and genome, at mid-fertile-age, assigned the sex most needed for balance. Never singles, always straight. Immigrants <strong>fade in</strong> over <code>BIRTH_DURATION</code> (1.5 s) exactly like naturally-born boids, and emit a <strong>white</strong> birth ring on arrival (natural births use the boid's own hue colour, so white clearly signals an immigration event).</p>
 
 <!-- ───────────────────────────── DISEASE ────────────────────────────────── -->
 <h2 id="disease">Disease</h2>
@@ -583,9 +583,9 @@ function biasedHue(h1, h2, preferredHue):
 <p>Predators are autonomous agents separate from the boid population. They do not flock, do not age, and do not breed.</p>
 
 <h3>Appearance</h3>
-<p>Predators use the same teardrop PNG sprite and forked tail fin as boids, tinted <strong>white</strong> (<code>0xffffff</code>). The PNG's greyscale shading is preserved by multiplicative tinting, giving a white body with natural depth.</p>
+<p>Predators use the same teardrop PNG sprite (<em>teardrop-v3.png</em>) and forked tail fin as boids, tinted <strong>white</strong> (<code>0xffffff</code>). The PNG's greyscale shading is preserved by multiplicative tinting, giving a white body with natural depth. Predators are drawn at <code>PREDATOR_RADIUS = RADIUS × 0.7</code> — the same size as a <em>single</em> boid — so they blend into the flock and are harder to spot.</p>
 <ul>
-  <li><strong>Body sprite</strong> — teardrop-v2.png at scale <code>PREDATOR_RADIUS / 13</code>, tint <code>0xffffff</code>, alpha 0.92</li>
+  <li><strong>Body sprite</strong> — teardrop-v3.png at scale <code>PREDATOR_RADIUS / 13</code>, tint <code>0xffffff</code>, alpha 0.92</li>
   <li><strong>Forked tail fin</strong> — same V-fork geometry as boid tails, filled near-white (<code>0xf0f4ff</code>, 90% alpha), drawn in the predator's own <code>predFin</code> layer below the sprite</li>
   <li><strong>Beak</strong> — always present (predators always express a beak); light grey (<code>0xd0d8e8</code>), same quadratic-curve shape as male boid beaks, length <code>PREDATOR_RADIUS × 0.9</code></li>
   <li><strong>Eyes</strong> — two circles at <code>noseEdge × 0.55</code> forward; colour transitions yellow (full) → orange → red (very hungry); each has a small white highlight dot; size increases slightly when hungry</li>
@@ -600,14 +600,19 @@ turn = clamp(angleDiff, −ts×strength, +ts×strength)
 pred.vx = cos(currentAngle + turn) × spd
 pred.vy = sin(currentAngle + turn) × spd</code></pre>
 <p>This is structurally identical to <code>steerToward()</code> used by boids — no velocity lerp, no per-frame speed normalisation. The heading changes by at most one smooth step per frame, giving the same movement quality as a regular boid.</p>
+<p>Two hunt modes are selectable via the <strong>hunt</strong> toggle button (<code>HUNT_MODE</code>):</p>
+<h3>Hunt mode: bump (default)</h3>
 <p><strong>When hungry</strong> (time since last meal &gt; <code>FULL_DURATION</code>):</p>
 <ol>
   <li>Scan all living boids within <code>PREDATOR_SENSE = 200 px</code></li>
-  <li>Target the nearest boid that does <em>not</em> belong to the current protected colour family; if none found within range, wander</li>
-  <li>If <code>veryHungry</code> (&gt; 2× <code>FULL_DURATION</code> without a meal), target any boid regardless of family</li>
+  <li>Target the <em>nearest</em> edible boid; if none in range, wander</li>
+  <li>If <code>veryHungry</code> (&gt; 2× <code>FULL_DURATION</code>), target any boid regardless of family</li>
   <li>Steer toward target via <code>_predSteer(pred, huntSpd, target.x, target.y, 1.0)</code></li>
 </ol>
-<p><strong>When full</strong>: wander at 60% speed. Wander uses identical geometry to the boid <code>wander()</code> function — a target is projected 30 px ahead along the current heading, shifted by a 20 px random-walk offset, then steered toward at strength 0.7. <strong>Wall avoidance</strong>: angle-based steer (same pattern as <code>avoidWalls()</code> for boids), strength 2.0, applied after wander/seek so walls always take priority. Hard velocity bounce at canvas edges snaps <code>_drawAngle</code>. Predators do <strong>not</strong> wrap around.</p>
+<p>Target is re-evaluated every frame — the predator always chases whoever is currently nearest.</p>
+<h3>Hunt mode: lock</h3>
+<p><strong>When hungry</strong>, the predator picks a <em>random</em> edible boid within <code>PREDATOR_SENSE</code> and commits to chasing that specific boid (<code>pred.lockedBoidId</code>) until it is eaten. The lock is validated every frame via <code>boidMap</code>: if the locked boid dies from any cause (old age, disease, another predator), the lock is released and a new random target is chosen. The locked boid's <strong>tail fin turns white</strong> as a visual indicator. In lock mode, bystander boids that pass in front of the beak are ignored — only the locked target can be eaten. The lock clears when the predator becomes full, so each new hunger episode picks a fresh random victim.</p>
+<p><strong>When full (both modes)</strong>: wander at 60% speed; lock clears. Wander uses identical geometry to the boid <code>wander()</code> function — a target is projected 30 px ahead along the current heading, shifted by a 20 px random-walk offset, then steered toward at strength 0.7. <strong>Wall avoidance</strong>: angle-based steer (same pattern as <code>avoidWalls()</code> for boids), strength 2.0, applied after wander/seek so walls always take priority. Hard velocity bounce at canvas edges snaps <code>_drawAngle</code>. Predators do <strong>not</strong> wrap around.</p>
 
 <h3>Colour families and eating</h3>
 <p>Boid hues are partitioned into five named families. A boid counts as belonging to a family only if its saturation ≥ 0.15 (non-grey).</p>
@@ -756,7 +761,7 @@ else:
 <pre><code>RADIUS          = 20    // boid body radius (was 10)
 WALL_MARGIN     = 80    // wall repulsion zone (was 40)
 BOND_DIST       = 90    // bond attraction range (was 45)
-PREDATOR_RADIUS = RADIUS = 20    // predator is same size as a regular boid</code></pre>
+PREDATOR_RADIUS = RADIUS * 0.7 = 14    // same size as a single boid</code></pre>
 <p>Bond line widths are also doubled (6 / 14 / 18 px for normal / fertile / spawn-flash) to remain legible on the low-resolution display.</p>
 
 <!-- ───────────────────────────── CONTROLS ───────────────────────────────── -->
@@ -782,6 +787,7 @@ PREDATOR_RADIUS = RADIUS = 20    // predator is same size as a regular boid</cod
 <tr><td>Predators</td><td>0–5</td><td>0</td><td>Number of active predators (reactive — changes take effect live)</td></tr>
 <tr><td>Full for (s)</td><td>1–30 s</td><td>10 s</td><td>Time a predator won't eat after a meal</td></tr>
 <tr><td>Prey</td><td>1–3 (step 1)</td><td>3 (other)</td><td>Predator diet: 1 = any boid; 2 = favored (eats preferred-family boids, works against the colour cycle); 3 = other (eats non-preferred-family boids, reinforces the colour cycle)</td></tr>
+<tr><td>Hunt</td><td>toggle (bump / lock)</td><td>bump</td><td><strong>bump</strong>: predator re-targets the nearest edible boid every frame. <strong>lock</strong>: on becoming hungry the predator picks a random edible boid in range and commits to chasing only that boid (shown with a white tail fin) until it is eaten; bystanders are ignored. Lock releases on eating or when full.</td></tr>
 <tr><td>Cluster max</td><td>2–100</td><td>20</td><td>Maximum comfortable cluster size; emigration pressure activates above this threshold</td></tr>
 <tr><td>Min density</td><td>1–8</td><td>3</td><td>Minimum neighbours within 90 px for a boid to be a cluster core boid; at 1 degrades to connected-component clustering</td></tr>
 <tr><td>Emigr. push</td><td>0.0–3.0</td><td>1.5</td><td>Steering strength of the centrifugal emigration force on outer-ring boids of an overcrowded cluster</td></tr>
@@ -793,13 +799,13 @@ PREDATOR_RADIUS = RADIUS = 20    // predator is same size as a regular boid</cod
 <tr><td>No overlap</td><td>toggle (off/on)</td><td>off</td><td>When on, a body-separation force prevents boid circles from overlapping. Each frame, boids within 2×RADIUS of each other receive a position nudge (8% of overlap depth) plus a <code>steerToward</code> impulse (strength 5). Bonded pairs settle at ~2×RADIUS apart. Uses the existing spatial grid — O(N·k). Exported.</td></tr>
 <tr><td>Bond lines</td><td>toggle (on/off)</td><td>on</td><td>Show or hide bond lines between paired boids (thin coloured line; thick amber when fertile; brief red flash at birth). Turning off removes all bond line rendering without affecting simulation logic. Exported.</td></tr>
 <tr><td>Circles</td><td>toggle (off/on)</td><td>off</td><td>Show or hide cluster aura circles. When off, <code>drawClusters()</code> clears the layer and returns immediately — no overdraw from cluster rendering. Exported.</td></tr>
-<tr><td>Body image — shape</td><td>file picker + label</td><td>default (teardrop-v2.png)</td><td>Load a PNG to replace the body sprite texture for both boids and predators. The PNG is read as a data URL and swapped live via <code>_swapBodyTexture()</code>; all pooled sprites are updated immediately. The data URL is embedded in exported files so the custom image persists.</td></tr>
+<tr><td>Body image — shape</td><td>file picker + label</td><td>default (teardrop-v3.png)</td><td>Load a PNG to replace the body sprite texture for both boids and predators. The PNG is read as a data URL and swapped live via <code>_swapBodyTexture()</code>; all pooled sprites are updated immediately. The data URL is embedded in exported files so the custom image persists.</td></tr>
 <tr><td>Body image — nose px</td><td>number (1–500)</td><td>32</td><td>Pixels from the image centre to the nose tip in the source PNG. Used to compute <code>noseEdge</code> for beak placement, eye placement, and eating-collision geometry: <code>noseEdge = r × (nosePx / bodyScale)</code>.</td></tr>
-<tr><td>Body image — body scale</td><td>number (0.5–200)</td><td>13</td><td>Sprite scale divisor: <code>sprite.scale = r / bodyScale</code>. Increase to shrink the sprite relative to the boid radius; decrease to enlarge it. Default 13 is calibrated for teardrop-v2.png at RADIUS = 20.</td></tr>
+<tr><td>Body image — body scale</td><td>number (0.5–200)</td><td>13</td><td>Sprite scale divisor: <code>sprite.scale = r / bodyScale</code>. Increase to shrink the sprite relative to the boid radius; decrease to enlarge it. Default 13 is calibrated for teardrop-v3.png at RADIUS = 20.</td></tr>
 <tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
-<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>circles toggle</strong> (shows/hides cluster aura circles, default off), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>circles toggle</strong> (shows/hides cluster aura circles, default off), <strong>hunt toggle</strong> (bump/lock hunting strategy, default bump), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
 
 <!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
 <h2 id="pyramid">Population Pyramid</h2>
@@ -830,6 +836,7 @@ barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
 <tr><td>Teardrop body (female)</td><td>Female boid; colour = HSL tint on greyscale PNG sprite; genetic lineage encoded in hue</td></tr>
 <tr><td>Teardrop body + forward beak (male)</td><td>Male boid; beak length encodes beakGene</td></tr>
 <tr><td>Forked V-tail behind body</td><td>Tail fin, lighter shade of body colour; extends ~3r behind boid centre</td></tr>
+<tr><td>White forked V-tail (on a coloured boid)</td><td>This boid is the locked target of a predator in <em>lock</em> hunt mode</td></tr>
 <tr><td>Two dark eyes with highlight (both sexes)</td><td>Eye size encodes eyeGene; same gene inherited by both sexes</td></tr>
 <tr><td>Small body (0.7× size)</td><td>Single boid — will never bond</td></tr>
 <tr><td>Gold glow around body</td><td>Bonded boid</td></tr>
@@ -838,14 +845,15 @@ barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
 <tr><td>Small white spot (centre)</td><td>Diseased boid — currently infectious</td></tr>
 <tr><td>Coloured trail behind boid</td><td>Motion history; length = MAX_TRAIL frames; colour matches boid</td></tr>
 <tr><td>White trail</td><td>Predator motion history</td></tr>
-<tr><td>Expanding ring around newborn</td><td>Birth pulse — fades over BIRTH_DURATION at the newborn's location</td></tr>
+<tr><td>Expanding coloured ring around newborn</td><td>Birth pulse — colour matches the boid's own hue; fades over BIRTH_DURATION</td></tr>
+<tr><td>Expanding <strong>white</strong> ring around new arrival</td><td>Immigrant birth pulse — always white to distinguish immigration from natural birth</td></tr>
 <tr><td>Coloured expanding rings + particles</td><td>Death splash — colour matches the eaten boid's hue</td></tr>
 <tr><td>Gold arc (partial)</td><td>Hit progress toward bonding threshold</td></tr>
 <tr><td>Gradient line (amber)</td><td>Bond between fertile straight M+F partners</td></tr>
 <tr><td>Gradient line (colour)</td><td>Bond — partners not forming a fertile pair</td></tr>
 <tr><td>Bright red bond line (2 s)</td><td>Flash at moment of child birth</td></tr>
 <tr><td>Soft coloured glow (behind boids)</td><td>Cluster aura — one of six colours per cluster; only drawn for clusters of ≥ 2 boids. Lone emigrants have no aura.</td></tr>
-<tr><td>White teardrop body with forked tail + beak</td><td>Predator; same PNG sprite as boids, tinted white; beak always present; forked tail in near-white</td></tr>
+<tr><td>Small white teardrop body with forked tail + beak</td><td>Predator; same PNG sprite as boids, tinted white, at 0.7× boid size (same as a single boid); beak always present; forked tail in near-white</td></tr>
 <tr><td>Yellow→red eyes on predator</td><td>Hunger level: yellow = full, orange = hungry, red = very hungry</td></tr>
 <tr><td>Coloured dot on predator rear</td><td>Protected colour family — predators will not eat boids of this colour (unless very hungry)</td></tr>
 <tr><td>Density bar</td><td>Real-time combined pressure (Arm 1)</td></tr>
