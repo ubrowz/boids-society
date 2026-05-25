@@ -378,6 +378,10 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
 <span class="ctrl-val" id="predatorDietVal">other</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>hunt</label>
+<button id="huntModeBtn" title="bump: targets nearest boid each frame&#10;lock: commits to one random target and chases until eaten" style="font-size:9px;padding:2px 10px;background:#1a2a3a;color:#54a0ff;border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;min-width:38px;">bump</button>
+</div>
 <div class="ctrl-divider">body image</div>
 <div class="ctrl-row">
 <label>shape</label>
@@ -614,6 +618,24 @@ if(SHOW_BOND_LINES){
 } else {
   bondLinesBtn.style.background='#555'; bondLinesKnob.style.left='3px';
   bondLinesLabel.textContent='off'; bondLinesLabel.style.color='#555';
+}
+});
+
+// ── hunt mode toggle ──────────────────────────────────────────────────────────
+let HUNT_MODE = 'bump'; // 'bump' | 'lock'
+document.getElementById('huntModeBtn').addEventListener('click', () => {
+HUNT_MODE = HUNT_MODE === 'bump' ? 'lock' : 'bump';
+const btn = document.getElementById('huntModeBtn');
+if(HUNT_MODE === 'lock'){
+  btn.textContent = 'lock';
+  btn.style.color = '#ff6b6b';
+  btn.style.borderColor = 'rgba(255,107,107,0.4)';
+} else {
+  btn.textContent = 'bump';
+  btn.style.color = '#54a0ff';
+  btn.style.borderColor = 'rgba(84,160,255,0.4)';
+  // clear all locks so predators don't keep stale targets
+  for(const p of predators) p.lockedBoidId = null;
 }
 });
 
@@ -1089,7 +1111,8 @@ _drawAngle:ang,
 lastEaten:-FULL_DURATION, // hungry from birth
 noPreyTimer:0,
 alive:true,
-trail:[]
+trail:[],
+lockedBoidId:null // for 'lock' hunt mode
 };
 }
 function syncPredatorCount(n){
@@ -1716,16 +1739,44 @@ const veryHungry = (simClock-pred.lastEaten)>FULL_DURATION*2;
 const huntSpd   = predSpd;
 const cruiseSpd = predSpd * 0.6;
 const curSpd    = isHungry ? huntSpd : cruiseSpd;
+// clear lock when not hungry (predator picks a fresh target each time it gets hungry)
+if(!isHungry) pred.lockedBoidId=null;
 // target seeking or wander — angle-capped turns, same physics as boids
 if(isHungry && aliveBoids.length>0){
-let target=null, bestDist=Infinity;
-for(const b of _sgNeighbors(pred.x,pred.y,PREDATOR_SENSE)){
-if(b.dying) continue;
-const dx=b.x-pred.x, dy=b.y-pred.y;
-const dist=Math.sqrt(dx*dx+dy*dy);
-if(dist>PREDATOR_SENSE) continue;
-const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
-if(edible && dist<bestDist){ bestDist=dist; target=b; }
+let target=null;
+if(HUNT_MODE==='lock'){
+  // validate existing lock — the target must still be alive
+  if(pred.lockedBoidId!==null){
+    const lb=boidMap.get(pred.lockedBoidId);
+    if(lb&&lb.alive&&!lb.dying) target=lb;
+    else pred.lockedBoidId=null; // target gone — pick a new one below
+  }
+  // acquire a new lock: choose a random edible boid within sensing range
+  if(!target){
+    const candidates=[];
+    for(const b of _sgNeighbors(pred.x,pred.y,PREDATOR_SENSE)){
+      if(b.dying) continue;
+      const dx=b.x-pred.x, dy=b.y-pred.y;
+      if(dx*dx+dy*dy>PREDATOR_SENSE*PREDATOR_SENSE) continue;
+      const edible=PREDATOR_DIET===1||(PREDATOR_DIET===2?boidInPreferredFamily(b):!boidInPreferredFamily(b))||veryHungry;
+      if(edible) candidates.push(b);
+    }
+    if(candidates.length>0){
+      target=candidates[Math.floor(Math.random()*candidates.length)];
+      pred.lockedBoidId=target.id;
+    }
+  }
+} else {
+  // bump: nearest edible boid within sensing range (original behaviour)
+  let bestDist=Infinity;
+  for(const b of _sgNeighbors(pred.x,pred.y,PREDATOR_SENSE)){
+    if(b.dying) continue;
+    const dx=b.x-pred.x, dy=b.y-pred.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>PREDATOR_SENSE) continue;
+    const edible=PREDATOR_DIET===1||(PREDATOR_DIET===2?boidInPreferredFamily(b):!boidInPreferredFamily(b))||veryHungry;
+    if(edible&&dist<bestDist){ bestDist=dist; target=b; }
+  }
 }
 if(target){
 _predSteer(pred, huntSpd, target.x, target.y, 1.0);
@@ -1781,6 +1832,7 @@ if(edible){
 b.alive=false;
 spawnDeathSplash(b.x,b.y,b.hue,b.sat);
 pred.lastEaten=simClock;
+pred.lockedBoidId=null; // meal complete — lock released
 break;
 }
 }
@@ -2708,6 +2760,16 @@ SHOW_CLUSTERS     = ${SHOW_CLUSTERS};
     if(btn)  btn.style.background='#555';
     if(knob) knob.style.left='3px';
     if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
+  }
+}
+HUNT_MODE         = '${HUNT_MODE}';
+// Sync hunt mode button visual
+{
+  const btn=document.getElementById('huntModeBtn');
+  if(btn){
+    btn.textContent=HUNT_MODE;
+    if(HUNT_MODE==='lock'){ btn.style.color='#ff6b6b'; btn.style.borderColor='rgba(255,107,107,0.4)'; }
+    else { btn.style.color='#54a0ff'; btn.style.borderColor='rgba(84,160,255,0.4)'; }
   }
 }
 BG_COLOR          = '${BG_COLOR}';
