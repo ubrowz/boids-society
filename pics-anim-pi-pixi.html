@@ -1677,7 +1677,7 @@ imm.isGay = false;
 imm.immigrantGeneration = 0;
 immigrantEvents.push(simClock);
 imm.age = imm.effectiveLifespan * F_FERTILE_FROM;
-imm.birthTimer= 0;
+imm.birthTimer= BIRTH_DURATION; // fade in like a newborn
 toSpawn.push(imm);
 }
 
