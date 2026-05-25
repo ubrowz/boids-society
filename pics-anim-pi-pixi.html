@@ -2423,8 +2423,10 @@ simClock+=dt;
 _fpsFrameCount++;
 if(_fpsFrameCount===1) _fpsWindowStart=ts;
 if(_fpsFrameCount>=30){
-  const elapsed=(ts-_fpsWindowStart)/1000;
-  if(_fpsEl) _fpsEl.textContent=Math.round(_fpsFrameCount/elapsed)+' fps';
+  const elapsedMs=ts-_fpsWindowStart;
+  const fps=Math.round(_fpsFrameCount/elapsedMs*1000);
+  const ms=Math.round(elapsedMs/_fpsFrameCount);
+  if(_fpsEl) _fpsEl.textContent=fps+' fps ('+ms+'ms)';
   _fpsFrameCount=0;
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
