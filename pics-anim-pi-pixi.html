@@ -130,18 +130,6 @@ cursor:pointer; border:2px solid #fff;
 #popCeilSlider::-webkit-slider-thumb { background:#e84393; box-shadow:0 0 8px rgba(232,67,147,0.8); }
 #popCeilSlider::-moz-range-thumb { background:#e84393; }
 #popCeilVal { color:#000; }
-#clusterMaxSlider { background:linear-gradient(to right,#0a0a00,#f9ca24); }
-#clusterMaxSlider::-webkit-slider-thumb { background:#f9ca24; box-shadow:0 0 8px rgba(249,202,36,0.8); }
-#clusterMaxSlider::-moz-range-thumb { background:#f9ca24; }
-#clusterMaxVal { color:#000; }
-#minDensitySlider { background:linear-gradient(to right,#0a0800,#e8b423); }
-#minDensitySlider::-webkit-slider-thumb { background:#e8b423; box-shadow:0 0 8px rgba(232,180,35,0.8); }
-#minDensitySlider::-moz-range-thumb { background:#e8b423; }
-#minDensityVal { color:#000; }
-#emigStrSlider { background:linear-gradient(to right,#0a0500,#fd9644); }
-#emigStrSlider::-webkit-slider-thumb { background:#fd9644; box-shadow:0 0 8px rgba(253,150,68,0.8); }
-#emigStrSlider::-moz-range-thumb { background:#fd9644; }
-#emigStrVal { color:#000; }
 #emigReturnSlider { background:linear-gradient(to right,#00120a,#26de81); }
 #emigReturnSlider::-webkit-slider-thumb { background:#26de81; box-shadow:0 0 8px rgba(38,222,129,0.8); }
 #emigReturnSlider::-moz-range-thumb { background:#26de81; }
@@ -187,6 +175,7 @@ display:flex; align-items:center; justify-content:center;
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="fpsDisplay" style="position:fixed;top:6px;left:8px;font:bold 13px monospace;color:#0f0;background:rgba(0,0,0,0.55);padding:2px 7px;border-radius:4px;pointer-events:none;z-index:9999;letter-spacing:0.5px;">-- fps</div>
 
 <div id="ui">
 <div id="controls">
@@ -300,17 +289,6 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </div>
 <div class="ctrl-col">
-<div class="ctrl-divider">clusters</div>
-<div class="ctrl-row">
-<label>cluster max</label>
-<input type="range" id="clusterMaxSlider" min="2" max="100" value="20">
-<span class="ctrl-val" id="clusterMaxVal">20</span>
-</div>
-<div class="ctrl-row">
-<label>min density</label>
-<input type="range" id="minDensitySlider" min="1" max="8" value="3" step="1">
-<span class="ctrl-val" id="minDensityVal">3</span>
-</div>
 <div class="ctrl-row" style="gap:8px;">
 <label>aura</label>
 <button id="auraGradBtn" title="Toggle aura gradient" style="
@@ -322,23 +300,6 @@ width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
-</div>
-<div class="ctrl-row" style="gap:8px;">
-<label>circles</label>
-<button id="clusterCircBtn" title="Toggle cluster circles" style="
-width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#555;position:relative;transition:background 0.2s;outline:none;">
-<span id="clusterCircKnob" style="
-position:absolute;top:3px;left:3px;
-width:16px;height:16px;border-radius:50%;
-background:#fff;transition:left 0.2s;display:block;"></span>
-</button>
-<span id="clusterCircLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
-</div>
-<div class="ctrl-row">
-<label>emigr. push</label>
-<input type="range" id="emigStrSlider" min="0" max="30" value="15" step="1">
-<span class="ctrl-val" id="emigStrVal">1.5</span>
 </div>
 <div class="ctrl-row">
 <label>emigr. return</label>
@@ -527,10 +488,7 @@ let _customBoidPNG = null; // data URL of user-loaded body image, or null for de
 // ── slider state ──────────────────────────────────────────────────────────────
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
-let CLUSTER_MAX        = parseInt(document.getElementById('clusterMaxSlider').value);
-let MIN_CLUSTER_DENSITY = parseInt(document.getElementById('minDensitySlider').value);
 let AURA_GRADIENT = true;
-let EMIG_PUSH      = parseInt(document.getElementById('emigStrSlider').value) / 10;
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
@@ -640,22 +598,6 @@ if(HUNT_MODE === 'lock'){
 }
 });
 
-// ── cluster circles toggle ────────────────────────────────────────────────────
-let SHOW_CLUSTERS = false;
-const clusterCircBtn   = document.getElementById('clusterCircBtn');
-const clusterCircKnob  = document.getElementById('clusterCircKnob');
-const clusterCircLabel = document.getElementById('clusterCircLabel');
-// init UI to OFF state (default: no circles)
-clusterCircBtn.addEventListener('click', () => {
-SHOW_CLUSTERS = !SHOW_CLUSTERS;
-if(SHOW_CLUSTERS){
-  clusterCircBtn.style.background='#f9ca24'; clusterCircKnob.style.left='25px';
-  clusterCircLabel.textContent='on'; clusterCircLabel.style.color='#f9ca24';
-} else {
-  clusterCircBtn.style.background='#555'; clusterCircKnob.style.left='3px';
-  clusterCircLabel.textContent='off'; clusterCircLabel.style.color='#555';
-}
-});
 
 // ── body image loader ─────────────────────────────────────────────────────────
 document.getElementById('bodyImgBtn').addEventListener('click', () => {
@@ -702,9 +644,6 @@ el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
-wire('clusterMaxSlider',  'clusterMaxVal',   v=>parseInt(v), v=>v, v=>{ CLUSTER_MAX=v; });
-wire('minDensitySlider',  'minDensityVal',   v=>parseInt(v), v=>v, v=>{ MIN_CLUSTER_DENSITY=v; });
-wire('emigStrSlider',    'emigStrVal',     v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_PUSH=v/10; });
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
@@ -754,7 +693,7 @@ resolution: 1,
 app.ticker.stop(); // simulation loop drives rendering manually
 
 // Graphics layers (z-ordered: first = bottom)
-['bg','trails','clusters','bondLines','birthRings'].forEach(k=>{
+['bg','trails','bondLines','birthRings'].forEach(k=>{
 _gfx[k] = new PIXI.Graphics(); app.stage.addChild(_gfx[k]);
 });
 // Tail fins sit below body sprites so they peek out from behind the body
@@ -873,117 +812,6 @@ for(let cx = cx0; cx <= cx1; cx++){
 return out;
 }
 
-// ── cluster detection ─────────────────────────────────────────────────────────
-const CLUSTER_RADIUS = BOND_DIST;
-const _cr2 = CLUSTER_RADIUS * CLUSTER_RADIUS;
-let _clusterIdCounter = 0;
-let _prevClusters = []; // [{cx,cy,id}] from previous frame for stable colour assignment
-
-function updateClusters(){
-for(const b of boids){ b.clusterId=-1; b.clusterSize=0; b.clusterCx=0; b.clusterCy=0; b.clusterBoundR=0; b._isCore=false; }
-
-// Step 1: classify core boids — need >= MIN_CLUSTER_DENSITY neighbours within CLUSTER_RADIUS
-for(const boid of boids){
-  if(!boid.alive||boid.dying) continue;
-  let n=0;
-  for(const nb of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
-    if(!nb.alive||nb.dying||nb===boid) continue;
-    const dx=nb.x-boid.x, dy=nb.y-boid.y;
-    if(dx*dx+dy*dy<_cr2) n++;
-  }
-  boid._isCore = n>=MIN_CLUSTER_DENSITY;
-}
-
-// Step 2: BFS through core boids only — thin chains and bridge boids don't propagate
-const rawClusters=[];
-for(const boid of boids){
-  if(!boid.alive||boid.dying||!boid._isCore||boid.clusterId!==-1) continue;
-  const ri=rawClusters.length;
-  const coreMembers=[boid];
-  boid.clusterId=ri;
-  for(let qi=0;qi<coreMembers.length;qi++){
-    const b=coreMembers[qi];
-    for(const nb of _sgNeighbors(b.x,b.y,CLUSTER_RADIUS)){
-      if(!nb.alive||nb.dying||!nb._isCore||nb.clusterId!==-1) continue;
-      const dx=nb.x-b.x, dy=nb.y-b.y;
-      if(dx*dx+dy*dy<_cr2){ nb.clusterId=ri; coreMembers.push(nb); }
-    }
-  }
-  rawClusters.push({allMembers:[...coreMembers], ri});
-}
-
-// Step 3: attach border boids to their nearest core neighbour
-for(const boid of boids){
-  if(!boid.alive||boid.dying||boid._isCore) continue;
-  let bestD2=Infinity, bestRi=-1;
-  for(const nb of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
-    if(!nb.alive||nb.dying||!nb._isCore||nb.clusterId===-1) continue;
-    const dx=nb.x-boid.x, dy=nb.y-boid.y;
-    const d2=dx*dx+dy*dy;
-    if(d2<_cr2&&d2<bestD2){ bestD2=d2; bestRi=nb.clusterId; }
-  }
-  if(bestRi>=0){ boid.clusterId=bestRi; rawClusters[bestRi].allMembers.push(boid); }
-}
-
-// Step 4: compute centroids and bounding radii
-for(const rc of rawClusters){
-  let cx=0,cy=0;
-  for(const m of rc.allMembers){ cx+=m.x; cy+=m.y; }
-  cx/=rc.allMembers.length; cy/=rc.allMembers.length;
-  let boundR=RADIUS*2;
-  for(const m of rc.allMembers){
-    const dx=m.x-cx, dy=m.y-cy;
-    const d=Math.sqrt(dx*dx+dy*dy)+RADIUS*1.5;
-    if(d>boundR) boundR=d;
-  }
-  rc.cx=cx; rc.cy=cy; rc.boundR=boundR;
-}
-
-// Step 5: stable colour IDs — match to nearest previous cluster centroid
-const matchThresh2=(CLUSTER_RADIUS*2)*(CLUSTER_RADIUS*2);
-const usedPrev=new Set();
-for(const rc of rawClusters){
-  let bestId=-1, bestD2=Infinity;
-  for(const prev of _prevClusters){
-    if(usedPrev.has(prev.id)) continue;
-    const dx=rc.cx-prev.cx, dy=rc.cy-prev.cy;
-    const d2=dx*dx+dy*dy;
-    if(d2<matchThresh2&&d2<bestD2){ bestD2=d2; bestId=prev.id; }
-  }
-  if(bestId>=0){ rc.stableId=bestId; usedPrev.add(bestId); }
-  else{ rc.stableId=_clusterIdCounter++; }
-}
-
-// Step 6: write back to boids
-for(const rc of rawClusters){
-  const sz=rc.allMembers.length;
-  for(const m of rc.allMembers){
-    m.clusterId=rc.stableId; m.clusterSize=sz;
-    m.clusterCx=rc.cx; m.clusterCy=rc.cy; m.clusterBoundR=rc.boundR;
-  }
-}
-_prevClusters=rawClusters.map(rc=>({cx:rc.cx,cy:rc.cy,id:rc.stableId}));
-}
-
-function clusterEmigration(boid){
-if(boid.clusterSize<=CLUSTER_MAX) return;
-// local centre of mass from neighbours within CLUSTER_RADIUS
-let lx=0,ly=0,lc=0;
-for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
-  if(!o.alive||o.dying||o===boid) continue;
-  const dx=o.x-boid.x, dy=o.y-boid.y;
-  if(dx*dx+dy*dy<_cr2){ lx+=o.x; ly+=o.y; lc++; }
-}
-if(lc===0) return;
-const lcx=lx/lc, lcy=ly/lc;
-const awayX=boid.x-lcx, awayY=boid.y-lcy;
-// periphery fraction: 0 at local centre → 1 at CLUSTER_RADIUS edge
-// interior boids feel no push; only the outer ring is shed gradually
-const peripheryFrac=Math.min(Math.sqrt(awayX*awayX+awayY*awayY)/CLUSTER_RADIUS,1);
-if(peripheryFrac<0.01) return;
-const overload=Math.min((boid.clusterSize-CLUSTER_MAX)/CLUSTER_MAX,1);
-steerToward(boid, boid.x+awayX, boid.y+awayY, overload*peripheryFrac*EMIG_PUSH);
-}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function gaussianRandom(mean, std){
@@ -1179,7 +1007,6 @@ eyeGene: (parentA!==undefined && parentB!==undefined)
 : EYE_GENE_DEFAULT,
 immigrantGeneration, isSingle, isGay, pairFamilyTarget:0,
 diseased:false, immune:false, diseaseTimer:0, diseaseHits:0, infectCount:0,
-clusterId:-1, clusterSize:0, clusterCx:0, clusterCy:0, clusterBoundR:0,
 trail:[]
 };
 }
@@ -1290,12 +1117,13 @@ const combinedPressure = Math.min(boid.localPressure + Math.max(boid.popPressure
 const warmup = Math.min(simClock / WARMUP_DURATION, 1);
 const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
 
-// cohesion radius = CLUSTER_RADIUS so nearness never pulls across cluster boundaries
+// cohesion radius = BOND_DIST so nearness stays local
+const _cohR2=BOND_DIST*BOND_DIST;
 let cx=0,cy=0,count=0;
-for(const o of _sgNeighbors(boid.x,boid.y,CLUSTER_RADIUS)){
+for(const o of _sgNeighbors(boid.x,boid.y,BOND_DIST)){
 if(!o.alive||o===boid) continue;
 const dx=o.x-boid.x, dy=o.y-boid.y;
-if(dx*dx+dy*dy<_cr2){ cx+=o.x; cy+=o.y; count++; }
+if(dx*dx+dy*dy<_cohR2){ cx+=o.x; cy+=o.y; count++; }
 }
 if(count===0){
 // lone emigrant — weak pull toward nearest other boid so they don't get permanently lost
@@ -2489,31 +2317,6 @@ if(inFam/alive.length>=0.9){
 }
 }
 
-// ── cluster aura drawing ──────────────────────────────────────────────────────
-const CLUSTER_PALETTE=[
-[255,100, 80],  // coral
-[ 70,190,255],  // sky blue
-[120,255, 90],  // lime
-[255,175, 35],  // amber
-[195, 75,255],  // violet
-[ 35,215,170],  // teal
-];
-
-function drawClusters(){
-const g=_gfx.clusters; g.clear();
-if(!SHOW_CLUSTERS) return;
-const seen=new Set();
-for(const b of boids){
-  if(!b.alive||b.dying||b.clusterSize<2||seen.has(b.clusterId)) continue;
-  seen.add(b.clusterId);
-  const [r,gr,bl]=CLUSTER_PALETTE[b.clusterId%CLUSTER_PALETTE.length];
-  const col=(r<<16)|(gr<<8)|bl;
-  const auraR=b.clusterBoundR*1.3;
-  // Approximate gradient: two concentric circles (inner slightly brighter)
-  g.beginFill(col,0.06); g.drawCircle(b.clusterCx,b.clusterCy,auraR);      g.endFill();
-  g.beginFill(col,0.05); g.drawCircle(b.clusterCx,b.clusterCy,auraR*0.55); g.endFill();
-}
-}
 
 // ── population pyramid ────────────────────────────────────────────────────────
 function drawPopPyramid() {
@@ -2600,6 +2403,8 @@ pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
 // ── main loop ─────────────────────────────────────────────────────────────────
 const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
+const _fpsEl = document.getElementById('fpsDisplay');
+let _fpsFrameCount = 0, _fpsWindowStart = 0;
 function loop(ts){
 if(!running) return;
 rafId=requestAnimationFrame(loop);
@@ -2607,11 +2412,18 @@ if(lastTime!==null && ts-lastTime < FRAME_MIN_MS) return;
 const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
 lastTime=ts;
 simClock+=dt;
+// FPS counter — update display every 30 rendered frames
+_fpsFrameCount++;
+if(_fpsFrameCount===1) _fpsWindowStart=ts;
+if(_fpsFrameCount>=30){
+  const elapsed=(ts-_fpsWindowStart)/1000;
+  if(_fpsEl) _fpsEl.textContent=Math.round(_fpsFrameCount/elapsed)+' fps';
+  _fpsFrameCount=0;
+}
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
 
 boidMap.clear(); for(const b of boids) if(b.alive) boidMap.set(b.id, b);
 _buildSpatialGrid();
-updateClusters();
 
 updateFertileCounts();
 updateEffectiveBreeders();
@@ -2619,7 +2431,6 @@ for(const boid of boids) if(boid.alive) computePressure(boid);
 
 drawBackground();
 drawTrails();
-drawClusters();
 drawBondLines();
 drawBirthRings();
 updateCollisions();
@@ -2631,7 +2442,7 @@ updateLifespan(boid,dt);
 if(!boid.alive) continue;
 updateBreeding(boid,dt);
 if(!boid.dying){
-avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid); clusterEmigration(boid);
+avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid);
 if(NO_OVERLAP) separateBoid(boid);
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
 // only actually rotate toward it by at most TURN_SPEED×6 per frame, preventing
@@ -2750,22 +2561,6 @@ SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
     if(btn)  btn.style.background='#54a0ff';
     if(knob) knob.style.left='25px';
     if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
-  } else {
-    if(btn)  btn.style.background='#555';
-    if(knob) knob.style.left='3px';
-    if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
-  }
-}
-SHOW_CLUSTERS     = ${SHOW_CLUSTERS};
-// Sync the cluster-circles button visual to match the exported SHOW_CLUSTERS state
-{
-  const btn=document.getElementById('clusterCircBtn');
-  const knob=document.getElementById('clusterCircKnob');
-  const lbl=document.getElementById('clusterCircLabel');
-  if(SHOW_CLUSTERS){
-    if(btn)  btn.style.background='#f9ca24';
-    if(knob) knob.style.left='25px';
-    if(lbl){ lbl.textContent='on'; lbl.style.color='#f9ca24'; }
   } else {
     if(btn)  btn.style.background='#555';
     if(knob) knob.style.left='3px';
