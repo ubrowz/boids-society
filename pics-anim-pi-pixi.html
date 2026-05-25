@@ -1852,6 +1852,21 @@ const gf=_gfx.predFin;    // trail + tail fin
 
 for(const pred of predators){
 if(!pred.alive) continue;
+
+// ── lock pulse ring — drawn at the locked boid's position ────────────────
+if(HUNT_MODE==='lock' && pred.lockedBoidId!==null){
+  const lb=boidMap.get(pred.lockedBoidId);
+  if(lb && lb.alive && !lb.dying){
+    const PULSE_PERIOD=1.5; // seconds per pulse
+    const phase=(simClock%PULSE_PERIOD)/PULSE_PERIOD; // 0→1
+    const pulseR=RADIUS*(1.2 + phase*2.4); // expands from 1.2r to 3.6r
+    const pulseAlpha=(1-phase)*0.70;
+    g.lineStyle(2, 0xff6b35, pulseAlpha); // red-orange
+    g.drawCircle(lb.x, lb.y, pulseR);
+    g.lineStyle(0);
+  }
+}
+
 const ang=Math.atan2(pred.vy,pred.vx);
 // Smooth display angle — same lerp as boids, snapped on wall bounce
 if(pred._drawAngle===undefined) pred._drawAngle=ang;
