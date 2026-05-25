@@ -517,6 +517,7 @@ let _spriteCount = 0;    // sprites used this frame; reset at start of each fram
 const _predBodySprites = []; // predator sprite pool — same texture, white tint
 let _predSpriteCount = 0;
 const _gfx = {}; // named Graphics layers, populated after app is created
+const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; rebuilt each frame
 // ── body image calibration (user-adjustable) ──────────────────────────────────
 let _noseOffset = 32;   // pixels from image centre to nose tip (teardrop-v2: pixel 72, anchor 40 → 32)
 let _bodyScale  = 13;   // body-radius calibration: spr.scale = r/_bodyScale
@@ -1853,20 +1854,6 @@ const gf=_gfx.predFin;    // trail + tail fin
 for(const pred of predators){
 if(!pred.alive) continue;
 
-// ── lock pulse ring — drawn at the locked boid's position ────────────────
-if(HUNT_MODE==='lock' && pred.lockedBoidId!==null){
-  const lb=boidMap.get(pred.lockedBoidId);
-  if(lb && lb.alive && !lb.dying){
-    const PULSE_PERIOD=1.5; // seconds per pulse
-    const phase=(simClock%PULSE_PERIOD)/PULSE_PERIOD; // 0→1
-    const pulseR=RADIUS*(1.2 + phase*2.4); // expands from 1.2r to 3.6r
-    const pulseAlpha=(1-phase)*0.70;
-    g.lineStyle(2, 0xff6b35, pulseAlpha); // red-orange
-    g.drawCircle(lb.x, lb.y, pulseR);
-    g.lineStyle(0);
-  }
-}
-
 const ang=Math.atan2(pred.vy,pred.vx);
 // Smooth display angle — same lerp as boids, snapped on wall bounce
 if(pred._drawAngle===undefined) pred._drawAngle=ang;
@@ -2159,7 +2146,8 @@ spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loade
 {
   const junc=1.70, tip=3.00, notch=2.70, forkW=0.55, juncW=0.26;
   const mid=(junc+tip)/2;                        // control-point back-distance
-  const tailCol = hslToHex(boid.hue, boid.sat*100, 68); // lighter than body (body=50%)
+  const isLocked = _lockedBoidIds.has(boid.id);
+  const tailCol = isLocked ? 0xffffff : hslToHex(boid.hue, boid.sat*100, 68);
   const gt=_gfx.tails;
   gt.beginFill(tailCol, baseAlpha*0.88);
   // top of junction
@@ -2224,9 +2212,11 @@ if(boid.diseased){
 }
 
 // birth ring (boid-level: expanding ring as newborn fades in)
+// immigrants always get a white ring so they stand out from natural births
 if(boid.birthTimer>0){
   const bt=boid.birthTimer/BIRTH_DURATION;
-  g.lineStyle(bt*8, boidHex(boid), bt*bt*0.9);
+  const ringCol = boid.immigrantGeneration>=0 ? 0xffffff : boidHex(boid);
+  g.lineStyle(bt*8, ringCol, bt*bt*0.9);
   g.drawCircle(boid.x,boid.y,RADIUS*(1+(1-bt)*4));
   g.lineStyle(0);
 }
@@ -2696,6 +2686,9 @@ _gfx.tails.clear();     // boid forked tail fins
 _gfx.predFin.clear();   // predator trail + tail fin
 _gfx.predators.clear(); // predator beak + eyes overlay
 _gfx.boids.clear();     // boid Graphics overlay: glow, eyes, beak, disease, birth ring
+// build set of boid IDs currently locked by a predator (for white tail fin)
+_lockedBoidIds.clear();
+if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==null) _lockedBoidIds.add(p.lockedBoidId);
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
