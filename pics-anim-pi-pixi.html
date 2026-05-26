@@ -130,6 +130,10 @@ cursor:pointer; border:2px solid #fff;
 #popCeilSlider::-webkit-slider-thumb { background:#e84393; box-shadow:0 0 8px rgba(232,67,147,0.8); }
 #popCeilSlider::-moz-range-thumb { background:#e84393; }
 #popCeilVal { color:#000; }
+#spriteLSlider { background:linear-gradient(to right,#1a0a1a,#fd79a8); }
+#spriteLSlider::-webkit-slider-thumb { background:#fd79a8; box-shadow:0 0 8px rgba(253,121,168,0.8); }
+#spriteLSlider::-moz-range-thumb { background:#fd79a8; }
+#spriteLVal { color:#fd79a8; }
 #emigReturnSlider { background:linear-gradient(to right,#00120a,#26de81); }
 #emigReturnSlider::-webkit-slider-thumb { background:#26de81; box-shadow:0 0 8px rgba(38,222,129,0.8); }
 #emigReturnSlider::-moz-range-thumb { background:#26de81; }
@@ -298,6 +302,11 @@ width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="colorLabel" style="font-size:10px;font-weight:700;color:#fd79a8;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+</div>
+<div class="ctrl-row">
+<label>tint L</label>
+<input type="range" id="spriteLSlider" min="50" max="100" value="85" step="1">
+<span class="ctrl-val" id="spriteLVal">85</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>details</label>
@@ -585,8 +594,9 @@ if(NO_OVERLAP){
 }
 });
 
-// ── colour toggle ─────────────────────────────────────────────────────────────
+// ── colour toggle + tint lightness ───────────────────────────────────────────
 let SHOW_COLOR = true;
+let SPRITE_L = parseInt(document.getElementById('spriteLSlider').value);
 const colorBtn   = document.getElementById('colorBtn');
 const colorKnob  = document.getElementById('colorKnob');
 const colorLabel = document.getElementById('colorLabel');
@@ -700,6 +710,7 @@ el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
+wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
@@ -2031,7 +2042,7 @@ const spr=_getBodySprite(_spriteCount++);
 spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=boid._drawAngle;
-spr.tint=SHOW_COLOR ? _drawHex(boid,85) : 0xffffff;
+spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
 
@@ -2647,6 +2658,8 @@ SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
   }
 }
 SHOW_COLOR        = ${SHOW_COLOR};
+SPRITE_L          = ${SPRITE_L};
+document.getElementById('spriteLSlider').value=${SPRITE_L}; document.getElementById('spriteLVal').textContent=${SPRITE_L};
 { const btn=document.getElementById('colorBtn'),knob=document.getElementById('colorKnob'),lbl=document.getElementById('colorLabel');
   if(SHOW_COLOR){ if(btn) btn.style.background='#fd79a8'; if(knob) knob.style.left='25px'; if(lbl){lbl.textContent='on';lbl.style.color='#fd79a8';} }
   else { if(btn) btn.style.background='#555'; if(knob) knob.style.left='3px'; if(lbl){lbl.textContent='off';lbl.style.color='#555';} } }
