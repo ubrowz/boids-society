@@ -163,7 +163,6 @@ tr:hover td { background:rgba(84,160,255,0.04); }
   <li><a href="#colormut">Colour Representation &amp; Mutation</a></li>
   <li><a href="#colorpref">Colour Family Cycle</a></li>
   <li><a href="#predators">Predators</a></li>
-  <li><a href="#clusters">Cluster Dynamics</a></li>
   <li><a href="#export">Export</a></li>
   <li><a href="#performance">Performance</a></li>
   <li><a href="#controls">User Controls</a></li>
@@ -175,16 +174,18 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 <!-- ───────────────────────────── OVERVIEW ───────────────────────────────── -->
 <h2 id="overview">Overview</h2>
 <p>An animated browser-based population simulation built on the classic boids algorithm. Coloured boids wander autonomously inside a bounded aquarium. They can bond, breed, age and die. A multi-arm feedback loop attempts to maintain a stable population around a user-defined target.</p>
-<p>The rendering engine is <strong>PixiJS v7 (WebGL)</strong>, replacing the original Canvas 2D path. Boid and predator bodies are drawn as textured sprites (teardrop-v2.png, embedded as base64); trail lines, tail fins, beaks, and effects are drawn with <code>PIXI.Graphics</code>. This gives a large framerate gain on the Raspberry Pi 4, which benefits strongly from GPU-accelerated sprite batching.</p>
+<p>The rendering engine is <strong>PixiJS v7 (WebGL)</strong>, replacing the original Canvas 2D path. Boid and predator bodies are drawn as textured sprites (teardrop-v3.png, embedded as base64); trail lines, tail fins, beaks, and effects are drawn with <code>PIXI.Graphics</code>. This gives a large framerate gain on the Raspberry Pi 4, which benefits strongly from GPU-accelerated sprite batching.</p>
 <p>The visual layer extends the base simulation with:</p>
 <ul>
   <li><strong>Motion trails</strong> — single-pass core line behind every moving boid and predator</li>
   <li><strong>Forked tail fin</strong> — a V-shaped Graphics polygon drawn behind each boid body, peeking out from behind the sprite</li>
-  <li><strong>Birth rings</strong> at spawn events</li>
+  <li><strong>Birth rings and death splashes</strong> — expanding ring on every birth; multi-ring particle burst on every death (predator kill, natural death, disease)</li>
   <li><strong>Morphological genetics</strong> — males carry a <code>beakGene</code> (beak length), all boids carry an <code>eyeGene</code> (eye size), both heritable and mutable via bit-flip</li>
-  <li><strong>Colour as HSL</strong> — boids store <code>{hue, sat}</code>; rendered at fixed lightness 50% via sprite tint</li>
+  <li><strong>Colour as HSL</strong> — boids store <code>{hue, sat}</code>; rendered via sprite tint at a user-adjustable lightness (50–100%, default 85%)</li>
   <li><strong>Colour family cycle</strong> — a preferred family (red → yellow → green → blue → magenta → …) cycles automatically; three selection pressures drive convergence</li>
   <li><strong>Predators</strong> — autonomous hunters that preferentially eat wrong-family boids; rendered as white teardrop sprites identical in shape to boids</li>
+  <li><strong>Details toggle</strong> — hides beak, forked tail, eyes, aura glow, disease dot and motion trails with one button; birth rings and death splashes always show</li>
+  <li><strong>Colour toggle</strong> — switches all boid rendering to greyscale tones; colour wheels, rings and splashes are unaffected</li>
   <li><strong>Export</strong> button — generates a standalone full-screen HTML with no UI, auto-start, auto-disease</li>
 </ul>
 <p>Target framerate is 30 fps (capped; simulation time is dt-based so it runs correctly at any framerate). All logic runs in a single self-contained HTML file with no external dependencies.</p>
@@ -193,6 +194,7 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 <h2 id="appearance">Boid Appearance</h2>
 <h3>Both sexes — body sprite</h3>
 <p>Rendered as a <strong>PixiJS Sprite</strong> using the embedded PNG texture <em>teardrop-v3.png</em> (80×80 px RGBA, anchor at pixel 40,40). The sprite is scaled to <code>RADIUS / 13</code> and tinted to the boid's colour via PixiJS's multiplicative tint. The PNG encodes shape and greyscale shading; the tint supplies hue. Nose (forward) is at pixel 72 (+32 px from anchor → 2.46r ahead in world space); tail base is at pixel 5 (−35 px → 2.69r behind).</p>
+<p><strong>Tinting:</strong> PixiJS tint is multiplicative — each pixel channel is multiplied by the tint colour. A white pixel in the PNG becomes exactly the tint colour; a greyscale mid-tone is darkened proportionally. To keep bright highlights visible the tint lightness is user-adjustable via the <strong>tint L</strong> slider (50–100%, default 85%): <code>tintHex = hsl(hue, sat×100%, SPRITE_L)</code>. In <em>greyscale mode</em> (colour toggle off), the tint is set to <code>0xffffff</code> (no colour shift) so the PNG's own grey shading is preserved at full brightness.</p>
 <h3>Both sexes — forked tail fin</h3>
 <p>A <strong>V-shaped forked tail</strong> is drawn behind each boid as a <code>PIXI.Graphics</code> polygon in the <code>tails</code> layer (below the sprite layer), so it visually peeks out from behind the body. The fill colour is the boid's hue at lightness 68% (lighter than the 50% body) — <strong>except</strong> when the boid is the locked target of a predator in <em>lock</em> hunt mode, in which case the tail fin is drawn <strong>white</strong> as a targeting indicator. Key geometry constants:</p>
 <pre><code>junction   = 1.70r back  (where the fork starts, inside sprite tail)
@@ -205,13 +207,18 @@ spread     = ±0.55r sideways at the tips</code></pre>
 <p>Each boid maintains a separate <code>_drawAngle</code> field that lerps toward the physics heading at factor 0.20 per frame. All drawing (sprite rotation, tail fin, beak, eyes) uses <code>_drawAngle</code>, not the raw velocity angle. On wall bounces, <code>_drawAngle</code> is snapped immediately to the new heading to avoid lerping through a 180° arc.</p>
 <h3>Both sexes — state visuals</h3>
 <table>
-<thead><tr><th>State</th><th>Visual</th></tr></thead>
+<thead><tr><th>State</th><th>Visual</th><th>Hidden by details toggle?</th></tr></thead>
 <tbody>
-<tr><td>Fertile or bonded</td><td>Three concentric circles approximating a radial glow (gold if bonded, boid colour if just fertile)</td></tr>
-<tr><td>Infertile, unbonded</td><td>55% opacity, no glow</td></tr>
-<tr><td>Diseased</td><td>Small white spot at body centre (radius 0.28r)</td></tr>
-<tr><td>Fading in/out</td><td>Sprite alpha ramps over BIRTH_DURATION / FADE_DURATION</td></tr>
-<tr><td>Trail</td><td>Single-pass core line behind every moving boid</td></tr>
+<tr><td>Fertile or bonded</td><td>Three concentric circles approximating a radial glow (gold if bonded, boid colour if just fertile)</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Infertile, unbonded</td><td>55% opacity, no glow</td><td>—</td></tr>
+<tr><td>Diseased</td><td>Small white spot at body centre (radius 0.28r)</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Fading in/out</td><td>Sprite alpha ramps over BIRTH_DURATION / FADE_DURATION</td><td>—</td></tr>
+<tr><td>Trail</td><td>Single-pass core line behind every moving boid</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Forked tail fin</td><td>V-polygon behind sprite, lighter shade of body colour</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Beak (males)</td><td>Forward tapered line, length set by beakGene</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Eyes (both sexes)</td><td>Two circles, size set by eyeGene</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Birth rings</td><td>Expanding coloured ring at spawn; white for immigrants</td><td>No — always shown</td></tr>
+<tr><td>Death splash</td><td>Multi-ring + particle burst at death location</td><td>No — always shown</td></tr>
 </tbody>
 </table>
 
@@ -352,7 +359,7 @@ globalPressure = clamp(fertilePairs / targetPairs − 1, −1, +1)</code></pre>
 
 <div class="arm">
 <h3>Arm 1 — Nearness (birth rate, indirect)</h3>
-<p><strong>Signals:</strong> <code>localPressure</code> and <code>popPressure</code> — controls how strongly boids steer toward each other. Cohesion is computed from neighbours within <code>CLUSTER_RADIUS</code> (90 px), not the full <code>SENSING_RADIUS</code>, so boids in different clusters feel no mutual attraction (see <a href="#clusters">Cluster Dynamics</a>).</p>
+<p><strong>Signals:</strong> <code>localPressure</code> and <code>popPressure</code> — controls how strongly boids steer toward each other. Cohesion is computed from neighbours within <code>BOND_DIST</code> (90 px), not the full <code>SENSING_RADIUS</code>, keeping flocking attraction local and preventing distant groups from pulling each other across the arena.</p>
 <pre><code>combinedPressure = min(localPressure + max(popPressure, 0), 1)
 strength = (MIN_NEARNESS + (BASE_NEARNESS − MIN_NEARNESS) × (1 − combinedPressure))
            × thresholdScale</code></pre>
@@ -474,7 +481,7 @@ alpha     = t² × 0.9                     # fades out quickly</code></pre>
 
 <!-- ───────────────────────────── DEATH SPLASHES ─────────────────────────── -->
 <h2 id="deathsplash">Death Splashes</h2>
-<p>When a predator eats a boid, a <code>deathSplash</code> is spawned at the boid's position, rendering over ~0.85 s. All colours are derived from the <strong>killed boid's own hue and saturation</strong> — a blue boid produces a blue burst, a red boid a red burst, etc.</p>
+<p>Every boid death — whether by predator kill, natural aging (Gompertz), or disease — spawns a <code>deathSplash</code> at the boid's position, rendering over ~0.85 s. All colours are derived from the <strong>dead boid's own hue and saturation</strong> — a blue boid produces a blue burst, a red boid a red burst, etc. The splash is identical regardless of cause of death.</p>
 <table>
 <thead><tr><th>Element</th><th>Max radius</th><th>Colour</th></tr></thead>
 <tbody>
@@ -650,60 +657,6 @@ eat if distance(tip, boid) &lt; RADIUS</code></pre>
 <h3>Count management</h3>
 <p>The <strong>predators</strong> slider (0–5) is reactive: increasing it spawns new predators immediately; decreasing it removes the excess. On simulation restart, predators are respawned according to the current slider value.</p>
 
-<!-- ───────────────────────────── CLUSTER DYNAMICS ───────────────────────── -->
-<h2 id="clusters">Cluster Dynamics</h2>
-<p>The simulation detects spatially coherent <strong>clusters</strong> of boids each frame and applies emigration pressure to prevent any single cluster from growing too large. When a cluster exceeds its maximum size, peripheral members are gradually pushed outward and drift as lone emigrants until they join another dense group or seed a new cluster.</p>
-
-<h3>Cluster detection (density-based)</h3>
-<p>Membership uses a DBSCAN-like algorithm with linking radius <code>CLUSTER_RADIUS = BOND_DIST = 90 px</code>:</p>
-<ol>
-  <li><strong>Core boids</strong> — a boid is core if it has ≥ <code>MIN_CLUSTER_DENSITY</code> neighbours within <code>CLUSTER_RADIUS</code>. Isolated boids and thin chains of boids are excluded.</li>
-  <li><strong>Cluster BFS</strong> — core boids are linked into clusters by BFS through core-only links. Two dense groups connected only by a single bridge boid remain separate clusters.</li>
-  <li><strong>Border boids</strong> — non-core boids within <code>CLUSTER_RADIUS</code> of any core boid are attached to their nearest core neighbour's cluster.</li>
-  <li><strong>Noise boids</strong> — boids with no core neighbour in range are lone emigrants: no cluster membership, no aura.</li>
-</ol>
-<p>Each boid stores <code>clusterId</code>, <code>clusterSize</code>, <code>clusterCx/Cy</code>, and <code>clusterBoundR</code> each frame. Cluster IDs are matched to the previous frame's centroids (within 2× <code>CLUSTER_RADIUS</code>) for stable colour assignment across frames.</p>
-
-<h3>Cohesion radius</h3>
-<p>Nearness cohesion operates at <code>CLUSTER_RADIUS</code> (90 px) rather than the full <code>SENSING_RADIUS</code> (~180 px). This gives clusters a hard spatial boundary: two clusters more than 90 px apart feel no mutual attraction and only merge if they physically drift together. <code>computePressure</code> still uses <code>SENSING_RADIUS</code> for local density sensing.</p>
-<p>Lone emigrants (no cluster-mates within <code>CLUSTER_RADIUS</code>) receive a weak global-centroid pull at strength <code>EMIG_RETURN</code> so they don't get stranded permanently.</p>
-
-<h3>Emigration</h3>
-<p>When a cluster exceeds <code>CLUSTER_MAX</code>, each member is assessed individually:</p>
-<pre><code>localCx, localCy = centre of mass of neighbours within CLUSTER_RADIUS
-peripheryFrac    = distance(boid, localCentre) / CLUSTER_RADIUS   # 0 at centre, 1 at edge
-overload         = min((clusterSize − CLUSTER_MAX) / CLUSTER_MAX, 1)
-steerStrength    = overload × peripheryFrac × EMIG_PUSH</code></pre>
-<ul>
-  <li>Interior boids (<code>peripheryFrac ≈ 0</code>) feel no emigration force and remain cohesive</li>
-  <li>Outer-ring boids feel full force and are shed first — a gradual peeling rather than an explosion</li>
-  <li>Using the <em>local</em> centre of mass means two colliding clusters repel each other instead of both disintegrating from the combined centroid</li>
-  <li>Overload is clamped at 1 (at 2× <code>CLUSTER_MAX</code>); large overshoots shed the outer ring at full force without causing a total explosion</li>
-</ul>
-
-<h3>Cluster aura</h3>
-<p>Each cluster of size ≥ 2 is rendered as a soft glow drawn behind the boids. Six colours cycle by stable cluster ID:</p>
-<table>
-<thead><tr><th>Index mod 6</th><th>Colour</th></tr></thead>
-<tbody>
-<tr><td>0</td><td>Coral <code>rgb(255,100,80)</code></td></tr>
-<tr><td>1</td><td>Sky blue <code>rgb(70,190,255)</code></td></tr>
-<tr><td>2</td><td>Lime <code>rgb(120,255,90)</code></td></tr>
-<tr><td>3</td><td>Amber <code>rgb(255,175,35)</code></td></tr>
-<tr><td>4</td><td>Violet <code>rgb(195,75,255)</code></td></tr>
-<tr><td>5</td><td>Teal <code>rgb(35,215,170)</code></td></tr>
-</tbody>
-</table>
-<p>Aura radius = <code>clusterBoundR × 1.3</code> where <code>clusterBoundR</code> = max member distance from centroid + <code>RADIUS × 1.5</code>. Two independent toggles control rendering:</p>
-<ul>
-  <li><strong>Circles toggle</strong> (<code>SHOW_CLUSTERS</code>, default <strong>off</strong>): master switch for cluster aura rendering. When off, <code>drawClusters()</code> returns after clearing the layer — zero overdraw. Toggle state is exported to standalone files.</li>
-  <li><strong>Aura toggle</strong> (gradient / flat): only has effect when circles are on.
-    <ul>
-      <li><strong>Gradient</strong> (default): two concentric filled circles approximating a radial glow (outer 0.06 alpha, inner 0.05 alpha). One draw per cluster — O(clusters), not O(boids).</li>
-      <li><strong>Flat</strong>: single solid fill at reduced alpha, no gradient computation. Recommended when frame rate drops on Pi with large clusters. Toggle state is exported to the standalone file.</li>
-    </ul>
-  </li>
-</ul>
 
 <!-- ───────────────────────────── EXPORT ─────────────────────────────────── -->
 <h2 id="export">Export</h2>
@@ -715,6 +668,10 @@ steerStrength    = overload × peripheryFrac × EMIG_PUSH</code></pre>
   <li>The canvas is repositioned as <code>position:fixed</code> filling the full window</li>
   <li>A boot script is injected before <code>&lt;/body&gt;</code> that overrides <code>resize()</code> to use <code>window.innerWidth / innerHeight</code>, sets <code>AUTO_DISEASE = true</code>, and calls <code>startSim()</code></li>
 </ol>
+<p>The boot script also bakes in the current toggle states so the exported file starts in the same visual configuration:</p>
+<pre><code>SHOW_COLOR   = true/false    // colour mode vs greyscale
+SPRITE_L     = 50–100        // tint lightness for coloured sprites
+SHOW_DETAILS = true/false    // beak / tail / trail / eyes / glow / disease dot</code></pre>
 
 <h3>Auto-disease</h3>
 <p>In the exported file, <code>AUTO_DISEASE = true</code> activates an automatic outbreak timer:</p>
@@ -738,7 +695,17 @@ else:
 <h2 id="performance">Performance</h2>
 <p>The frame loop is capped at <strong>30 fps</strong>. <code>dt</code> is computed from actual elapsed time so simulation speed is framerate-independent.</p>
 
-<h3>Pi-specific optimisations</h3>
+<h3>Real-world fps observations</h3>
+<table>
+<thead><tr><th>Platform</th><th>Observed fps</th><th>Root cause</th></tr></thead>
+<tbody>
+<tr><td>Mac (ProMotion display)</td><td>24 fps</td><td><strong>Display sync artefact, not a code problem.</strong> The Mac's ProMotion adaptive display sees the animation targeting 30 fps and locks to 24 Hz — the nearest clean rate. Every <code>requestAnimationFrame</code> callback fires at 41.67 ms intervals; every callback triggers a render; the display reports 24 fps. The code completes each frame well within 42 ms. This figure is not a useful benchmark.</td></tr>
+<tr><td>Raspberry Pi 4 (under-voltage)</td><td>18 fps</td><td><strong>CPU throttled due to insufficient power.</strong> <code>vcgencmd get_throttled</code> returned <code>0x50005</code> (bits 0+2 active = currently under-voltage and currently throttled). The CPU was clocked from 1.5 GHz down to ~600 MHz. Fix: use a proper 5 V / 3 A USB-C adapter with a quality cable. Verify with <code>vcgencmd get_throttled</code> → <code>0x0</code>.</td></tr>
+<tr><td>Raspberry Pi 4 (correct PSU)</td><td>~30 fps</td><td>Expected steady-state at 30 boids + 1 predator with optimisations below.</td></tr>
+</tbody>
+</table>
+
+<h3>Code optimisations</h3>
 <table>
 <thead><tr><th>Optimisation</th><th>Before</th><th>After</th></tr></thead>
 <tbody>
@@ -749,6 +716,10 @@ else:
 <tr><td>Neighbour queries (pressure, nearness, collision, disease)</td><td>O(N²) per frame</td><td>O(N·k) via spatial hash grid; cell size = max(SENSING_RADIUS, RADIUS×2)</td></tr>
 <tr><td>Partner / child lookups (<code>.find()</code>)</td><td>O(N) each, 7 call sites</td><td>O(1) via <code>boidMap</code> (Map keyed by id, rebuilt once per frame)</td></tr>
 <tr><td>Collision pairs</td><td>Double loop with sqrt distance</td><td>Grid neighbours + <code>b.id ≤ a.id</code> dedup, squared distance only</td></tr>
+<tr><td>Cluster detection</td><td>DBSCAN-like 3-pass neighbour scan every frame (O(N) × 3); cluster aura draw</td><td><strong>Removed entirely.</strong> Feature was not adding simulation value. Saved more CPU than any other single change.</td></tr>
+<tr><td>Per-frame GC allocations</td><td><code>_sgNeighbors()</code>: <code>new []</code> per call (~90–120×/frame). <code>_buildSpatialGrid()</code>: <code>new Map()</code> per frame. <code>updateEffectiveBreeders()</code>: shadow Map + Set per frame. <code>updateFertileCounts()</code>: two <code>.filter()</code> throwaway arrays per frame.</td><td>Shared reusable buffer (<code>_sgBuf.length=0</code>); <code>Map.clear()</code> and reuse; persistent <code>_ebSeen</code> Set; single counting loop. Zero allocations in the hot neighbour-scan path.</td></tr>
+<tr><td><code>updateStatus()</code> — O(N²) DOM writes</td><td>Called every frame: <code>genomeDiversity()</code> = 435 pair comparisons at 30 boids; 25+ DOM writes per frame triggering layout passes; 5× <code>.filter()</code> calls</td><td>Throttled to every 5th rendered frame (~6 fps). Status panel values (birth rate, diversity, inbreeding) do not need 30 fps refresh.</td></tr>
+<tr><td>Dead boid removal</td><td><code>boids.filter(b=&gt;b.alive)</code> — new array every frame</td><td>In-place reverse splice; POP_CEILING culling uses a count+walk instead of <code>.filter()</code></td></tr>
 <tr><td>Trail render</td><td>Two passes (glow + core)</td><td>Core pass only — glow pass removed</td></tr>
 <tr><td>Boid glow</td><td>Every boid, radial gradient, radius 2.8r</td><td>Bonded or fertile boids only, three concentric circles at 2.0r — ~70–80% pixel reduction</td></tr>
 <tr><td>Predator glow</td><td>Radial gradient, radius 3r per predator</td><td>Removed — eye colour signals hunger instead</td></tr>
@@ -788,24 +759,22 @@ PREDATOR_RADIUS = RADIUS * 0.7 = 14    // same size as a single boid</code></pre
 <tr><td>Full for (s)</td><td>1–30 s</td><td>10 s</td><td>Time a predator won't eat after a meal</td></tr>
 <tr><td>Prey</td><td>1–3 (step 1)</td><td>3 (other)</td><td>Predator diet: 1 = any boid; 2 = favored (eats preferred-family boids, works against the colour cycle); 3 = other (eats non-preferred-family boids, reinforces the colour cycle)</td></tr>
 <tr><td>Hunt</td><td>toggle (bump / lock)</td><td>bump</td><td><strong>bump</strong>: predator re-targets the nearest edible boid every frame. <strong>lock</strong>: on becoming hungry the predator picks a random edible boid in range and commits to chasing only that boid (shown with a white tail fin) until it is eaten; bystanders are ignored. Lock releases on eating or when full.</td></tr>
-<tr><td>Cluster max</td><td>2–100</td><td>20</td><td>Maximum comfortable cluster size; emigration pressure activates above this threshold</td></tr>
-<tr><td>Min density</td><td>1–8</td><td>3</td><td>Minimum neighbours within 90 px for a boid to be a cluster core boid; at 1 degrades to connected-component clustering</td></tr>
-<tr><td>Emigr. push</td><td>0.0–3.0</td><td>1.5</td><td>Steering strength of the centrifugal emigration force on outer-ring boids of an overcrowded cluster</td></tr>
-<tr><td>Emigr. return</td><td>0.0–1.0</td><td>0.4</td><td>Steering strength of the global-centroid pull on lone emigrants with no cluster-mates in range</td></tr>
 <tr><td>Sensing radius</td><td>30–300 px</td><td>130 px</td><td>How far boids can sense neighbours for pressure, cohesion, collision, and disease. Smaller values reduce CPU load (smaller spatial grid queries); larger values give a more globally-aware flock. Exported (baked into boot script).</td></tr>
 <tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales core trail alpha for both boids and predators</td></tr>
 <tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
-<tr><td>Background</td><td>colour picker</td><td>#081828</td><td>Canvas background colour — flat fill applied every frame. Exported. Any colour is valid; dark colours work best with the existing trail glow and boid shading.</td></tr>
+<tr><td>Background</td><td>colour picker</td><td>#081828</td><td>Canvas background colour — flat fill applied every frame. Exported. Any colour is valid; dark colours work best with the existing trail glow and boid shading. Setting to pure black (<code>#000000</code>) is recommended for LED panel use — off pixels generate no PWM activity, reducing GPIO timing jitter and flicker.</td></tr>
 <tr><td>No overlap</td><td>toggle (off/on)</td><td>off</td><td>When on, a body-separation force prevents boid circles from overlapping. Each frame, boids within 2×RADIUS of each other receive a position nudge (8% of overlap depth) plus a <code>steerToward</code> impulse (strength 5). Bonded pairs settle at ~2×RADIUS apart. Uses the existing spatial grid — O(N·k). Exported.</td></tr>
 <tr><td>Bond lines</td><td>toggle (on/off)</td><td>on</td><td>Show or hide bond lines between paired boids (thin coloured line; thick amber when fertile; brief red flash at birth). Turning off removes all bond line rendering without affecting simulation logic. Exported.</td></tr>
-<tr><td>Circles</td><td>toggle (off/on)</td><td>off</td><td>Show or hide cluster aura circles. When off, <code>drawClusters()</code> clears the layer and returns immediately — no overdraw from cluster rendering. Exported.</td></tr>
+<tr><td>Details</td><td>toggle (on/off)</td><td>on</td><td>Show or hide the detail layer: beak (male), forked tail fin, eyes, aura glow (bonded/fertile), disease dot, and motion trails. Birth rings and death splashes are always shown regardless. Turning off substantially reduces overdraw and GPU draw calls. Exported.</td></tr>
+<tr><td>Colour</td><td>toggle (on/off)</td><td>on</td><td>Switch boid rendering between colour mode and greyscale. In greyscale mode the sprite tint is set to <code>0xffffff</code> (no hue shift) so the PNG's own grey shading is preserved at full brightness. Tail fins, beaks and glow effects also render in greyscale. Birth rings, death splashes, and the colour cycle/wheel are unaffected. Exported.</td></tr>
+<tr><td>Tint L</td><td>50–100%</td><td>85%</td><td>Lightness of the sprite tint in colour mode: <code>hsl(hue, sat×100%, SPRITE_L)</code>. At L = 50% the tint is fully saturated but dark; at L = 100% it is white (no tint). The default 85% gives bright highlights while retaining hue. Only applies when colour mode is on. Exported.</td></tr>
 <tr><td>Body image — shape</td><td>file picker + label</td><td>default (teardrop-v3.png)</td><td>Load a PNG to replace the body sprite texture for both boids and predators. The PNG is read as a data URL and swapped live via <code>_swapBodyTexture()</code>; all pooled sprites are updated immediately. The data URL is embedded in exported files so the custom image persists.</td></tr>
 <tr><td>Body image — nose px</td><td>number (1–500)</td><td>32</td><td>Pixels from the image centre to the nose tip in the source PNG. Used to compute <code>noseEdge</code> for beak placement, eye placement, and eating-collision geometry: <code>noseEdge = r × (nosePx / bodyScale)</code>.</td></tr>
 <tr><td>Body image — body scale</td><td>number (0.5–200)</td><td>13</td><td>Sprite scale divisor: <code>sprite.scale = r / bodyScale</code>. Increase to shrink the sprite relative to the boid radius; decrease to enlarge it. Default 13 is calibrated for teardrop-v3.png at RADIUS = 20.</td></tr>
 <tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
-<p>Buttons: <strong>immigration toggle</strong>, <strong>aura gradient/flat toggle</strong> (switches cluster aura between radial gradient and solid fill), <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>circles toggle</strong> (shows/hides cluster aura circles, default off), <strong>hunt toggle</strong> (bump/lock hunting strategy, default bump), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>details toggle</strong> (shows/hides beak/tail/eyes/glow/disease dot/trails, default on), <strong>colour toggle</strong> (colour vs greyscale rendering, default on), <strong>hunt toggle</strong> (bump/lock hunting strategy, default bump), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
 
 <!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
 <h2 id="pyramid">Population Pyramid</h2>
@@ -833,26 +802,25 @@ barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
 <table>
 <thead><tr><th>Visual element</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td>Teardrop body (female)</td><td>Female boid; colour = HSL tint on greyscale PNG sprite; genetic lineage encoded in hue</td></tr>
-<tr><td>Teardrop body + forward beak (male)</td><td>Male boid; beak length encodes beakGene</td></tr>
-<tr><td>Forked V-tail behind body</td><td>Tail fin, lighter shade of body colour; extends ~3r behind boid centre</td></tr>
+<tr><td>Teardrop body (female)</td><td>Female boid; colour = HSL tint on greyscale PNG sprite; genetic lineage encoded in hue. In greyscale mode (colour toggle off) the tint is <code>0xffffff</code> so PNG shading is preserved.</td></tr>
+<tr><td>Teardrop body + forward beak (male)</td><td>Male boid; beak length encodes beakGene. Hidden when details toggle is off.</td></tr>
+<tr><td>Forked V-tail behind body</td><td>Tail fin, lighter shade of body colour; extends ~3r behind boid centre. Hidden when details toggle is off.</td></tr>
 <tr><td>White forked V-tail (on a coloured boid)</td><td>This boid is the locked target of a predator in <em>lock</em> hunt mode</td></tr>
-<tr><td>Two dark eyes with highlight (both sexes)</td><td>Eye size encodes eyeGene; same gene inherited by both sexes</td></tr>
+<tr><td>Two dark eyes with highlight (both sexes)</td><td>Eye size encodes eyeGene; same gene inherited by both sexes. Hidden when details toggle is off.</td></tr>
 <tr><td>Small body (0.7× size)</td><td>Single boid — will never bond</td></tr>
-<tr><td>Gold glow around body</td><td>Bonded boid</td></tr>
-<tr><td>Coloured glow around body</td><td>Fertile unbonded boid</td></tr>
+<tr><td>Gold glow around body</td><td>Bonded boid. Hidden when details toggle is off.</td></tr>
+<tr><td>Coloured glow around body</td><td>Fertile unbonded boid. Hidden when details toggle is off.</td></tr>
 <tr><td>Dimmed opacity (55%), no glow</td><td>Outside fertile window (juvenile or post-reproductive)</td></tr>
-<tr><td>Small white spot (centre)</td><td>Diseased boid — currently infectious</td></tr>
-<tr><td>Coloured trail behind boid</td><td>Motion history; length = MAX_TRAIL frames; colour matches boid</td></tr>
-<tr><td>White trail</td><td>Predator motion history</td></tr>
-<tr><td>Expanding coloured ring around newborn</td><td>Birth pulse — colour matches the boid's own hue; fades over BIRTH_DURATION</td></tr>
-<tr><td>Expanding <strong>white</strong> ring around new arrival</td><td>Immigrant birth pulse — always white to distinguish immigration from natural birth</td></tr>
-<tr><td>Coloured expanding rings + particles</td><td>Death splash — colour matches the eaten boid's hue</td></tr>
+<tr><td>Small white spot (centre)</td><td>Diseased boid — currently infectious. Hidden when details toggle is off.</td></tr>
+<tr><td>Coloured trail behind boid</td><td>Motion history; length = MAX_TRAIL frames; colour matches boid. Hidden when details toggle is off.</td></tr>
+<tr><td>White trail</td><td>Predator motion history. Hidden when details toggle is off.</td></tr>
+<tr><td>Expanding coloured ring around newborn</td><td>Birth pulse — colour matches the boid's own hue; fades over BIRTH_DURATION. Always shown regardless of details toggle.</td></tr>
+<tr><td>Expanding <strong>white</strong> ring around new arrival</td><td>Immigrant birth pulse — always white to distinguish immigration from natural birth. Always shown.</td></tr>
+<tr><td>Coloured expanding rings + particles</td><td>Death splash — colour matches the dead boid's hue; triggered by predator kill, natural aging, or disease. Always shown regardless of details toggle.</td></tr>
 <tr><td>Gold arc (partial)</td><td>Hit progress toward bonding threshold</td></tr>
 <tr><td>Gradient line (amber)</td><td>Bond between fertile straight M+F partners</td></tr>
 <tr><td>Gradient line (colour)</td><td>Bond — partners not forming a fertile pair</td></tr>
 <tr><td>Bright red bond line (2 s)</td><td>Flash at moment of child birth</td></tr>
-<tr><td>Soft coloured glow (behind boids)</td><td>Cluster aura — one of six colours per cluster; only drawn for clusters of ≥ 2 boids. Lone emigrants have no aura.</td></tr>
 <tr><td>Small white teardrop body with forked tail + beak</td><td>Predator; same PNG sprite as boids, tinted white, at 0.7× boid size (same as a single boid); beak always present; forked tail in near-white</td></tr>
 <tr><td>Yellow→red eyes on predator</td><td>Hunger level: yellow = full, orange = hungry, red = very hungry</td></tr>
 <tr><td>Coloured dot on predator rear</td><td>Protected colour family — predators will not eat boids of this colour (unless very hungry)</td></tr>
