@@ -287,6 +287,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>details</label>
+<button id="detailsBtn" title="Toggle beak, forked tail and trail" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#a29bfe;position:relative;transition:background 0.2s;outline:none;">
+<span id="detailsKnob" style="
+position:absolute;top:3px;left:25px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+</div>
 </div>
 <div class="ctrl-col">
 <div class="ctrl-row" style="gap:8px;">
@@ -558,6 +570,22 @@ if(NO_OVERLAP){
 } else {
   noOverlapBtn.style.background='#555'; noOverlapKnob.style.left='3px';
   noOverlapLabel.textContent='off'; noOverlapLabel.style.color='#555';
+}
+});
+
+// ── details toggle (beak, forked tail, trail) ────────────────────────────────
+let SHOW_DETAILS = true;
+const detailsBtn   = document.getElementById('detailsBtn');
+const detailsKnob  = document.getElementById('detailsKnob');
+const detailsLabel = document.getElementById('detailsLabel');
+detailsBtn.addEventListener('click', () => {
+SHOW_DETAILS = !SHOW_DETAILS;
+if(SHOW_DETAILS){
+  detailsBtn.style.background='#a29bfe'; detailsKnob.style.left='25px';
+  detailsLabel.textContent='on'; detailsLabel.style.color='#a29bfe';
+} else {
+  detailsBtn.style.background='#555'; detailsKnob.style.left='3px';
+  detailsLabel.textContent='off'; detailsLabel.style.color='#555';
 }
 });
 
@@ -1851,6 +1879,7 @@ g.lineStyle(0);
 
 function drawTrails(){
 const g=_gfx.trails; g.clear();
+if(!SHOW_DETAILS) return;
 for(const boid of boids){
 if(!boid.alive||boid.trail.length<2) continue;
 let bAlpha=1;
@@ -1979,7 +2008,7 @@ spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loade
 // Sprite tail tip is at (35/13)*r ≈ 2.69r behind boid centre.
 // The junction where the fork starts is at 1.7r back (inside the narrow tail of the sprite).
 // Fork tips extend to 3.0r back, spread ±0.55r sideways, with a centre notch at 2.7r.
-{
+if(SHOW_DETAILS){
   const junc=1.70, tip=3.00, notch=2.70, forkW=0.55, juncW=0.26;
   const mid=(junc+tip)/2;                        // control-point back-distance
   const isLocked = _lockedBoidIds.has(boid.id);
@@ -2011,7 +2040,7 @@ spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loade
 const noseEdge = r * (_noseOffset / _bodyScale);
 
 // beak: males only — attaches at the sprite nose edge, points further forward
-if(boid.sex==='M'){
+if(SHOW_DETAILS && boid.sex==='M'){
   const beakLen=r*(0.3+boid.beakGene/255*1.7);
   const bkBx=boid.x+cos*noseEdge*0.93, bkBy=boid.y+sin*noseEdge*0.93; // base just inside nose
   const bkTx=boid.x+cos*(noseEdge+beakLen), bkTy=boid.y+sin*(noseEdge+beakLen);
@@ -2578,6 +2607,22 @@ SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
     if(btn)  btn.style.background='#54a0ff';
     if(knob) knob.style.left='25px';
     if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
+  } else {
+    if(btn)  btn.style.background='#555';
+    if(knob) knob.style.left='3px';
+    if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
+  }
+}
+SHOW_DETAILS      = ${SHOW_DETAILS};
+// Sync details button visual
+{
+  const btn=document.getElementById('detailsBtn');
+  const knob=document.getElementById('detailsKnob');
+  const lbl=document.getElementById('detailsLabel');
+  if(SHOW_DETAILS){
+    if(btn)  btn.style.background='#a29bfe';
+    if(knob) knob.style.left='25px';
+    if(lbl){ lbl.textContent='on'; lbl.style.color='#a29bfe'; }
   } else {
     if(btn)  btn.style.background='#555';
     if(knob) knob.style.left='3px';
