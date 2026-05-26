@@ -288,6 +288,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
+<label>colour</label>
+<button id="colorBtn" title="Toggle boid colour (off = greyscale body, trail, beak, tail)" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#fd79a8;position:relative;transition:background 0.2s;outline:none;">
+<span id="colorKnob" style="
+position:absolute;top:3px;left:25px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="colorLabel" style="font-size:10px;font-weight:700;color:#fd79a8;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
 <label>details</label>
 <button id="detailsBtn" title="Toggle beak, forked tail and trail" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -570,6 +582,22 @@ if(NO_OVERLAP){
 } else {
   noOverlapBtn.style.background='#555'; noOverlapKnob.style.left='3px';
   noOverlapLabel.textContent='off'; noOverlapLabel.style.color='#555';
+}
+});
+
+// ── colour toggle ─────────────────────────────────────────────────────────────
+let SHOW_COLOR = true;
+const colorBtn   = document.getElementById('colorBtn');
+const colorKnob  = document.getElementById('colorKnob');
+const colorLabel = document.getElementById('colorLabel');
+colorBtn.addEventListener('click', () => {
+SHOW_COLOR = !SHOW_COLOR;
+if(SHOW_COLOR){
+  colorBtn.style.background='#fd79a8'; colorKnob.style.left='25px';
+  colorLabel.textContent='on'; colorLabel.style.color='#fd79a8';
+} else {
+  colorBtn.style.background='#555'; colorKnob.style.left='3px';
+  colorLabel.textContent='off'; colorLabel.style.color='#555';
 }
 });
 
@@ -870,6 +898,8 @@ const f=n=>Math.round(Math.max(0,Math.min(1,l-a*Math.max(-1,Math.min(k(n)-3,9-k(
 return(f(0)<<16)|(f(8)<<8)|f(4);
 }
 function boidHex(b){ return hslToHex(b.hue,b.sat*100,50); }
+// draw-time colour helper — returns grey when SHOW_COLOR is off
+function _drawHex(b, l){ return SHOW_COLOR ? hslToHex(b.hue,b.sat*100,l) : hslToHex(0,0,l); }
 function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 
 // Sprite pool — fetch or create the Nth sprite for this frame
@@ -1888,7 +1918,7 @@ if(boid.birthTimer>0) bAlpha=1-(boid.birthTimer/BIRTH_DURATION);
 if(boid.dying)        bAlpha=1-(boid.fadeTimer/FADE_DURATION);
 bAlpha=Math.max(0,bAlpha);
 const n=boid.trail.length;
-const col=boidHex(boid);
+const col=_drawHex(boid,50);
 for(let i=1;i<n;i++){
   const t=Math.pow(i/(n-1),0.5);
   g.lineStyle(t*7+0.8, col, t*0.85*bAlpha*TRAIL_OPACITY);
@@ -1974,7 +2004,7 @@ const baseAlpha = alpha * (fertile ? 1.0 : 0.55);
 // glow — three concentric circles approximate radial gradient
 if(SHOW_DETAILS && (isBonded||fertile)){
   const glowR=RADIUS*2.0;
-  const glowCol = isBonded ? 0xffcc44 : boidHex(boid);
+  const glowCol = isBonded ? 0xffcc44 : _drawHex(boid,50);
   g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
   g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
   g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
@@ -2001,7 +2031,7 @@ const spr=_getBodySprite(_spriteCount++);
 spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=boid._drawAngle;
-spr.tint=boidHex(boid);
+spr.tint=_drawHex(boid,50);
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
 
@@ -2013,7 +2043,7 @@ if(SHOW_DETAILS){
   const junc=1.70, tip=3.00, notch=2.70, forkW=0.55, juncW=0.26;
   const mid=(junc+tip)/2;                        // control-point back-distance
   const isLocked = _lockedBoidIds.has(boid.id);
-  const tailCol = isLocked ? 0xffffff : hslToHex(boid.hue, boid.sat*100, 68);
+  const tailCol = isLocked ? 0xffffff : _drawHex(boid,68);
   const gt=_gfx.tails;
   gt.beginFill(tailCol, baseAlpha*0.88);
   // top of junction
@@ -2047,7 +2077,7 @@ if(SHOW_DETAILS && boid.sex==='M'){
   const bkTx=boid.x+cos*(noseEdge+beakLen), bkTy=boid.y+sin*(noseEdge+beakLen);
   const bkCpx=boid.x+cos*(noseEdge+beakLen*0.5), bkCpy=boid.y+sin*(noseEdge+beakLen*0.5);
   const bkW=r*0.18;
-  const beakCol=hslToHex(boid.hue, boid.sat*100, 56);
+  const beakCol=_drawHex(boid,56);
   g.beginFill(beakCol, baseAlpha);
   g.moveTo(bkBx+px*bkW, bkBy+py*bkW);
   g.quadraticCurveTo(bkCpx+px*bkW*0.2, bkCpy+py*bkW*0.2, bkTx, bkTy);
@@ -2616,6 +2646,10 @@ SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
     if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
   }
 }
+SHOW_COLOR        = ${SHOW_COLOR};
+{ const btn=document.getElementById('colorBtn'),knob=document.getElementById('colorKnob'),lbl=document.getElementById('colorLabel');
+  if(SHOW_COLOR){ if(btn) btn.style.background='#fd79a8'; if(knob) knob.style.left='25px'; if(lbl){lbl.textContent='on';lbl.style.color='#fd79a8';} }
+  else { if(btn) btn.style.background='#555'; if(knob) knob.style.left='3px'; if(lbl){lbl.textContent='off';lbl.style.color='#555';} } }
 SHOW_DETAILS      = ${SHOW_DETAILS};
 // Sync details button visual
 {
