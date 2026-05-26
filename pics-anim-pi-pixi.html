@@ -1289,6 +1289,7 @@ if(boid.age>=boid.maxLifespan || Math.random()<hazardRate(boid,scale)*dt) boid.d
 
 function killBoid(boid){
 boid.alive=false;
+spawnDeathSplash(boid.x,boid.y,boid.hue,boid.sat);
 if(boid.diseased){ rHistory.push(boid.infectCount); if(rHistory.length>30) rHistory.shift(); }
 deathEvents.push(simClock);
 if(boid.partnerId!==null){
