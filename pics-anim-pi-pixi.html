@@ -2031,7 +2031,7 @@ const spr=_getBodySprite(_spriteCount++);
 spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=boid._drawAngle;
-spr.tint=_drawHex(boid,50);
+spr.tint=SHOW_COLOR ? _drawHex(boid,85) : 0xffffff;
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
 
