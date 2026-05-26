@@ -1971,7 +1971,7 @@ const r = boid.isSingle ? RADIUS*0.7 : RADIUS;
 const baseAlpha = alpha * (fertile ? 1.0 : 0.55);
 
 // glow — three concentric circles approximate radial gradient
-if(isBonded||fertile){
+if(SHOW_DETAILS && (isBonded||fertile)){
   const glowR=RADIUS*2.0;
   const glowCol = isBonded ? 0xffcc44 : boidHex(boid);
   g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
@@ -2071,8 +2071,8 @@ g.drawCircle(erx-er*0.3,ery-er*0.3,er*0.38);
 g.endFill();
 }
 
-// disease spot — always clearly visible (ignores fertility dimming)
-if(boid.diseased){
+// disease spot
+if(SHOW_DETAILS && boid.diseased){
   g.beginFill(0xffffff, alpha*0.95);
   g.drawCircle(boid.x,boid.y,r*0.28);
   g.endFill();
