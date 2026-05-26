@@ -2056,6 +2056,7 @@ if(SHOW_DETAILS && boid.sex==='M'){
 }
 
 // eyes at ≈55% of nose distance — wide middle-front region of the body
+if(SHOW_DETAILS){
 const er=r*(0.15+(boid.eyeGene/255)*0.4);
 const eyeSpread=r*0.35+er*0.4;
 const eyeFwd=noseEdge*0.55;                           // ≈1.35r ahead
@@ -2068,6 +2069,7 @@ g.beginFill(0xffffff, baseAlpha*0.70);
 g.drawCircle(elx-er*0.3,ely-er*0.3,er*0.38);
 g.drawCircle(erx-er*0.3,ery-er*0.3,er*0.38);
 g.endFill();
+}
 
 // disease spot — always clearly visible (ignores fertility dimming)
 if(boid.diseased){
