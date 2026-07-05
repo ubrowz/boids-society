@@ -231,6 +231,11 @@ display:flex; align-items:center; justify-content:center;
 <span class="ctrl-val" id="sensingVal">130</span>
 </div>
 <div class="ctrl-row">
+<label>depth</label>
+<input type="range" id="depthSlider" min="0" max="600" value="0" step="25">
+<span class="ctrl-val" id="depthVal">off</span>
+</div>
+<div class="ctrl-row">
 <label>singles</label>
 <input type="range" id="singleSlider" min="0" max="80" value="20" step="5">
 <span class="ctrl-val" id="singleVal">20%</span>
@@ -319,6 +324,18 @@ width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>upright</label>
+<button id="uprightBtn" title="Keep the body image upright instead of rotating with the movement direction" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="uprightKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="uprightLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
 </div>
 <div class="ctrl-col">
@@ -627,6 +644,24 @@ if(SHOW_DETAILS){
 }
 });
 
+// ── upright toggle (body image keeps fixed orientation instead of rotating) ──
+// Only affects the body sprite; tail, beak and eyes still follow the heading,
+// so with a photo body it's best combined with details off.
+let UPRIGHT_SPRITE = false;
+const uprightBtn   = document.getElementById('uprightBtn');
+const uprightKnob  = document.getElementById('uprightKnob');
+const uprightLabel = document.getElementById('uprightLabel');
+uprightBtn.addEventListener('click', () => {
+UPRIGHT_SPRITE = !UPRIGHT_SPRITE;
+if(UPRIGHT_SPRITE){
+  uprightBtn.style.background='#ffb142'; uprightKnob.style.left='25px';
+  uprightLabel.textContent='on'; uprightLabel.style.color='#ffb142';
+} else {
+  uprightBtn.style.background='#555'; uprightKnob.style.left='3px';
+  uprightLabel.textContent='off'; uprightLabel.style.color='#555';
+}
+});
+
 // ── bond-lines toggle ─────────────────────────────────────────────────────────
 let SHOW_BOND_LINES = true;
 const bondLinesBtn   = document.getElementById('bondLinesBtn');
@@ -721,6 +756,7 @@ TURN_SPEED=TURN_SPEED_BASE*(SPEED/SPEED_MAX);
 WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
 });
 wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v; });
+wire('depthSlider', 'depthVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ DEPTH=v; });
 wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
 wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
 wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
@@ -804,6 +840,20 @@ let TURN_SPEED = TURN_SPEED_BASE * (SPEED / SPEED_MAX);
 let WANDER_STR = WANDER_STR_BASE * (SPEED / SPEED_MAX);
 const WALL_MARGIN = 80;
 const BOND_DIST = 90;
+// ── depth (2.5D) ──────────────────────────────────────────────────────────────
+// z ∈ [0, DEPTH]: 0 = nearest, DEPTH = farthest. The legacy 2D plane (scale 1)
+// sits at mid-depth z=DEPTH/2 — boids nearer than the midplane grow BEYOND
+// normal size (up to 2× at z=0 with DEPTH=600), farther ones shrink.
+// DEPTH=0 → pure 2D (every dz below is 0, every scale is 1 — exact legacy).
+// z affects hard collisions (bonding, disease, separation) and rendering only;
+// xy steering (nearness, cohesion, walls) stays 2D so flock dynamics don't
+// need retuning when depth changes. Predators ignore z entirely in v1.
+let DEPTH = parseInt(document.getElementById('depthSlider').value);
+const Z_FOCAL = 600;        // perspective focal length: scale = Z_FOCAL/(Z_FOCAL+z-DEPTH/2)
+const Z_SPEED_FRAC = 0.35;  // max |vz| as fraction of SPEED — depth drift slower than planar flight
+const Z_MARGIN = 60;        // soft-repulsion band at the near/far depth walls
+// denominator stays ≥ Z_FOCAL-DEPTH/2 = 300 at the slider max of 600 — never 0
+function zScaleOf(o){ return DEPTH>0 ? Z_FOCAL/(Z_FOCAL+(o.z||0)-DEPTH/2) : 1; }
 const BOND_STRENGTH = 3.0;
 const COOLDOWN_FRAMES = 30;
 const FADE_DURATION = 2.0;
@@ -1022,10 +1072,10 @@ while(predators.filter(p=>p.alive).length < N_PREDATORS) predators.push(makePred
 const alive=predators.filter(p=>p.alive);
 while(alive.length > N_PREDATORS){ alive[alive.length-1].alive=false; alive.pop(); }
 }
-function spawnDeathSplash(x,y,hue,sat){
+function spawnDeathSplash(x,y,hue,sat,scale=1){
 const s=Math.round(sat*100);
 deathSplashes.push({
-x, y, age:0, duration:0.85, hue, s,
+x, y, age:0, duration:0.85, hue, s, scale,
 particles: Array.from({length:12},()=>{
 const ang=Math.random()*Math.PI*2;
 return {cx:Math.cos(ang),cy:Math.sin(ang),spd:80+Math.random()*200,r:6+Math.random()*10};
@@ -1063,6 +1113,8 @@ return {
 id:nextId++, x: x!==undefined?x:RADIUS+Math.random()*(canvas.width-RADIUS*2),
 y: y!==undefined?y:RADIUS+Math.random()*(canvas.height-RADIUS*2),
 vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED, _sa:angle, _drawAngle:angle,
+// children are born at their parents' depth; everyone else at a random depth
+z:(parentA!==undefined&&parentB!==undefined)?(parentA.z+parentB.z)/2:Math.random()*DEPTH, vz:0,
 hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
 age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
 partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
@@ -1183,6 +1235,28 @@ const cx=boid.x+nx*30, cy=boid.y+ny*30;
 steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*20,1);
 }
 
+// ── z (depth) motion ─────────────────────────────────────────────────────────
+// z is independent of the xy heading: a slow 1D random walk with soft bounds
+// at z=0 (near) and z=DEPTH (far), plus gentle convergence toward the
+// partner's z so bonded pairs can actually collide (bonding needs 3D
+// proximity once DEPTH>0). DEPTH=0 pins everything to z=0 (pure 2D).
+function updateZ(boid){
+if(DEPTH<=0){ boid.z=0; boid.vz=0; return; }
+const vmax=SPEED*Z_SPEED_FRAC;
+boid.vz+=(Math.random()-0.5)*vmax*0.25;
+if(boid.partnerId!==null){
+  const p=boidMap.get(boid.partnerId);
+  if(p&&p.alive) boid.vz+=(p.z-boid.z)*0.01;
+}
+const m=Math.min(Z_MARGIN,DEPTH/2);
+if(boid.z<m)       boid.vz+=(m-boid.z)/m*vmax*0.08;
+if(boid.z>DEPTH-m) boid.vz-=(boid.z-(DEPTH-m))/m*vmax*0.08;
+boid.vz=Math.max(-vmax,Math.min(vmax,boid.vz));
+boid.z+=boid.vz;
+if(boid.z<0){ boid.z=0; boid.vz=Math.abs(boid.vz); }
+if(boid.z>DEPTH){ boid.z=DEPTH; boid.vz=-Math.abs(boid.vz); }
+}
+
 function nearnessBehavior(boid){
 const thresholdScale = 1.0+(BOND_THRESHOLD-1)*0.24;
 
@@ -1279,8 +1353,9 @@ let fx=0, fy=0;
 const cw=canvas.width, ch=canvas.height;
 for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
   if(!nb.alive || nb===boid) continue;
-  const dx=boid.x-nb.x, dy=boid.y-nb.y;
-  const d2=dx*dx+dy*dy;
+  // 3D distance: boids at different depths pass over each other without pushing
+  const dx=boid.x-nb.x, dy=boid.y-nb.y, dz=boid.z-nb.z;
+  const d2=dx*dx+dy*dy+dz*dz;
   if(d2<_SEP_D2){
     const d=d2>0.25?Math.sqrt(d2):0.5;
     const wt=(_SEP_D-d)/_SEP_D; // weight: 1 at same pos, 0 at edge
@@ -1289,6 +1364,7 @@ for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
     const push=(_SEP_D-d)*0.08;
     boid.x+=dx/d*push;
     boid.y+=dy/d*push;
+    boid.z+=dz/d*push; // z-push: resolves stacks aligned along the depth axis (dz=0 in 2D mode — no-op)
   }
 }
 if(fx!==0||fy!==0){
@@ -1297,6 +1373,7 @@ if(fx!==0||fy!==0){
 }
 boid.x=Math.max(RADIUS,Math.min(cw-RADIUS,boid.x));
 boid.y=Math.max(RADIUS,Math.min(ch-RADIUS,boid.y));
+boid.z=Math.max(0,Math.min(DEPTH,boid.z));
 }
 
 // ── lifespan feedback ─────────────────────────────────────────────────────────
@@ -1330,7 +1407,7 @@ if(boid.age>=boid.maxLifespan || Math.random()<hazardRate(boid,scale)*dt) boid.d
 
 function killBoid(boid){
 boid.alive=false;
-spawnDeathSplash(boid.x,boid.y,boid.hue,boid.sat);
+spawnDeathSplash(boid.x,boid.y,boid.hue,boid.sat,zScaleOf(boid));
 if(boid.diseased){ rHistory.push(boid.infectCount); if(rHistory.length>30) rHistory.shift(); }
 deathEvents.push(simClock);
 if(boid.partnerId!==null){
@@ -1387,7 +1464,8 @@ birthEvents.push(simClock);
 const mx=(boid.x+partner.x)/2+(Math.random()-0.5)*20;
 const my=(boid.y+partner.y)/2+(Math.random()-0.5)*20;
 const childColor=inheritColor(boid,partner);
-birthRings.push({x:mx,y:my,hue:childColor.hue,sat:childColor.sat,age:0,duration:1.2});
+birthRings.push({x:mx,y:my,hue:childColor.hue,sat:childColor.sat,age:0,duration:1.2,
+scale:(zScaleOf(boid)+zScaleOf(partner))/2});
 const child=makeBoid(mx,my,childColor,true,boid,partner);
 toSpawn.push(child);
 }
@@ -1420,8 +1498,8 @@ for(const b of _sgNeighbors(a.x,a.y,RADIUS*2)){
 if(b.id<=a.id||!b.alive||b.dying) continue;
 const c=getCool(a.id,b.id);
 if(c>0){setCool(a.id,b.id,c-1);continue;}
-const dx=b.x-a.x,dy=b.y-a.y;
-if(dx*dx+dy*dy>=r2) continue;
+const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+if(dx*dx+dy*dy+dz*dz>=r2) continue;
 if(a.partnerId!==null||b.partnerId!==null) continue;
 if(a.isSingle||b.isSingle) continue;
 if(a.isGay!==b.isGay) continue; // gay only bonds with gay, straight with straight
@@ -1535,8 +1613,8 @@ if(!aD&&!bD) continue;
 if(aD&&bD) continue;
 const infected=aD?a:b, healthy=aD?b:a;
 if(healthy.immune) continue;
-const dx=b.x-a.x, dy=b.y-a.y;
-if(dx*dx+dy*dy>=r2) continue;
+const dx=b.x-a.x, dy=b.y-a.y, dz=b.z-a.z;
+if(dx*dx+dy*dy+dz*dz>=r2) continue;
 const k=pairKey(infected.id,healthy.id);
 if((diseaseCooldown.get(k)||0)>simClock) continue;
 diseaseCooldown.set(k,simClock+DISEASE_COOLDOWN);
@@ -1737,7 +1815,7 @@ const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b
 if(edible){
 // eat it
 b.alive=false;
-spawnDeathSplash(b.x,b.y,b.hue,b.sat);
+spawnDeathSplash(b.x,b.y,b.hue,b.sat,zScaleOf(b));
 pred.lastEaten=simClock;
 pred.lockedBoidId=null; // meal complete — lock released
 break;
@@ -1805,7 +1883,7 @@ if(pred.trail.length>=2){
 const spr=_getPredSprite(_predSpriteCount++);
 spr.visible=true;
 spr.x=bx; spr.y=by;
-spr.rotation=pred._drawAngle;
+spr.rotation=UPRIGHT_SPRITE ? 0 : pred._drawAngle;
 spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
 spr.alpha=0.92;
 spr.scale.set(r/_bodyScale); // scale: r/_bodyScale; adjust _bodyScale if body looks too big/small
@@ -1857,24 +1935,25 @@ for(const s of deathSplashes){
 const t=s.age/s.duration;
 const alpha=1-t;
 const h=s.hue, sat=s.s;
+const sc=s.scale||1; // depth scale captured at death — far deaths splash smaller
 // outer ring (stroke only — no fill)
-g.lineStyle(12*(1-t), hslToHex(h,sat,38), alpha*0.8);
-g.drawCircle(s.x,s.y,t*220);
+g.lineStyle(12*(1-t)*sc, hslToHex(h,sat,38), alpha*0.8);
+g.drawCircle(s.x,s.y,t*220*sc);
 // second ring
-g.lineStyle(6*(1-t), hslToHex(h,sat,58), alpha*0.6);
-g.drawCircle(s.x,s.y,t*140);
+g.lineStyle(6*(1-t)*sc, hslToHex(h,sat,58), alpha*0.6);
+g.drawCircle(s.x,s.y,t*140*sc);
 g.lineStyle(0);
 // inner flash
 if(t<0.4){
   const ft=t/0.4;
   g.beginFill(hslToHex(h,sat,75),(1-ft)*0.8);
-  g.drawCircle(s.x,s.y,(1-ft)*84);
+  g.drawCircle(s.x,s.y,(1-ft)*84*sc);
   g.endFill();
 }
 // particles
 const pCol=hslToHex(h,sat,45);
 for(const p of s.particles){
-  const bx=s.x+p.cx*p.spd*t, by=s.y+p.cy*p.spd*t, pr=p.r*(1-t*0.3);
+  const bx=s.x+p.cx*p.spd*t*sc, by=s.y+p.cy*p.spd*t*sc, pr=p.r*(1-t*0.3)*sc;
   g.beginFill(pCol, alpha*0.9);
   g.drawCircle(bx,by,pr);
   g.endFill();
@@ -1913,7 +1992,7 @@ else {
   if(dh>180)dh-=360; else if(dh<-180)dh+=360;
   color=hslToHex((boid.hue+dh*0.5+360)%360,70,55); lw=6;
 }
-g.lineStyle(lw,color,alpha*0.75);
+g.lineStyle(lw*((zScaleOf(boid)+zScaleOf(partner))/2),color,alpha*0.75);
 g.moveTo(boid.x,boid.y); g.lineTo(partner.x,partner.y);
 }
 g.lineStyle(0);
@@ -1930,9 +2009,10 @@ if(boid.dying)        bAlpha=1-(boid.fadeTimer/FADE_DURATION);
 bAlpha=Math.max(0,bAlpha);
 const n=boid.trail.length;
 const col=_drawHex(boid,50);
+const zsc=zScaleOf(boid); // trail width tracks the boid's current depth
 for(let i=1;i<n;i++){
   const t=Math.pow(i/(n-1),0.5);
-  g.lineStyle(t*7+0.8, col, t*0.85*bAlpha*TRAIL_OPACITY);
+  g.lineStyle((t*7+0.8)*zsc, col, t*0.85*bAlpha*TRAIL_OPACITY);
   g.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
   g.lineTo(boid.trail[i].x,  boid.trail[i].y);
 }
@@ -1946,27 +2026,28 @@ for(const ring of birthRings){
 const t = ring.age / ring.duration;
 if(t >= 1) continue;
 const col = hslToHex(ring.hue, Math.round(ring.sat*100), 50);
+const sc = ring.scale || 1; // depth scale at birth — far births flash smaller
 
 // soft bloom — large filled circle, fades fast
 const tBloom = Math.min(t * 3, 1);
 const bloomA = Math.pow(1 - tBloom, 1.8) * 0.35;
 if(bloomA > 0.01){
   g.beginFill(col, bloomA);
-  g.drawCircle(ring.x, ring.y, tBloom * 110);
+  g.drawCircle(ring.x, ring.y, tBloom * 110 * sc);
   g.endFill();
 }
 
 // outer ring — slow, thick (stroke only)
-const r1 = t * 150;
+const r1 = t * 150 * sc;
 const a1 = Math.pow(1 - t, 1.2) * 0.95;
-g.lineStyle((1 - t) * 9 + 1, col, a1);
+g.lineStyle(((1 - t) * 9 + 1) * sc, col, a1);
 g.drawCircle(ring.x, ring.y, r1);
 
 // inner ring — faster, tighter
 const t2 = Math.min(t * 2, 1);
-const r2 = t2 * 80;
+const r2 = t2 * 80 * sc;
 const a2 = Math.pow(1 - t2, 1.0);
-g.lineStyle((1 - t2) * 6 + 1, col, a2);
+g.lineStyle(((1 - t2) * 6 + 1) * sc, col, a2);
 g.drawCircle(ring.x, ring.y, r2);
 g.lineStyle(0);
 
@@ -1975,7 +2056,7 @@ if(t < 0.25){
   const tf = t / 0.25;
   const flashA = Math.pow(1 - tf, 0.8);
   g.beginFill(col, flashA);
-  g.drawCircle(ring.x, ring.y, tf * 28);
+  g.drawCircle(ring.x, ring.y, tf * 28 * sc);
   g.endFill();
 }
 }
@@ -2009,12 +2090,15 @@ if(alpha<=0) return;
 
 const isBonded = boid.partnerId!==null;
 const fertile = isFertile(boid);
-const r = boid.isSingle ? RADIUS*0.7 : RADIUS;
-const baseAlpha = alpha * (fertile ? 1.0 : 0.55);
+// perspective: zs=1 at z=0 (near) shrinking with depth; everything below is
+// drawn from r, so scaling r scales body, tail, eyes, beak and glow together
+const zs = zScaleOf(boid);
+const r = (boid.isSingle ? RADIUS*0.7 : RADIUS) * zs;
+const baseAlpha = alpha * (fertile ? 1.0 : 0.55) * Math.min(1, 0.45+0.55*zs); // dim beyond the midplane only
 
 // glow — three concentric circles approximate radial gradient
 if(SHOW_DETAILS && (isBonded||fertile)){
-  const glowR=RADIUS*2.0;
+  const glowR=RADIUS*2.0*zs;
   const glowCol = isBonded ? 0xffcc44 : _drawHex(boid,50);
   g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
   g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
@@ -2041,7 +2125,7 @@ const px=-sin, py=cos; // perpendicular (left)
 const spr=_getBodySprite(_spriteCount++);
 spr.visible=true;
 spr.x=bx; spr.y=by;
-spr.rotation=boid._drawAngle;
+spr.rotation=UPRIGHT_SPRITE ? 0 : boid._drawAngle;
 spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
@@ -2125,8 +2209,8 @@ if(SHOW_DETAILS && boid.diseased){
 if(boid.birthTimer>0){
   const bt=boid.birthTimer/BIRTH_DURATION;
   const ringCol = boid.immigrantGeneration===0 ? 0xffffff : boidHex(boid);
-  g.lineStyle(bt*8, ringCol, bt*bt*0.9);
-  g.drawCircle(boid.x,boid.y,RADIUS*(1+(1-bt)*4));
+  g.lineStyle(bt*8*zs, ringCol, bt*bt*0.9);
+  g.drawCircle(boid.x,boid.y,RADIUS*zs*(1+(1-bt)*4));
   g.lineStyle(0);
 }
 }
@@ -2519,7 +2603,7 @@ updateLifespan(boid,dt);
 if(!boid.alive) continue;
 updateBreeding(boid,dt);
 if(!boid.dying){
-avoidWalls(boid); wander(boid); nearnessBehavior(boid); bondAttraction(boid);
+avoidWalls(boid); wander(boid); updateZ(boid); nearnessBehavior(boid); bondAttraction(boid);
 if(NO_OVERLAP) separateBoid(boid);
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
 // only actually rotate toward it by at most TURN_SPEED×6 per frame, preventing
@@ -2585,6 +2669,8 @@ _gfx.boids.clear();     // boid Graphics overlay: glow, eyes, beak, disease, bir
 // build set of boid IDs currently locked by a predator (for white tail fin)
 _lockedBoidIds.clear();
 if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==null) _lockedBoidIds.add(p.lockedBoidId);
+// painter's order: with depth on, draw far boids first so near ones cover them
+if(DEPTH>0) boids.sort((a,b)=>b.z-a.z);
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
@@ -2635,6 +2721,16 @@ if(NO_OVERLAP){
   if(btn)  btn.style.background='#54a0ff';
   if(knob) knob.style.left='25px';
   if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
+}
+UPRIGHT_SPRITE    = ${UPRIGHT_SPRITE};
+// Sync the upright button visual to match the exported UPRIGHT_SPRITE state
+if(UPRIGHT_SPRITE){
+  const btn=document.getElementById('uprightBtn');
+  const knob=document.getElementById('uprightKnob');
+  const lbl=document.getElementById('uprightLabel');
+  if(btn)  btn.style.background='#ffb142';
+  if(knob) knob.style.left='25px';
+  if(lbl){ lbl.textContent='on'; lbl.style.color='#ffb142'; }
 }
 SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
 // Sync the bond-lines button visual to match the exported SHOW_BOND_LINES state
@@ -2692,6 +2788,7 @@ resize = function(){
   if(app) app.renderer.resize(canvas.width, canvas.height);
 };
 SENSING_RADIUS = ${SENSING_RADIUS};
+DEPTH          = ${DEPTH};
 _noseOffset    = ${_noseOffset};
 _bodyScale     = ${_bodyScale};
 ${_customBoidPNG ? `(function(){

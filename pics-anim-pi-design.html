@@ -146,6 +146,7 @@ tr:hover td { background:rgba(84,160,255,0.04); }
   <li><a href="#appearance">Boid Appearance</a></li>
   <li><a href="#lifecycle">Boid Lifecycle</a></li>
   <li><a href="#movement">Movement</a></li>
+  <li><a href="#depth">Depth (2.5D)</a></li>
   <li><a href="#singles">Singles</a></li>
   <li><a href="#orientation">Sexual Orientation</a></li>
   <li><a href="#bonding">Bonding</a></li>
@@ -186,6 +187,8 @@ tr:hover td { background:rgba(84,160,255,0.04); }
   <li><strong>Predators</strong> — autonomous hunters that preferentially eat wrong-family boids; rendered as white teardrop sprites identical in shape to boids</li>
   <li><strong>Details toggle</strong> — hides beak, forked tail, eyes, aura glow, disease dot and motion trails with one button; birth rings and death splashes always show</li>
   <li><strong>Colour toggle</strong> — switches all boid rendering to greyscale tones; colour wheels, rings and splashes are unaffected</li>
+  <li><strong>Depth (2.5D)</strong> — an optional user-defined depth range: boids drift in z, near boids render larger than far ones, and hard collisions become 3D (see <a href="#depth">Depth</a>)</li>
+  <li><strong>Upright toggle</strong> — pins the body sprite to its original orientation instead of rotating with the movement direction (for photo bodies)</li>
   <li><strong>Export</strong> button — generates a standalone full-screen HTML with no UI, auto-start, auto-disease</li>
 </ul>
 <p>Target framerate is 30 fps (capped; simulation time is dt-based so it runs correctly at any framerate). All logic runs in a single self-contained HTML file with no external dependencies.</p>
@@ -246,6 +249,26 @@ spread     = ±0.55r sideways at the tips</code></pre>
   <li><strong>Bond attraction</strong> — bonded partners stay within 45 px of each other</li>
 </ol>
 <p>Speed is user-controlled via a slider (1–10, mapped to 0.45–4.5 px/frame).</p>
+
+<!-- ───────────────────────────── DEPTH ──────────────────────────────────── -->
+<h2 id="depth">Depth (2.5D)</h2>
+<p>The <strong>depth</strong> slider (0–600, default 0 = off) gives the aquarium a third dimension without abandoning the 2D architecture. Each boid carries a <code>z</code> coordinate in <code>[0, DEPTH]</code> (0 = nearest to the viewer) and a z-velocity <code>vz</code>. At depth 0 every <code>dz</code> is zero and every scale factor is 1, so the simulation is bit-for-bit the original 2D behaviour.</p>
+
+<h3>z-motion</h3>
+<p>The xy steering model (heading angle + constant speed) is untouched. Depth motion is an <em>independent</em> 1D random walk per boid (<code>updateZ</code>): <code>vz</code> is jittered each frame, capped at 35% of the planar speed so depth reads as drift, with soft repulsion inside a 60&nbsp;px band at the near/far walls and a hard clamp at the boundaries. Bonded boids additionally converge gently toward their partner's z so pairs can actually meet in 3D. New boids spawn at a random depth; children are born at their parents' mean depth.</p>
+
+<h3>Perspective rendering</h3>
+<p>The legacy 2D plane sits at <strong>mid-depth</strong>: <code>scale = Z_FOCAL / (Z_FOCAL + z − DEPTH/2)</code> with <code>Z_FOCAL = 600</code>. A boid at <code>z = DEPTH/2</code> renders at exactly legacy size; nearer boids grow beyond it (up to 2× at z=0 with depth 600) and farther ones shrink (down to 0.67×). Because the body sprite, tail fin, beak, eyes and glow all derive their geometry from the boid radius <code>r</code>, scaling <code>r</code> by this factor scales everything coherently. Trails and bond lines thin with distance, death splashes and birth rings capture the depth scale at spawn time, and boids beyond the midplane dim slightly (alpha × <code>min(1, 0.45 + 0.55·scale)</code>). Draw order is painter's: the boid array is z-sorted (far first) each frame before drawing, so near boids cover far ones.</p>
+
+<h3>Simulation semantics</h3>
+<p>Depth affects <em>hard collisions only</em>: bonding hits, disease transmission and no-overlap separation all use 3D distance (<code>dx² + dy² + dz²</code>), so boids at different depths pass over each other on screen without interacting. xy steering — nearness/cohesion, pressure sensing, wall avoidance — deliberately stays 2D so the population feedback loops don't need retuning when depth changes. The 2D spatial grid is kept as broad phase; the z check happens in the narrow-phase distance test. In no-overlap mode the position nudge acts in all three axes (the z-push resolves stacks aligned along the depth axis; in 2D mode it is a mathematical no-op).</p>
+
+<h3>Known trade-offs (v1)</h3>
+<ul>
+  <li><strong>Encounter dilution</strong> — depth dilutes density, so bonding (and disease spread) is measurably slower at high depth: the volume grows but interaction radii stay constant. At depth 600 expect a visibly slower ecosystem; depth 200–400 is a good balance.</li>
+  <li><strong>Predators ignore z entirely</strong> — they hunt, chase and eat in 2D, so a full-size predator can catch a visually small far boid. Predator z-chase is the natural v2 item.</li>
+  <li><strong>Layer artefacts</strong> — tail fins live in a Graphics layer below all sprites, so a near boid's tail can briefly hide behind a far boid's body during screen overlaps.</li>
+</ul>
 
 <!-- ───────────────────────────── SINGLES ────────────────────────────────── -->
 <h2 id="singles">Singles</h2>
@@ -760,6 +783,7 @@ PREDATOR_RADIUS = RADIUS * 0.7 = 14    // same size as a single boid</code></pre
 <tr><td>Prey</td><td>1–3 (step 1)</td><td>3 (other)</td><td>Predator diet: 1 = any boid; 2 = favored (eats preferred-family boids, works against the colour cycle); 3 = other (eats non-preferred-family boids, reinforces the colour cycle)</td></tr>
 <tr><td>Hunt</td><td>toggle (bump / lock)</td><td>bump</td><td><strong>bump</strong>: predator re-targets the nearest edible boid every frame. <strong>lock</strong>: on becoming hungry the predator picks a random edible boid in range and commits to chasing only that boid (shown with a white tail fin) until it is eaten; bystanders are ignored. Lock releases on eating or when full.</td></tr>
 <tr><td>Sensing radius</td><td>30–300 px</td><td>130 px</td><td>How far boids can sense neighbours for pressure, cohesion, collision, and disease. Smaller values reduce CPU load (smaller spatial grid queries); larger values give a more globally-aware flock. Exported (baked into boot script).</td></tr>
+<tr><td>Depth</td><td>0–600 (0 = off)</td><td>off</td><td>Depth of the 2.5D z-range (see <a href="#depth">Depth</a>). At 0 the simulation is exactly the legacy 2D behaviour. Can be changed live — boids drift into the new range. Exported (baked into boot script).</td></tr>
 <tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales core trail alpha for both boids and predators</td></tr>
 <tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
 <tr><td>Background</td><td>colour picker</td><td>#081828</td><td>Canvas background colour — flat fill applied every frame. Exported. Any colour is valid; dark colours work best with the existing trail glow and boid shading. Setting to pure black (<code>#000000</code>) is recommended for LED panel use — off pixels generate no PWM activity, reducing GPIO timing jitter and flicker.</td></tr>
@@ -768,13 +792,14 @@ PREDATOR_RADIUS = RADIUS * 0.7 = 14    // same size as a single boid</code></pre
 <tr><td>Details</td><td>toggle (on/off)</td><td>on</td><td>Show or hide the detail layer: beak (male), forked tail fin, eyes, aura glow (bonded/fertile), disease dot, and motion trails. Birth rings and death splashes are always shown regardless. Turning off substantially reduces overdraw and GPU draw calls. Exported.</td></tr>
 <tr><td>Colour</td><td>toggle (on/off)</td><td>on</td><td>Switch boid rendering between colour mode and greyscale. In greyscale mode the sprite tint is set to <code>0xffffff</code> (no hue shift) so the PNG's own grey shading is preserved at full brightness. Tail fins, beaks and glow effects also render in greyscale. Birth rings, death splashes, and the colour cycle/wheel are unaffected. Exported.</td></tr>
 <tr><td>Tint L</td><td>50–100%</td><td>85%</td><td>Lightness of the sprite tint in colour mode: <code>hsl(hue, sat×100%, SPRITE_L)</code>. At L = 50% the tint is fully saturated but dark; at L = 100% it is white (no tint). The default 85% gives bright highlights while retaining hue. Only applies when colour mode is on. Exported.</td></tr>
+<tr><td>Upright</td><td>toggle (off/on)</td><td>off</td><td>When on, the body sprite is drawn at fixed rotation 0 (the PNG's own orientation) instead of rotating with the movement direction — for both boids and predators. The drawn details (tail fin, beak, eyes) still follow the heading, so with a photo body this pairs naturally with details off. Simulation and steering are unaffected. Exported.</td></tr>
 <tr><td>Body image — shape</td><td>file picker + label</td><td>default (teardrop-v3.png)</td><td>Load a PNG to replace the body sprite texture for both boids and predators. The PNG is read as a data URL and swapped live via <code>_swapBodyTexture()</code>; all pooled sprites are updated immediately. The data URL is embedded in exported files so the custom image persists.</td></tr>
 <tr><td>Body image — nose px</td><td>number (1–500)</td><td>32</td><td>Pixels from the image centre to the nose tip in the source PNG. Used to compute <code>noseEdge</code> for beak placement, eye placement, and eating-collision geometry: <code>noseEdge = r × (nosePx / bodyScale)</code>.</td></tr>
 <tr><td>Body image — body scale</td><td>number (0.5–200)</td><td>13</td><td>Sprite scale divisor: <code>sprite.scale = r / bodyScale</code>. Increase to shrink the sprite relative to the boid radius; decrease to enlarge it. Default 13 is calibrated for teardrop-v3.png at RADIUS = 20.</td></tr>
 <tr><td>Pyramid refresh</td><td>1–10 s</td><td>3 s</td><td>How often (in simulation seconds) the population pyramid is redrawn. Not exported.</td></tr>
 </tbody>
 </table>
-<p>Buttons: <strong>immigration toggle</strong>, <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>details toggle</strong> (shows/hides beak/tail/eyes/glow/disease dot/trails, default on), <strong>colour toggle</strong> (colour vs greyscale rendering, default on), <strong>hunt toggle</strong> (bump/lock hunting strategy, default bump), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
+<p>Buttons: <strong>immigration toggle</strong>, <strong>no overlap toggle</strong> (enables body-separation physics), <strong>bond lines toggle</strong> (shows/hides pair bond lines), <strong>details toggle</strong> (shows/hides beak/tail/eyes/glow/disease dot/trails, default on), <strong>colour toggle</strong> (colour vs greyscale rendering, default on), <strong>upright toggle</strong> (pins the body sprite orientation, default off), <strong>hunt toggle</strong> (bump/lock hunting strategy, default bump), <strong>body image load</strong> (file picker — replaces boid/predator sprite PNG live), <strong>infect</strong> (introduces one disease case), <strong>▶ / ▐▐ play/pause</strong>, <strong>⬇ export</strong>. Colour pickers: <strong>background</strong> (canvas fill colour, default <code>#081828</code>).</p>
 
 <!-- ───────────────────────────── POPULATION PYRAMID ─────────────────────── -->
 <h2 id="pyramid">Population Pyramid</h2>
