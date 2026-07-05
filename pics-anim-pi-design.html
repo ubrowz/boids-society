@@ -175,7 +175,7 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 <!-- ───────────────────────────── OVERVIEW ───────────────────────────────── -->
 <h2 id="overview">Overview</h2>
 <p>An animated browser-based population simulation built on the classic boids algorithm. Coloured boids wander autonomously inside a bounded aquarium. They can bond, breed, age and die. A multi-arm feedback loop attempts to maintain a stable population around a user-defined target.</p>
-<p>The rendering engine is <strong>PixiJS v7 (WebGL)</strong>, replacing the original Canvas 2D path. Boid and predator bodies are drawn as textured sprites (teardrop-v3.png, embedded as base64); trail lines, tail fins, beaks, and effects are drawn with <code>PIXI.Graphics</code>. This gives a large framerate gain on the Raspberry Pi 4, which benefits strongly from GPU-accelerated sprite batching.</p>
+<p>The rendering engine is <strong>PixiJS v7 (WebGL)</strong>, replacing the original Canvas 2D path. The PixiJS source (v7.4.2, ~450&nbsp;KB) is <strong>embedded inline</strong> in the HTML — no CDN fetch at load time — so the file and every export from it run fully offline (essential for a Pi without internet access). Boid and predator bodies are drawn as textured sprites (teardrop-v3.png, embedded as base64); trail lines, tail fins, beaks, and effects are drawn with <code>PIXI.Graphics</code>. This gives a large framerate gain on the Raspberry Pi 4, which benefits strongly from GPU-accelerated sprite batching.</p>
 <p>The visual layer extends the base simulation with:</p>
 <ul>
   <li><strong>Motion trails</strong> — single-pass core line behind every moving boid and predator</li>
