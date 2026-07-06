@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Boids Aquarium (PixiJS)</title>
+<title>Boids Aquarium — dashboard</title>
 <script>/* PixiJS v7.4.2 — embedded inline so the file (and its exports) run fully offline */
 /*!
  * pixi.js - v7.4.2
@@ -1116,173 +1116,125 @@ void main(void)\r
 </script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html, body { background:#ffffff; }
-body {
-display:flex; flex-direction:column;
-justify-content:center; align-items:center;
-min-height:100vh; overflow:hidden;
-font-family:'Courier New',monospace;
-gap:4px;
+:root{
+  --bg:#071523; --panel:#0c1f33; --panel2:#17334f; --inset:#0a1a2b;
+  --ink:#e3eef7; --muted:#7f97ac; --line:#1f3a55; --line2:#2a4a6a;
+  --accent:#00d2d3; --good:#0be881; --warn:#ffd32a; --bad:#ff6b6b;
 }
-canvas {
-display:block;
+html, body { background:var(--bg); }
+body{
+  min-height:100vh; overflow-y:auto;
+  color:var(--ink);
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
 }
-#controls { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
-#ctrl-cols { display:flex; flex-direction:row; align-items:flex-start; gap:12px; }
-.ctrl-col { display:flex; flex-direction:column; gap:8px; align-items:center; }
-.ctrl-row {
-display:flex; align-items:center; gap:6px;
-color:#000; font-size:10px; letter-spacing:0.5px;
-text-transform:uppercase; user-select:none;
-}
-.ctrl-row label { min-width:82px; text-align:right; }
-.ctrl-val { min-width:40px; text-align:left; font-size:10px; font-weight:700; color:#000; }
-input[type=range] {
--webkit-appearance:none; appearance:none;
-width:120px; height:3px; border-radius:2px;
-background:linear-gradient(to right,#1a3a5c,#54a0ff);
-outline:none; cursor:pointer;
-}
-input[type=range]::-webkit-slider-thumb {
--webkit-appearance:none; appearance:none;
-width:16px; height:16px; border-radius:50%;
-background:#54a0ff; box-shadow:0 0 6px rgba(84,160,255,0.8);
-cursor:pointer; border:2px solid #fff;
-}
-input[type=range]::-moz-range-thumb {
-width:16px; height:16px; border-radius:50%;
-background:#54a0ff; box-shadow:0 0 6px rgba(84,160,255,0.8);
-cursor:pointer; border:2px solid #fff;
-}
-#bondSlider { background:linear-gradient(to right,#2a1f00,#ffd32a); }
-#bondSlider::-webkit-slider-thumb { background:#ffd32a; box-shadow:0 0 8px rgba(255,211,42,0.8); }
-#bondSlider::-moz-range-thumb { background:#ffd32a; }
-#bondVal { color:#000; }
-#lifeSlider { background:linear-gradient(to right,#2a0a00,#ff6b6b); }
-#lifeSlider::-webkit-slider-thumb { background:#ff6b6b; box-shadow:0 0 8px rgba(255,107,107,0.8); }
-#lifeSlider::-moz-range-thumb { background:#ff6b6b; }
-#lifeVal { color:#000; }
-#childSlider { background:linear-gradient(to right,#002a10,#0be881); }
-#childSlider::-webkit-slider-thumb { background:#0be881; box-shadow:0 0 8px rgba(11,232,129,0.8); }
-#childSlider::-moz-range-thumb { background:#0be881; }
-#childVal { color:#000; }
-#targetSlider { background:linear-gradient(to right,#002a2a,#00d2d3); }
-#targetSlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
-#targetSlider::-moz-range-thumb { background:#00d2d3; }
-#targetVal { color:#000; }
-#speedSlider { background:linear-gradient(to right,#1a0a2a,#a29bfe); }
-#speedSlider::-webkit-slider-thumb { background:#a29bfe; box-shadow:0 0 8px rgba(162,155,254,0.8); }
-#speedSlider::-moz-range-thumb { background:#a29bfe; }
-#speedVal { color:#000; }
-#sensingSlider { background:linear-gradient(to right,#0a1a1a,#00b894); }
-#sensingSlider::-webkit-slider-thumb { background:#00b894; box-shadow:0 0 8px rgba(0,184,148,0.8); }
-#sensingSlider::-moz-range-thumb { background:#00b894; }
-#sensingVal { color:#000; }
-#singleSlider { background:linear-gradient(to right,#1a1a1a,#aaaaaa); }
-#singleSlider::-webkit-slider-thumb { background:#aaaaaa; box-shadow:0 0 8px rgba(180,180,180,0.8); }
-#singleSlider::-moz-range-thumb { background:#aaaaaa; }
-#singleVal { color:#000; }
-#familySlider { background:linear-gradient(to right,#1a0a2a,#fd79a8); }
-#familySlider::-webkit-slider-thumb { background:#fd79a8; box-shadow:0 0 8px rgba(253,121,168,0.8); }
-#familySlider::-moz-range-thumb { background:#fd79a8; }
-#familyVal { color:#000; }
-#divorceSlider { background:linear-gradient(to right,#1a0800,#e17055); }
-#divorceSlider::-webkit-slider-thumb { background:#e17055; box-shadow:0 0 8px rgba(225,112,85,0.8); }
-#divorceSlider::-moz-range-thumb { background:#e17055; }
-#divorceVal { color:#000; }
-#gaySlider { background:linear-gradient(to right,#1a002a,#a855f7); }
-#gaySlider::-webkit-slider-thumb { background:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.8); }
-#gaySlider::-moz-range-thumb { background:#a855f7; }
-#gayVal { color:#000; }
-#diseaseThreshSlider { background:linear-gradient(to right,#0a0a0a,#444); }
-#diseaseThreshSlider::-webkit-slider-thumb { background:#444; box-shadow:0 0 8px rgba(80,80,80,0.8); }
-#diseaseThreshSlider::-moz-range-thumb { background:#444; }
-#diseaseThreshVal { color:#000; }
-#diseaseDurSlider { background:linear-gradient(to right,#0a0a0a,#888); }
-#diseaseDurSlider::-webkit-slider-thumb { background:#888; box-shadow:0 0 8px rgba(140,140,140,0.8); }
-#diseaseDurSlider::-moz-range-thumb { background:#888; }
-#diseaseDurVal { color:#000; }
-#fatalitySlider { background:linear-gradient(to right,#1a0000,#c0392b); }
-#fatalitySlider::-webkit-slider-thumb { background:#c0392b; box-shadow:0 0 8px rgba(192,57,43,0.8); }
-#fatalitySlider::-moz-range-thumb { background:#c0392b; }
-#fatalityVal { color:#000; }
-#mutationSlider { background:linear-gradient(to right,#0a1a2a,#a855f7); }
-#mutationSlider::-webkit-slider-thumb { background:#a855f7; box-shadow:0 0 8px rgba(168,85,247,0.8); }
-#mutationSlider::-moz-range-thumb { background:#a855f7; }
-#mutationVal { color:#000; }
-#familyPullSlider { background:linear-gradient(to right,#0a1a0a,#0be881); }
-#familyPullSlider::-webkit-slider-thumb { background:#0be881; box-shadow:0 0 8px rgba(11,232,129,0.8); }
-#familyPullSlider::-moz-range-thumb { background:#0be881; }
-#familyPullVal { color:#000; }
-#predatorSlider { background:linear-gradient(to right,#0a0000,#cc0000); }
-#predatorSlider::-webkit-slider-thumb { background:#cc0000; box-shadow:0 0 8px rgba(200,0,0,0.8); }
-#predatorSlider::-moz-range-thumb { background:#cc0000; }
-#predatorVal { color:#000; }
-#fullDurSlider { background:linear-gradient(to right,#0a0000,#884400); }
-#fullDurSlider::-webkit-slider-thumb { background:#884400; box-shadow:0 0 8px rgba(136,68,0,0.8); }
-#fullDurSlider::-moz-range-thumb { background:#884400; }
-#fullDurVal { color:#000; }
-#predatorDietSlider { background:linear-gradient(to right,#0a0500,#ff7f00); }
-#predatorDietSlider::-webkit-slider-thumb { background:#ff7f00; box-shadow:0 0 8px rgba(255,127,0,0.8); }
-#predatorDietSlider::-moz-range-thumb { background:#ff7f00; }
-#predatorDietVal { color:#000; }
-#trailOpacitySlider { background:linear-gradient(to right,#0a0a1a,#00d2d3); }
-#trailOpacitySlider::-webkit-slider-thumb { background:#00d2d3; box-shadow:0 0 8px rgba(0,210,211,0.8); }
-#trailOpacitySlider::-moz-range-thumb { background:#00d2d3; }
-#trailOpacityVal { color:#000; }
-#trailLengthSlider { background:linear-gradient(to right,#0a0a1a,#48dbfb); }
-#trailLengthSlider::-webkit-slider-thumb { background:#48dbfb; box-shadow:0 0 8px rgba(72,219,251,0.8); }
-#trailLengthSlider::-moz-range-thumb { background:#48dbfb; }
-#trailLengthVal { color:#000; }
-#popCeilSlider { background:linear-gradient(to right,#0a0000,#e84393); }
-#popCeilSlider::-webkit-slider-thumb { background:#e84393; box-shadow:0 0 8px rgba(232,67,147,0.8); }
-#popCeilSlider::-moz-range-thumb { background:#e84393; }
-#popCeilVal { color:#000; }
-#spriteLSlider { background:linear-gradient(to right,#1a0a1a,#fd79a8); }
-#spriteLSlider::-webkit-slider-thumb { background:#fd79a8; box-shadow:0 0 8px rgba(253,121,168,0.8); }
-#spriteLSlider::-moz-range-thumb { background:#fd79a8; }
-#spriteLVal { color:#fd79a8; }
-#emigReturnSlider { background:linear-gradient(to right,#00120a,#26de81); }
-#emigReturnSlider::-webkit-slider-thumb { background:#26de81; box-shadow:0 0 8px rgba(38,222,129,0.8); }
-#emigReturnSlider::-moz-range-thumb { background:#26de81; }
-#emigReturnVal { color:#000; }
-.ctrl-divider {
-font-size:10px; letter-spacing:2px; color:#000;
-text-transform:uppercase; padding:2px 0 0 0; user-select:none;
-}
-.fb-wrap {
-display:flex; align-items:center; gap:8px;
-color:#000; font-size:10px; letter-spacing:1.2px; text-transform:uppercase;
-}
-.fb-bar { width:120px; height:5px; border-radius:3px; background:rgba(0,0,0,0.1); overflow:hidden; }
-.fb-fill { height:100%; width:50%; border-radius:3px; transition:width 0.35s ease; }
-#nearFill { background:linear-gradient(to right,#1a3a5c,#54a0ff); }
-#lifeFill { background:linear-gradient(to right,#2a0a00,#ff6b6b); }
-#statusBar {
-display:grid; grid-template-columns:150px 120px;
-font-size:11px; letter-spacing:1px; text-transform:uppercase;
-text-align:left;
-}
-#statusBar span { white-space:nowrap; color:#555; font-size:11px; }
-#statusBar span .val { color:#000; font-family:monospace; font-weight:700; }
-.hi { color:#c0392b !important; }
-.lo { color:#27ae60 !important; }
-.ok { color:#000 !important; }
-#playBtn {
-margin-top:2px; align-self:center;
-width:64px; height:64px; border-radius:50%;
-background:rgba(0,210,211,0.12);
-border:2px solid rgba(0,210,211,0.5);
-color:#00d2d3; font-size:26px; line-height:1;
-cursor:pointer; box-shadow:0 0 16px rgba(0,210,211,0.25);
-transition:background 0.2s, box-shadow 0.2s;
-display:flex; align-items:center; justify-content:center;
-}
-#playBtn:hover { background:rgba(0,210,211,0.22); box-shadow:0 0 28px rgba(0,210,211,0.45); }
-#playBtn.running { border-color:rgba(255,107,107,0.6); color:#ff6b6b; background:rgba(255,107,107,0.1); }
-#playBtn.running:hover { background:rgba(255,107,107,0.2); box-shadow:0 0 28px rgba(255,107,107,0.4); }
-#ui { display:flex; flex-direction:row; align-items:flex-start; gap:16px; }
-#rightCol { display:flex; flex-direction:column; align-items:flex-start; gap:7px; }
+/* Dashboard mode: the simulation lives in its own tab. Generated tank/standalone
+   documents inject !important overrides that flip these two and hide #ui. */
+canvas#c { display:none; }
+#fpsDisplay { display:none; }
+
+#ui{ max-width:1280px; margin:0 auto; padding:18px 22px 48px; }
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+#dbHead{ display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:4px 2px 14px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+#dbTitle h1{ font-size:21px; font-weight:700; letter-spacing:-0.01em; line-height:1.15; }
+#dbTitle span{ font:500 10px ui-monospace,Menlo,Consolas,monospace; color:var(--accent);
+  letter-spacing:0.16em; text-transform:uppercase; }
+#dbLink{ display:flex; align-items:center; gap:7px; margin-left:auto;
+  font:500 11px ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.05em; color:var(--muted); }
+#linkDot{ font-size:13px; line-height:1; color:#4a5b6b; }
+#dbActions{ display:flex; align-items:center; gap:10px; }
+#aquariumBtn{
+  padding:10px 18px; border-radius:8px; cursor:pointer;
+  font:600 13px system-ui,sans-serif; letter-spacing:0.02em;
+  color:#03282e; background:var(--accent); border:none;
+  box-shadow:0 0 18px rgba(0,210,211,0.30); }
+#aquariumBtn:hover{ filter:brightness(1.12); }
+#playBtn{
+  width:42px; height:42px; border-radius:50%; padding:0;
+  background:rgba(0,210,211,0.10); border:2px solid rgba(0,210,211,0.5);
+  color:var(--accent); font-size:15px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background 0.2s; }
+#playBtn:hover{ background:rgba(0,210,211,0.2); }
+#playBtn.running{ border-color:rgba(255,107,107,0.6); color:var(--bad); background:rgba(255,107,107,0.08); }
+#exportBtn{
+  width:42px; height:42px; border-radius:8px; font-size:16px; cursor:pointer;
+  background:rgba(11,232,129,0.10); border:2px solid rgba(11,232,129,0.45); color:var(--good); }
+#exportBtn:hover{ background:rgba(11,232,129,0.2); }
+
+/* ── panel columns (masonry-style: panels pack without holes) ───────────── */
+#dbGrid{ columns:258px; column-gap:14px; }
+.panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px;
+  padding:13px 14px 11px; break-inside:avoid; margin-bottom:14px; }
+.panel h2{ font:600 10px ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.16em;
+  text-transform:uppercase; color:var(--accent); margin-bottom:9px; }
+#statusPanel{ column-span:all; }
+
+/* ── control rows ───────────────────────────────────────────────────────── */
+.ctrl-row{ display:flex; align-items:center; gap:8px; padding:3px 0;
+  color:var(--muted); font-size:10.5px; letter-spacing:0.05em; text-transform:uppercase; user-select:none; }
+.ctrl-row label{ min-width:94px; text-align:left; }
+.ctrl-row input[type=range]{ flex:1; min-width:56px; width:auto; }
+.ctrl-val{ min-width:54px; text-align:right;
+  font:600 11px ui-monospace,Menlo,Consolas,monospace; color:var(--ink); font-variant-numeric:tabular-nums; }
+input[type=range]{
+  -webkit-appearance:none; appearance:none;
+  width:120px; height:4px; border-radius:2px;
+  background:var(--panel2); outline:none; cursor:pointer; }
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none;
+  width:14px; height:14px; border-radius:50%;
+  background:var(--accent); cursor:pointer; border:2px solid #05222e;
+  box-shadow:0 0 6px rgba(0,210,211,0.5); }
+input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border-radius:50%; background:var(--accent);
+  cursor:pointer; border:2px solid #05222e; box-shadow:0 0 6px rgba(0,210,211,0.5); }
+input[type=number]{
+  width:58px; background:var(--inset); color:var(--good);
+  border:1px solid var(--line2); border-radius:4px;
+  font:600 11px ui-monospace,Menlo,Consolas,monospace; padding:3px 6px; text-align:right; outline:none; }
+input[type=color]{ width:44px; height:24px; border:1px solid var(--line2); padding:1px;
+  cursor:pointer; border-radius:4px; background:var(--inset); outline:none; }
+.mini-btn{ font:600 10px ui-monospace,Menlo,Consolas,monospace; padding:4px 12px;
+  background:var(--inset); color:#54a0ff; border:1px solid rgba(84,160,255,0.4);
+  border-radius:4px; cursor:pointer; letter-spacing:0.06em; white-space:nowrap; text-transform:uppercase; }
+.mini-note{ font-size:9.5px; color:var(--muted); text-transform:none; letter-spacing:0; }
+
+/* ── status panel internals ─────────────────────────────────────────────── */
+#statusGrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(212px,1fr)); gap:12px 24px; align-items:start; }
+.stat-block{ display:flex; flex-direction:column; gap:7px; min-width:0; }
+.stat-cap{ font:600 9.5px ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.14em;
+  text-transform:uppercase; color:var(--muted); }
+#popRow{ display:flex; align-items:baseline; gap:9px; }
+#popSpan{ font:700 38px/1 ui-monospace,Menlo,Consolas,monospace; color:var(--ink); font-variant-numeric:tabular-nums; }
+#popUnit{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; }
+.kv{ display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.05em; }
+.kv .val{ font:600 12px ui-monospace,Menlo,Consolas,monospace; color:var(--ink); }
+.hi { color:var(--bad) !important; }
+.lo { color:var(--good) !important; }
+.ok { color:var(--ink) !important; }
+.fb-wrap{ display:flex; align-items:center; gap:8px;
+  font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); }
+.fb-wrap span{ min-width:56px; }
+.fb-bar{ flex:1; height:5px; border-radius:3px; background:var(--inset); overflow:hidden; }
+.fb-fill{ height:100%; width:50%; border-radius:3px; transition:width 0.35s ease; }
+#nearFill{ background:linear-gradient(to right,#1a3a5c,#54a0ff); }
+#lifeFill{ background:linear-gradient(to right,#2a0a00,#ff6b6b); }
+#readout{ display:grid; grid-template-columns:auto 1fr; gap:2px 12px;
+  font-size:10.5px; letter-spacing:0.05em; text-transform:uppercase; line-height:1.75; }
+#readout .rk{ color:var(--muted); }
+#readout span:not(.rk){ font:600 11px/1.75 ui-monospace,Menlo,Consolas,monospace; color:var(--ink); }
+#inbreedingWarn{ font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--bad); }
+#noTankHint{ font-size:11px; color:var(--muted); font-style:italic; }
+.vrow{ display:flex; align-items:center; gap:8px; font-size:11px;
+  text-transform:uppercase; letter-spacing:0.05em; }
+.vrow .vstate{ font-weight:700; min-width:96px; }
+.vrow .vdetail{ color:var(--muted); font-size:10px; text-transform:none; letter-spacing:0; }
+
+#pyramidPanel canvas{ display:block; border:1px solid var(--line); border-radius:4px; background:var(--inset); max-width:100%; }
+button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -1290,9 +1242,67 @@ display:flex; align-items:center; justify-content:center;
 <div id="fpsDisplay" style="position:fixed;top:6px;left:8px;font:bold 13px monospace;color:#e0ecff;background:rgba(0,0,0,0.55);padding:2px 7px;border-radius:4px;pointer-events:none;z-index:9999;letter-spacing:0.5px;">-- boids · --</div>
 
 <div id="ui">
-<div id="controls">
-<div id="ctrl-cols">
-<div class="ctrl-col">
+<header id="dbHead">
+  <div id="dbTitle"><h1>Boids Aquarium</h1><span>population laboratory</span></div>
+  <div id="dbLink"><span id="linkDot">●</span><span id="linkLabel">no aquarium open</span></div>
+  <div id="dbActions">
+    <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
+    <button id="playBtn" title="Pause / resume the aquarium">▶</button>
+    <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi)">⬇</button>
+  </div>
+</header>
+
+<div id="dbGrid">
+
+<section class="panel" id="statusPanel">
+<h2>Live status</h2>
+<div id="statusGrid">
+  <div class="stat-block">
+    <div id="popRow"><span id="popSpan" class="val">—</span><span id="popUnit">boids</span></div>
+    <div class="kv"><span>avg lifespan</span><span id="lifeSpan" class="val">— s</span></div>
+    <div class="fb-wrap"><span>density</span><div class="fb-bar"><div class="fb-fill" id="nearFill"></div></div></div>
+    <div class="fb-wrap"><span>lifespan</span><div class="fb-bar"><div class="fb-fill" id="lifeFill"></div></div></div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-cap">vitals</div>
+    <div id="readout">
+      <span class="rk">pairs</span><span id="rdFertile">—</span>
+      <span class="rk">births</span><span id="rdBirth">—</span>
+      <span class="rk">deaths</span><span id="rdDeath">—</span>
+      <span class="rk">immigration</span><span id="rdImmig">—</span>
+      <span class="rk">sick</span><span id="rdSick">0</span>
+    </div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-cap">gene pool</div>
+    <div id="readout2" style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:10.5px;letter-spacing:0.05em;text-transform:uppercase;line-height:1.75;">
+      <span class="rk" style="color:var(--muted);">R</span><span id="rdR" style="font:600 11px/1.75 ui-monospace,Menlo,monospace;">—</span>
+      <span class="rk" style="color:var(--muted);">diversity</span><span id="rdDiv" style="font:600 11px/1.75 ui-monospace,Menlo,monospace;">—</span>
+      <span class="rk" style="color:var(--muted);">dis. deaths</span><span id="rdDied" style="font:600 11px/1.75 ui-monospace,Menlo,monospace;">0</span>
+      <span class="rk" style="color:var(--muted);">eff. breeders</span><span id="rdEffBr" style="font:600 11px/1.75 ui-monospace,Menlo,monospace;">—</span>
+      <span class="rk" style="color:var(--muted);">50/500 rule</span><span id="rdSmallPop" style="font:600 11px/1.75 ui-monospace,Menlo,monospace;">—</span>
+    </div>
+    <div id="inbreedingWarn" style="display:none;">
+    inbreeding: hazard ×<span id="inbreedMult">—</span> · modal −<span id="inbreedDelta">—</span> s
+    </div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-cap">colour target &amp; viability</div>
+    <div class="kv"><span id="familyDot" style="font-size:15px;line-height:1;">●</span>
+      <span id="familyName" style="font-weight:700;min-width:58px;">—</span>
+      <span>conv.</span><span id="familyConv" class="val">—</span>
+      <span id="familyTimer" style="font-size:9px;"></span></div>
+    <div class="vrow"><span id="viabilityDot" style="font-size:14px;line-height:1;">●</span>
+      <span id="viabilityState" class="vstate">—</span><span id="viabilityDetail" class="vdetail">—</span></div>
+    <div class="vrow"><span id="bondRiskDot" style="font-size:14px;line-height:1;">●</span>
+      <span id="bondRiskState" class="vstate">—</span><span id="bondRiskDetail" class="vdetail">—</span></div>
+    <div id="noTankHint">open the aquarium to see live data</div>
+  </div>
+</div>
+</section>
+
+<section class="panel">
+<h2>Population</h2>
 <div class="ctrl-row">
 <label>target pop</label>
 <input type="range" id="targetSlider" min="2" max="200" value="30">
@@ -1303,6 +1313,27 @@ display:flex; align-items:center; justify-content:center;
 <input type="range" id="popCeilSlider" min="0" max="150" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>immigration</label>
+<button id="immigrationBtn" title="Toggle immigration" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#c0392b;position:relative;transition:background 0.2s;outline:none;">
+<span id="immigrationKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="immigrationLabel" style="color:#c0392b;font-weight:700;">off</span>
+</div>
+<div class="ctrl-row">
+<label>emigr. return</label>
+<input type="range" id="emigReturnSlider" min="0" max="10" value="4" step="1">
+<span class="ctrl-val" id="emigReturnVal">0.4</span>
+</div>
+</section>
+
+<section class="panel">
+<h2>Life &amp; breeding</h2>
 <div class="ctrl-row">
 <label>bond after</label>
 <input type="range" id="bondSlider" min="1" max="20" value="1">
@@ -1328,21 +1359,10 @@ display:flex; align-items:center; justify-content:center;
 <input type="range" id="divorceSlider" min="0" max="50" value="5" step="5">
 <span class="ctrl-val" id="divorceVal">5%</span>
 </div>
-<div class="ctrl-row">
-<label>speed</label>
-<input type="range" id="speedSlider" min="1" max="10" value="7" step="1">
-<span class="ctrl-val" id="speedVal">7</span>
-</div>
-<div class="ctrl-row">
-<label>sensing r</label>
-<input type="range" id="sensingSlider" min="30" max="300" value="130" step="10">
-<span class="ctrl-val" id="sensingVal">130</span>
-</div>
-<div class="ctrl-row">
-<label>depth</label>
-<input type="range" id="depthSlider" min="0" max="600" value="0" step="25">
-<span class="ctrl-val" id="depthVal">off</span>
-</div>
+</section>
+
+<section class="panel">
+<h2>Society &amp; genetics</h2>
 <div class="ctrl-row">
 <label>singles</label>
 <input type="range" id="singleSlider" min="0" max="80" value="20" step="5">
@@ -1363,22 +1383,24 @@ display:flex; align-items:center; justify-content:center;
 <input type="range" id="familyPullSlider" min="0" max="100" value="60" step="5">
 <span class="ctrl-val" id="familyPullVal">60%</span>
 </div>
-<div class="ctrl-divider">visuals</div>
+</section>
+
+<section class="panel">
+<h2>Motion &amp; space</h2>
 <div class="ctrl-row">
-<label>trail opacity</label>
-<input type="range" id="trailOpacitySlider" min="0" max="100" value="40" step="5">
-<span class="ctrl-val" id="trailOpacityVal">40%</span>
+<label>speed</label>
+<input type="range" id="speedSlider" min="1" max="10" value="7" step="1">
+<span class="ctrl-val" id="speedVal">7</span>
 </div>
 <div class="ctrl-row">
-<label>trail length</label>
-<input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
-<span class="ctrl-val" id="trailLengthVal">30</span>
+<label>sensing r</label>
+<input type="range" id="sensingSlider" min="30" max="300" value="130" step="10">
+<span class="ctrl-val" id="sensingVal">130</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
-<label>background</label>
-<input type="color" id="bgColorInput" value="#081828" title="Canvas background colour" style="
-width:44px;height:22px;border:none;padding:1px;cursor:pointer;
-border-radius:4px;background:#222;outline:none;">
+<div class="ctrl-row">
+<label>depth</label>
+<input type="range" id="depthSlider" min="0" max="600" value="0" step="25">
+<span class="ctrl-val" id="depthVal">off</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>no overlap</label>
@@ -1392,18 +1414,58 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="noOverlapLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
-<label>bond lines</label>
-<button id="bondLinesBtn" title="Toggle bond lines" style="
-width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#555;position:relative;transition:background 0.2s;outline:none;">
-<span id="bondLinesKnob" style="
-position:absolute;top:3px;left:3px;
-width:16px;height:16px;border-radius:50%;
-background:#fff;transition:left 0.2s;display:block;"></span>
-</button>
-<span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+</section>
+
+<section class="panel">
+<h2>Disease</h2>
+<div class="ctrl-row">
+<label>infect. hits</label>
+<input type="range" id="diseaseThreshSlider" min="1" max="10" value="1" step="1">
+<span class="ctrl-val" id="diseaseThreshVal">1</span>
 </div>
+<div class="ctrl-row">
+<label>infect. dur.</label>
+<input type="range" id="diseaseDurSlider" min="5" max="60" value="10" step="5">
+<span class="ctrl-val" id="diseaseDurVal">10 s</span>
+</div>
+<div class="ctrl-row">
+<label>fatality %</label>
+<input type="range" id="fatalitySlider" min="0" max="80" value="10" step="5">
+<span class="ctrl-val" id="fatalityVal">10%</span>
+<span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#ff6b6b;letter-spacing:0.5px;"></span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>outbreak</label>
+<button id="infectBtn" title="Infect a random boid" class="mini-btn">infect</button>
+<span id="infectStatus" class="mini-note"></span>
+</div>
+</section>
+
+<section class="panel">
+<h2>Predators</h2>
+<div class="ctrl-row">
+<label>predators</label>
+<input type="range" id="predatorSlider" min="0" max="5" value="0" step="1">
+<span class="ctrl-val" id="predatorVal">0</span>
+</div>
+<div class="ctrl-row">
+<label>full for (s)</label>
+<input type="range" id="fullDurSlider" min="1" max="30" value="10" step="1">
+<span class="ctrl-val" id="fullDurVal">10 s</span>
+</div>
+<div class="ctrl-row">
+<label>prey</label>
+<input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
+<span class="ctrl-val" id="predatorDietVal">other</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>hunt</label>
+<button id="huntModeBtn" title="bump: targets nearest boid each frame&#10;lock: commits to one random target and chases until eaten" class="mini-btn" style="color:#54a0ff;min-width:52px;">bump</button>
+</div>
+</section>
+
+<section class="panel">
+<h2>Appearance</h2>
 <div class="ctrl-row" style="gap:8px;">
 <label>colour</label>
 <button id="colorBtn" title="Toggle boid colour (off = greyscale body, trail, beak, tail)" style="
@@ -1445,8 +1507,6 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="uprightLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-</div>
-<div class="ctrl-col">
 <div class="ctrl-row" style="gap:8px;">
 <label>aura</label>
 <button id="auraGradBtn" title="Toggle aura gradient" style="
@@ -1459,171 +1519,74 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
 </div>
-<div class="ctrl-row">
-<label>emigr. return</label>
-<input type="range" id="emigReturnSlider" min="0" max="10" value="4" step="1">
-<span class="ctrl-val" id="emigReturnVal">0.4</span>
-</div>
-<div class="ctrl-divider">disease</div>
-<div class="ctrl-row">
-<label>infect. hits</label>
-<input type="range" id="diseaseThreshSlider" min="1" max="10" value="1" step="1">
-<span class="ctrl-val" id="diseaseThreshVal">1</span>
-</div>
-<div class="ctrl-row">
-<label>infect. dur.</label>
-<input type="range" id="diseaseDurSlider" min="5" max="60" value="10" step="5">
-<span class="ctrl-val" id="diseaseDurVal">10 s</span>
-</div>
-<div class="ctrl-row">
-<label>fatality %</label>
-<input type="range" id="fatalitySlider" min="0" max="80" value="10" step="5">
-<span class="ctrl-val" id="fatalityVal">10%</span>
-<span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#c0392b;letter-spacing:0.5px;"></span>
-</div>
-<div class="ctrl-divider">predators</div>
-<div class="ctrl-row">
-<label>predators</label>
-<input type="range" id="predatorSlider" min="0" max="5" value="0" step="1">
-<span class="ctrl-val" id="predatorVal">0</span>
-</div>
-<div class="ctrl-row">
-<label>full for (s)</label>
-<input type="range" id="fullDurSlider" min="1" max="30" value="10" step="1">
-<span class="ctrl-val" id="fullDurVal">10 s</span>
-</div>
-<div class="ctrl-row">
-<label>prey</label>
-<input type="range" id="predatorDietSlider" min="1" max="3" value="3" step="1">
-<span class="ctrl-val" id="predatorDietVal">other</span>
-</div>
 <div class="ctrl-row" style="gap:8px;">
-<label>hunt</label>
-<button id="huntModeBtn" title="bump: targets nearest boid each frame&#10;lock: commits to one random target and chases until eaten" style="font-size:9px;padding:2px 10px;background:#1a2a3a;color:#54a0ff;border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;min-width:38px;">bump</button>
-</div>
-<div class="ctrl-divider">body image</div>
-<div class="ctrl-row">
-<label>shape</label>
-<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
-<button id="bodyImgBtn" title="Load a PNG to replace the body sprite" style="font-size:9px;padding:2px 8px;background:#1a2a3a;color:#54a0ff;border:1px solid rgba(84,160,255,0.4);border-radius:4px;cursor:pointer;letter-spacing:0.5px;white-space:nowrap;">load</button>
-<span id="bodyImgName" style="font-size:9px;color:#666;white-space:nowrap;">default</span>
-</div>
-<div class="ctrl-row">
-<label title="Pixels from image centre to nose tip">nose px</label>
-<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1" style="width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
-</div>
-<div class="ctrl-row">
-<label title="Sprite scale = r ÷ this value">body scale</label>
-<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5" style="width:40px;background:#1a2a3a;color:#0be881;border:1px solid rgba(84,160,255,0.25);border-radius:3px;font-size:9px;padding:1px 4px;text-align:right;outline:none;">
-</div>
-</div><!-- end second ctrl-col -->
-</div><!-- end #ctrl-cols -->
-
-
-</div><!-- end #controls -->
-
-<div id="rightCol">
-<div style="display:flex;gap:12px;align-items:center;">
-<div class="fb-wrap">
-<span>density</span>
-<div class="fb-bar"><div class="fb-fill" id="nearFill"></div></div>
-</div>
-<div class="fb-wrap">
-<span>lifespan</span>
-<div class="fb-bar"><div class="fb-fill" id="lifeFill"></div></div>
-</div>
-</div>
-
-<div id="statusBar">
-<span>population: <span id="popSpan" class="val">—</span></span>
-<span>lifespan: <span id="lifeSpan" class="val">— s</span></span>
-</div>
-<div id="inbreedingWarn" style="display:none;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#ff6b6b;">
-inbreeding: hazard ×<span id="inbreedMult">—</span> · modal −<span id="inbreedDelta">—</span> s
-</div>
-
-<div id="readout" style="
-display:grid; grid-template-columns:repeat(4,auto); gap:1px 10px;
-font-size:11px; letter-spacing:1px; text-transform:uppercase;
-color:#000; line-height:1.7; align-items:baseline;
-">
-<span style="color:#555;">pairs</span> <span id="rdFertile" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">birth</span> <span id="rdBirth" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">death</span> <span id="rdDeath" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">immig.</span> <span id="rdImmig" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">sick</span> <span id="rdSick" style="font-family:monospace;font-weight:700;">0</span>
-<span style="color:#555;">R</span> <span id="rdR" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">div</span> <span id="rdDiv" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">dis.deaths</span> <span id="rdDied" style="font-family:monospace;font-weight:700;">0</span>
-<span style="color:#555;">eff.br.</span> <span id="rdEffBr" style="font-family:monospace;font-weight:700;">—</span>
-<span style="color:#555;">50-rule</span> <span id="rdSmallPop" style="font-family:monospace;font-weight:700;">—</span>
-</div>
-
-<div style="display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
-<span style="color:#555;">target</span>
-<span id="familyDot" style="font-size:16px;line-height:1;">●</span>
-<span id="familyName" style="font-weight:700;min-width:58px;">—</span>
-<span style="color:#555;font-size:9px;">conv.</span>
-<span id="familyConv" style="font-family:monospace;font-weight:700;min-width:32px;">—</span>
-<span id="familyTimer" style="color:#555;font-size:9px;min-width:28px;"></span>
-</div>
-
-<div style="display:flex;flex-direction:column;gap:4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;user-select:none;">
-<div style="display:flex;align-items:center;gap:8px;">
-<span id="viabilityDot"   style="font-size:15px;line-height:1;">●</span>
-<span id="viabilityState" style="font-weight:700;min-width:80px;">—</span>
-<span id="viabilityDetail" style="color:#555;font-size:10px;">—</span>
-</div>
-<div style="display:flex;align-items:center;gap:8px;">
-<span id="bondRiskDot"    style="font-size:15px;line-height:1;">●</span>
-<span id="bondRiskState"  style="font-weight:700;min-width:80px;">—</span>
-<span id="bondRiskDetail" style="color:#555;font-size:10px;">—</span>
-</div>
-</div>
-
-<div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#000;user-select:none;">
-<span>immigration</span>
-<button id="immigrationBtn" title="Toggle immigration" style="
+<label>bond lines</label>
+<button id="bondLinesBtn" title="Toggle bond lines" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#c0392b;position:relative;transition:background 0.2s;outline:none;">
-<span id="immigrationKnob" style="
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="bondLinesKnob" style="
 position:absolute;top:3px;left:3px;
 width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
-<span id="immigrationLabel" style="color:#c0392b;font-weight:700;">off</span>
+<span id="bondLinesLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-
-<div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#000;user-select:none;">
-<span>disease</span>
-<button id="infectBtn" title="Infect a random boid" style="
-padding:2px 10px;border-radius:4px;border:1px solid #333;cursor:pointer;
-background:#1a1a1a;color:#eee;font-size:10px;letter-spacing:1px;
-text-transform:uppercase;font-family:'Courier New',monospace;outline:none;">infect</button>
-<span id="infectStatus" style="color:#555;font-size:10px;"></span>
+<div class="ctrl-row">
+<label>trail opacity</label>
+<input type="range" id="trailOpacitySlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="trailOpacityVal">40%</span>
 </div>
-
-<button id="playBtn" title="Start simulation">▶</button>
-<button id="exportBtn" title="Export standalone HTML" style="
-padding:0;width:36px;height:36px;border-radius:6px;font-size:16px;line-height:1;
-background:rgba(11,232,129,0.12);border:2px solid rgba(11,232,129,0.5);
-color:#0be881;cursor:pointer;box-shadow:0 0 16px rgba(11,232,129,0.25);
-font-family:'Courier New',monospace;outline:none;">⬇</button>
+<div class="ctrl-row">
+<label>trail length</label>
+<input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
+<span class="ctrl-val" id="trailLengthVal">30</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label>background</label>
+<input type="color" id="bgColorInput" value="#081828" title="Canvas background colour">
+</div>
+</section>
 
-<div id="pyramidCol" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
-<div class="ctrl-row" style="gap:6px;">
-<label style="min-width:auto;">refresh</label>
-<input type="range" id="pyramidRefreshSlider" min="1" max="10" value="3" style="width:80px;">
+<section class="panel">
+<h2>Body image</h2>
+<div class="ctrl-row">
+<label>shape</label>
+<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
+<button id="bodyImgBtn" title="Load a PNG to replace the body sprite" class="mini-btn">load</button>
+<span id="bodyImgName" class="mini-note">default</span>
+</div>
+<div class="ctrl-row">
+<label title="Pixels from image centre to nose tip">nose px</label>
+<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1">
+</div>
+<div class="ctrl-row">
+<label title="Sprite scale = r ÷ this value">body scale</label>
+<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5">
+</div>
+</section>
+
+<section class="panel" id="pyramidPanel">
+<h2>Demographics</h2>
+<canvas id="popPyramid" width="260" height="200"></canvas>
+<div class="ctrl-row" style="margin-top:6px;">
+<label>refresh</label>
+<input type="range" id="pyramidRefreshSlider" min="1" max="10" value="3">
 <span id="pyramidRefreshVal" class="ctrl-val">3 s</span>
 </div>
-<canvas id="popPyramid" width="260" height="200"
-  style="display:block;border:1px solid rgba(0,0,0,0.08);border-radius:4px;background:#fafafa;"></canvas>
-</div>
-</div>
+</section>
+
+</div><!-- end #dbGrid -->
+</div><!-- end #ui -->
 
 <script>
 const canvas = document.getElementById('c');
+
+// ── run mode ──────────────────────────────────────────────────────────────────
+// 'dash'       — this file opened directly: control dashboard only, no simulation
+// 'tank'       — generated by "open aquarium": fullscreen sim + live bridge to opener
+// 'standalone' — generated by export: fullscreen sim, no bridge (Pi kiosk)
+// Generated documents get window.__RUNMODE injected into <head> before this script.
+const RUN_MODE = window.__RUNMODE || 'dash';
 
 // ── PixiJS initialisation ─────────────────────────────────────────────────────
 // app is created after the first resize() so the canvas already has correct dims
@@ -1812,21 +1775,25 @@ if(HUNT_MODE === 'lock'){
 document.getElementById('bodyImgBtn').addEventListener('click', () => {
 document.getElementById('bodyImgFile').click();
 });
+// Apply a new body PNG (data URL): remembered for exports, swapped into live sprites.
+// Used by the file picker locally and by the tank bridge on the aquarium side.
+function applyBodyPNG(dataURL){
+_customBoidPNG = dataURL;
+const tex = PIXI.Texture.from(dataURL);
+if(tex.baseTexture.valid){
+  _swapBodyTexture(tex);
+} else {
+  tex.baseTexture.on('loaded', () => _swapBodyTexture(tex));
+  tex.baseTexture.on('error',  () => { _customBoidPNG=null; console.warn('Body image failed to load'); });
+}
+}
 document.getElementById('bodyImgFile').addEventListener('change', e => {
 const file = e.target.files[0];
 if(!file) return;
 const reader = new FileReader();
 reader.onload = ev => {
-  const dataURL = ev.target.result;
-  _customBoidPNG = dataURL;
-  // Create new PixiJS texture from data URL and swap all pooled sprites
-  const tex = PIXI.Texture.from(dataURL);
-  if(tex.baseTexture.valid){
-    _swapBodyTexture(tex);
-  } else {
-    tex.baseTexture.on('loaded', () => _swapBodyTexture(tex));
-    tex.baseTexture.on('error',  () => { _customBoidPNG=null; console.warn('Body image failed to load'); });
-  }
+  applyBodyPNG(ev.target.result);
+  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',data:ev.target.result});
   // Show filename (truncated, no extension)
   document.getElementById('bodyImgName').textContent =
     file.name.replace(/\.[^.]+$/,'').substring(0,14);
@@ -1884,6 +1851,7 @@ wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=
 // ── canvas sizing ─────────────────────────────────────────────────────────────
 let SENSING_RADIUS = 130;
 function resize() {
+if(RUN_MODE==='dash') return; // dashboard: canvas stays hidden and unsized
 const ui = document.getElementById('ui');
 const uiH = ui ? ui.offsetHeight + 8 : 0;
 canvas.width  = Math.max(window.innerWidth, 60);
@@ -1891,9 +1859,11 @@ canvas.height = Math.max(window.innerHeight - uiH, 60);
 if(app) app.renderer.resize(canvas.width, canvas.height);
 // SENSING_RADIUS is controlled by the slider — not recalculated on resize
 }
-resize(); // set canvas dims before creating app below
+resize(); // set canvas dims before creating app below (no-op in dashboard mode)
 
 // ── PixiJS app + graphic layers ───────────────────────────────────────────────
+// The dashboard never renders the sim — skip the WebGL context entirely.
+if(RUN_MODE!=='dash'){
 app = new PIXI.Application({
 view: canvas,
 width: canvas.width, height: canvas.height,
@@ -1926,8 +1896,9 @@ _gfx.predSprites = new PIXI.Container(); app.stage.addChild(_gfx.predSprites);
 _gfx.predators = new PIXI.Graphics(); app.stage.addChild(_gfx.predators);
 // Body sprite texture embedded as base64 — no file loading needed
 _boidTexture = PIXI.Texture.from(_BOID_PNG);
+} // end if(RUN_MODE!=='dash')
 
-window.addEventListener('resize', () => { resize(); if (!running) drawIdle(); });
+window.addEventListener('resize', () => { if(RUN_MODE==='dash') return; resize(); if (!running) drawIdle(); });
 
 // ── constants ─────────────────────────────────────────────────────────────────
 // ── colour family cycle ───────────────────────────────────────────────────────
@@ -3500,6 +3471,7 @@ let running=false, rafId=null, lastTime=null;
 const playBtn=document.getElementById('playBtn');
 
 function drawIdle(){
+if(!app) return; // dashboard mode: nothing to draw
 const w=canvas.width, h=canvas.height;
 // background
 const gb=_gfx.bg; gb.clear();
@@ -3556,9 +3528,17 @@ playBtn.classList.remove('running');
 playBtn.title='Resume simulation';
 }
 
-playBtn.addEventListener('click',()=>{ if(!running) startSim(); else pauseSim(); });
+playBtn.addEventListener('click',()=>{
+if(RUN_MODE==='dash'){
+  // remote control: toggle the aquarium tab; open one if none is live
+  if(_tankAlive()) _tankSend({boid:1,t:'ctl',kind:'click',id:'playBtn'});
+  else openAquarium();
+  return;
+}
+if(!running) startSim(); else pauseSim(); });
 
 document.getElementById('infectBtn').addEventListener('click',()=>{
+if(RUN_MODE==='dash') return; // forwarded to the aquarium tab by the control bridge
 const candidates=boids.filter(b=>b.alive&&!b.dying&&!b.diseased&&!b.immune);
 const statusEl=document.getElementById('infectStatus');
 if(!running){ statusEl.textContent='not running'; return; }
@@ -3785,6 +3765,7 @@ drawPredators();
 if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
 drawPopPyramid();
+if(RUN_MODE==='tank') _postPyramid();
 }
 // age death splashes
 for(let i=deathSplashes.length-1;i>=0;i--){
@@ -3795,21 +3776,30 @@ if(deathSplashes[i].age>=deathSplashes[i].duration) deathSplashes.splice(i,1);
 app.renderer.render(app.stage);
 // Status panel: update at ~6fps — genomeDiversity is O(N²) and DOM writes are expensive
 _statusThrottle++;
-if(_statusThrottle >= 5){ _statusThrottle=0; updateStatus(); }
+if(_statusThrottle >= 5){ _statusThrottle=0; updateStatus(); if(RUN_MODE==='tank') _postStatus(); }
 }
 
 // ── export ────────────────────────────────────────────────────────────────────
-document.getElementById('exportBtn').addEventListener('click', ()=>{
+// Build a fullscreen simulation document from the live DOM.
+// runMode 'standalone' → Pi kiosk export (auto-disease, no bridge)
+// runMode 'tank'       → the "open aquarium" tab (bridged to this dashboard)
+function buildStandaloneHTML(runMode){
 // Sync current slider positions → HTML attributes so outerHTML captures them
 document.querySelectorAll('input[type="range"]').forEach(el => el.setAttribute('value', el.value));
 
 let html = document.documentElement.outerHTML;
+html = runMode==='tank'
+  ? html.replace('<title>Boids Aquarium — dashboard</title>','<title>Boids Aquarium — live tank</title>')
+  : html.replace('<title>Boids Aquarium — dashboard</title>','<title>Boids Aquarium</title>');
 
-// 1. Inject CSS at the very start of <head> — applied before any rendering, no flash
-const exportCSS = `<style>
+// 1. Head injection: run-mode marker + fullscreen CSS. The !important rules beat
+//    the dashboard stylesheet (which hides the canvas and lays out #ui).
+const exportCSS = `<script>window.__RUNMODE=${JSON.stringify(runMode)};<\/script>
+<style>
 #ui { display:none !important; }
-body { margin:0; padding:0; overflow:hidden; background:#050e18; }
-canvas#c { position:fixed; top:0; left:0; display:block; }
+body { margin:0 !important; padding:0 !important; overflow:hidden !important; background:#050e18 !important; }
+canvas#c { position:fixed !important; top:0 !important; left:0 !important; display:block !important; }
+#fpsDisplay { display:block !important; }
 </style>`;
 html = html.replace('<head>', '<head>\n' + exportCSS);
 
@@ -3889,7 +3879,7 @@ HUNT_MODE         = '${HUNT_MODE}';
   }
 }
 BG_COLOR          = '${BG_COLOR}';
-AUTO_DISEASE      = true;
+AUTO_DISEASE      = ${runMode==='standalone'}; // kiosk exports self-seed disease; the tank is dashboard-driven
 resize = function(){
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -3911,10 +3901,13 @@ startSim();
 <\/script>`;
 
 const idx = html.lastIndexOf('</body>');
-html = idx !== -1
+return idx !== -1
   ? html.slice(0, idx) + bootScript + '\n</body></html>'
   : html + bootScript;
+}
 
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+const html = buildStandaloneHTML('standalone');
 const blob = new Blob([html], {type:'text/html'});
 const url  = URL.createObjectURL(blob);
 const a    = document.createElement('a');
@@ -3923,6 +3916,122 @@ document.body.appendChild(a); a.click();
 document.body.removeChild(a);
 URL.revokeObjectURL(url);
 });
+
+// ── dashboard ⇄ aquarium bridge ───────────────────────────────────────────────
+// The aquarium tab is a generated copy of this document (RUN_MODE 'tank') opened
+// via window.open + document.write, so its baked settings match the dashboard at
+// launch. Controls are forwarded as messages and applied by driving the tank's
+// own hidden UI elements — every wire() handler and side effect is reused
+// verbatim. The tank mirrors its status DOM and pyramid back ~3× per second.
+let tankWin = null;
+function _tankAlive(){ return !!(tankWin && !tankWin.closed); }
+function _tankSend(m){ if(_tankAlive()) try{ tankWin.postMessage(m,'*'); }catch(e){} }
+
+function openAquarium(){
+if(_tankAlive()){ tankWin.focus(); return; }
+const html = buildStandaloneHTML('tank');
+tankWin = window.open('about:blank','boidAquarium');
+if(!tankWin){ alert('The browser blocked the aquarium pop-up — allow pop-ups for this page and try again.'); return; }
+tankWin.document.open();
+tankWin.document.write(html);
+tankWin.document.close();
+}
+
+if(RUN_MODE==='dash'){
+document.getElementById('aquariumBtn').addEventListener('click', openAquarium);
+
+// forward every slider / colour / number change to the tank
+document.addEventListener('input', e => {
+  const el=e.target;
+  if(!el.id || !_tankAlive()) return;
+  if(el.matches('input[type=range],input[type=color],input[type=number]'))
+    _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
+});
+// forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn']);
+document.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
+  _tankSend({boid:1,t:'ctl',kind:'click',id:b.id});
+});
+
+// receive live status + pyramid mirrors from the tank
+const _pyCtx = document.getElementById('popPyramid').getContext('2d');
+window.addEventListener('message', e => {
+  const m=e.data;
+  if(!m || m.boid!==1 || e.source!==tankWin) return;
+  if(m.t==='status'){
+    const s=m.s;
+    for(const id in s.ids){
+      const el=document.getElementById(id); if(!el) continue;
+      const v=s.ids[id];
+      el.textContent=v.t; el.style.color=v.c;
+      if(v.cl!==undefined) el.className=v.cl;
+    }
+    nearFill.style.width=s.nearW; lifeFill.style.width=s.lifeW;
+    document.getElementById('familyDot').style.color=s.famDot;
+    document.getElementById('inbreedingWarn').style.display=s.inbreedShow;
+    document.getElementById('noTankHint').style.display='none';
+    playBtn.innerHTML = s.running ? '&#9646;&#9646;' : '&#9654;';
+    playBtn.classList.toggle('running', s.running);
+    document.getElementById('linkLabel').textContent =
+      'aquarium live · '+s.count+' boids · '+Math.floor(s.clock)+' s';
+  } else if(m.t==='pyramid'){
+    const img=new Image();
+    img.onload=()=>{ _pyCtx.clearRect(0,0,260,200); _pyCtx.drawImage(img,0,0); };
+    img.src=m.data;
+  }
+});
+
+// link indicator: green while the tank tab is alive
+setInterval(()=>{
+  const dot=document.getElementById('linkDot'), lbl=document.getElementById('linkLabel');
+  if(_tankAlive()){ dot.style.color='#0be881'; }
+  else {
+    dot.style.color='#4a5b6b';
+    lbl.textContent='no aquarium open';
+    playBtn.innerHTML='&#9654;'; playBtn.classList.remove('running');
+    document.getElementById('noTankHint').style.display='';
+  }
+}, 800);
+}
+
+if(RUN_MODE==='tank'){
+// apply dashboard commands by driving this document's own hidden controls
+window.addEventListener('message', e => {
+  const m=e.data;
+  if(!m || m.boid!==1) return;
+  if(window.opener && e.source!==window.opener) return;
+  if(m.t==='ctl'){
+    const el=document.getElementById(m.id);
+    if(!el) return;
+    if(m.kind==='click') el.click();
+    else { el.value=m.value; el.dispatchEvent(new Event('input',{bubbles:true})); }
+  } else if(m.t==='bodyimg'){
+    applyBodyPNG(m.data);
+  }
+});
+}
+
+// tank → dashboard status mirror (called from the sim loop)
+const _MIRROR_IDS=['popSpan','lifeSpan','rdFertile','rdBirth','rdDeath','rdImmig','rdSick','rdR','rdDiv','rdDied','rdEffBr','rdSmallPop','fatalityEffVal','familyName','familyConv','familyTimer','inbreedMult','inbreedDelta','infectStatus'];
+function _postStatus(){
+if(!window.opener) return;
+let count=0; for(const b of boids) if(b.alive&&!b.dying) count++;
+const s={running, count, clock:simClock,
+  nearW:nearFill.style.width, lifeW:lifeFill.style.width,
+  famDot:document.getElementById('familyDot').style.color,
+  inbreedShow:document.getElementById('inbreedingWarn').style.display, ids:{}};
+for(const id of _MIRROR_IDS){
+  const el=document.getElementById(id); if(!el) continue;
+  s.ids[id]={t:el.textContent, c:el.style.color||'', cl:el.className||undefined};
+}
+try{ window.opener.postMessage({boid:1,t:'status',s},'*'); }catch(e){}
+}
+function _postPyramid(){
+if(!window.opener) return;
+try{ window.opener.postMessage({boid:1,t:'pyramid',data:document.getElementById('popPyramid').toDataURL('image/png')},'*'); }catch(e){}
+}
 </script>
 
 </body>

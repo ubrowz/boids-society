@@ -164,6 +164,7 @@ tr:hover td { background:rgba(84,160,255,0.04); }
   <li><a href="#colormut">Colour Representation &amp; Mutation</a></li>
   <li><a href="#colorpref">Colour Family Cycle</a></li>
   <li><a href="#predators">Predators</a></li>
+  <li><a href="#dashboard">Dashboard &amp; Run Modes</a></li>
   <li><a href="#export">Export</a></li>
   <li><a href="#performance">Performance</a></li>
   <li><a href="#controls">User Controls</a></li>
@@ -175,6 +176,9 @@ tr:hover td { background:rgba(84,160,255,0.04); }
 <!-- ───────────────────────────── OVERVIEW ───────────────────────────────── -->
 <h2 id="overview">Overview</h2>
 <p>An animated browser-based population simulation built on the classic boids algorithm. Coloured boids wander autonomously inside a bounded aquarium. They can bond, breed, age and die. A multi-arm feedback loop attempts to maintain a stable population around a user-defined target.</p>
+<p>Since July 2026 the file opens as a <strong>control dashboard</strong>: the simulation itself runs fullscreen in
+a separate tab (the <em>aquarium</em>), launched from the dashboard and remote-controlled live over a
+<code>postMessage</code> bridge — see <a href="#dashboard">Dashboard &amp; Run Modes</a>.</p>
 <p>The rendering engine is <strong>PixiJS v7 (WebGL)</strong>, replacing the original Canvas 2D path. The PixiJS source (v7.4.2, ~450&nbsp;KB) is <strong>embedded inline</strong> in the HTML — no CDN fetch at load time — so the file and every export from it run fully offline (essential for a Pi without internet access). Boid and predator bodies are drawn as textured sprites (teardrop-v3.png, embedded as base64); trail lines, tail fins, beaks, and effects are drawn with <code>PIXI.Graphics</code>. This gives a large framerate gain on the Raspberry Pi 4, which benefits strongly from GPU-accelerated sprite batching.</p>
 <p>The visual layer extends the base simulation with:</p>
 <ul>
@@ -680,6 +684,35 @@ eat if distance(tip, boid) &lt; RADIUS</code></pre>
 <h3>Count management</h3>
 <p>The <strong>predators</strong> slider (0–5) is reactive: increasing it spawns new predators immediately; decreasing it removes the excess. On simulation restart, predators are respawned according to the current slider value.</p>
 
+
+<!-- ───────────────────────────── EXPORT ─────────────────────────────────── -->
+<h2 id="dashboard">Dashboard &amp; Run Modes</h2>
+<p>The file is a <strong>control dashboard</strong> when opened directly; the simulation runs in a separate tab.
+A <code>RUN_MODE</code> marker (injected into the <code>&lt;head&gt;</code> of generated documents) selects one of three modes:</p>
+<ul>
+  <li><strong>dash</strong> (default) — the dark control-room UI: grouped control panels, live status, pyramid.
+  No PixiJS/WebGL context is created; the canvas stays hidden. Suitable for hosting as a public website
+  (single self-contained file, works from any static host).</li>
+  <li><strong>tank</strong> — created by the <strong>open aquarium</strong> button: <code>buildStandaloneHTML('tank')</code>
+  serializes the live DOM (all current settings baked in), opens a new tab via <code>window.open</code> +
+  <code>document.write</code>, and auto-starts fullscreen.</li>
+  <li><strong>standalone</strong> — the classic ⬇ export for the Pi kiosk: identical to tank but with
+  auto-disease enabled and no bridge.</li>
+</ul>
+<h3>The dashboard ⇄ tank bridge</h3>
+<p>Dashboard and tank talk over <code>postMessage</code> (works on <code>file://</code> and https alike):</p>
+<ul>
+  <li><strong>Controls → tank:</strong> every slider/colour/number input and each toggle-button click is forwarded
+  as a <code>{t:'ctl'}</code> message. The tank applies it by <em>driving its own hidden copy of the control</em>
+  (set value + dispatch <code>input</code>, or <code>click()</code>) so every <code>wire()</code> handler and side
+  effect is reused verbatim — no duplicated setter logic. A custom body PNG is forwarded as a data URL.</li>
+  <li><strong>Tank → dashboard:</strong> ~3× per second the tank mirrors its status DOM (population, rates,
+  gene-pool stats, colour target, bars) as a compact snapshot, and ships the population pyramid as a PNG data URL
+  at the pyramid refresh cadence. The header shows a green link dot and “aquarium live · N boids”.</li>
+  <li>The ▶ button remote-controls the tank (restart/pause); with no tank open it opens one.
+  Closing the tank tab leaves the dashboard in its “no aquarium open” state; the button relaunches with current settings.
+  Closing the dashboard leaves the tank swimming autonomously with its last settings.</li>
+</ul>
 
 <!-- ───────────────────────────── EXPORT ─────────────────────────────────── -->
 <h2 id="export">Export</h2>
