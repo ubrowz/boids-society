@@ -1496,6 +1496,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
+<label>dim infertile</label>
+<button id="dimBtn" title="Draw infertile boids at 55% opacity (off = everyone fully opaque; fertility still shows via the glow)" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#ff9f43;position:relative;transition:background 0.2s;outline:none;">
+<span id="dimKnob" style="
+position:absolute;top:3px;left:25px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="dimLabel" style="font-size:10px;font-weight:700;color:#ff9f43;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+</div>
+<div class="ctrl-row" style="gap:8px;">
 <label>upright</label>
 <button id="uprightBtn" title="Keep the body image upright instead of rotating with the movement direction" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1712,6 +1724,25 @@ if(SHOW_DETAILS){
 } else {
   detailsBtn.style.background='#555'; detailsKnob.style.left='3px';
   detailsLabel.textContent='off'; detailsLabel.style.color='#555';
+}
+});
+
+// ── infertile-dimming toggle ─────────────────────────────────────────────────
+// On (default): non-fertile boids draw at 55% opacity — the age/fertility signal.
+// Off: everyone fully opaque (better for photo bodies); fertility still shows
+// via the aura glow.
+let DIM_INFERTILE = true;
+const dimBtn   = document.getElementById('dimBtn');
+const dimKnob  = document.getElementById('dimKnob');
+const dimLabel = document.getElementById('dimLabel');
+dimBtn.addEventListener('click', () => {
+DIM_INFERTILE = !DIM_INFERTILE;
+if(DIM_INFERTILE){
+  dimBtn.style.background='#ff9f43'; dimKnob.style.left='25px';
+  dimLabel.textContent='on'; dimLabel.style.color='#ff9f43';
+} else {
+  dimBtn.style.background='#555'; dimKnob.style.left='3px';
+  dimLabel.textContent='off'; dimLabel.style.color='#555';
 }
 });
 
@@ -3173,7 +3204,7 @@ const fertile = isFertile(boid);
 // drawn from r, so scaling r scales body, tail, eyes, beak and glow together
 const zs = zScaleOf(boid);
 const r = (boid.isSingle ? RADIUS*0.7 : RADIUS) * zs;
-const baseAlpha = alpha * (fertile ? 1.0 : 0.55) * Math.min(1, 0.45+0.55*zs); // dim beyond the midplane only
+const baseAlpha = alpha * ((fertile||!DIM_INFERTILE) ? 1.0 : 0.55) * Math.min(1, 0.45+0.55*zs); // dim beyond the midplane only
 
 // glow — three concentric circles approximate radial gradient
 if(SHOW_DETAILS && (isBonded||fertile)){
@@ -3757,8 +3788,12 @@ _gfx.boids.clear();     // boid Graphics overlay: glow, eyes, beak, disease, bir
 // build set of boid IDs currently locked by a predator (for white tail fin)
 _lockedBoidIds.clear();
 if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==null) _lockedBoidIds.add(p.lockedBoidId);
-// painter's order: with depth on, draw far boids first so near ones cover them
-if(DEPTH>0) boids.sort((a,b)=>b.z-a.z);
+// Painter's order, always applied: far boids first, in 16-unit z-bands with a
+// descending-id tie-break. Quantising stops the front/back flicker between
+// boids at nearly equal depth (their z random walks cross constantly), and the
+// tie-break keeps a stable order at depth 0 — newborns fade in BEHIND older
+// boids instead of popping over everything. ~57 µs/frame on a Pi 4 at N=200.
+boids.sort((a,b)=>(((b.z/16)|0)-((a.z/16)|0))||(b.id-a.id));
 for(const boid of boids) drawBoid(boid);
 drawDeathSplashes();
 drawPredators();
@@ -3819,6 +3854,16 @@ if(NO_OVERLAP){
   if(btn)  btn.style.background='#54a0ff';
   if(knob) knob.style.left='25px';
   if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
+}
+DIM_INFERTILE     = ${DIM_INFERTILE};
+// Sync the dim-infertile button visual (default on)
+if(!DIM_INFERTILE){
+  const btn=document.getElementById('dimBtn');
+  const knob=document.getElementById('dimKnob');
+  const lbl=document.getElementById('dimLabel');
+  if(btn)  btn.style.background='#555';
+  if(knob) knob.style.left='3px';
+  if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
 }
 UPRIGHT_SPRITE    = ${UPRIGHT_SPRITE};
 // Sync the upright button visual to match the exported UPRIGHT_SPRITE state
@@ -3948,7 +3993,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn']);
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn']);
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
