@@ -1623,8 +1623,8 @@ let _boidTexF = null;    // female body texture — per-sex override → shared 
 let _predTex  = null;    // predator body texture — follows the shared image only
 const _bodySprites = []; // reusable Sprite pool — one per visible boid per frame
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
-const _predBodySprites = []; // predator sprite pool — same texture, white tint
-let _predSpriteCount = 0;
+// predators share the boid body pool (_bodySprites) so they interleave by depth
+const _drawList = []; // reused each frame: boids + live predators, depth-sorted
 const _gfx = {}; // named Graphics layers, populated after app is created
 const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; rebuilt each frame
 // ── body image calibration (user-adjustable) ──────────────────────────────────
@@ -1926,23 +1926,23 @@ app.ticker.stop(); // simulation loop drives rendering manually
 ['bg','trails','bondLines','birthRings'].forEach(k=>{
 _gfx[k] = new PIXI.Graphics(); app.stage.addChild(_gfx[k]);
 });
-// Tail fins sit below body sprites so they peek out from behind the body
-_gfx.tails = new PIXI.Graphics();
-app.stage.addChild(_gfx.tails);
-// Sprite container sits above tails but below the Graphics overlay
-// so eyes/beak/glow are drawn on top of the sprite body
+// Below-body decorations (peek out from behind the bodies):
+//   tails   — boid forked tail fins
+//   predFin — predator trail + forked tail fin
+_gfx.tails  = new PIXI.Graphics(); app.stage.addChild(_gfx.tails);
+_gfx.predFin = new PIXI.Graphics(); app.stage.addChild(_gfx.predFin);
+// Shared body container — boids AND predators live here together and are
+// assigned in one depth-sorted order each frame, so they occlude each other
+// correctly (a near predator covers far boids; far boids/predators sit behind).
 _gfx.bodySprites = new PIXI.Container();
 app.stage.addChild(_gfx.bodySprites);
-['boids','splashes'].forEach(k=>{
-_gfx[k] = new PIXI.Graphics(); app.stage.addChild(_gfx[k]);
-});
-// Predator layers (above boid splashes, below predator beak/eyes overlay):
-//   predFin  — predator trail + forked tail fin (below sprite)
-//   predSprites — white teardrop body sprites
-//   predators — beak + eyes drawn on top of body sprite
-_gfx.predFin = new PIXI.Graphics(); app.stage.addChild(_gfx.predFin);
-_gfx.predSprites = new PIXI.Container(); app.stage.addChild(_gfx.predSprites);
+// Above-body overlays (small localised features, drawn over all bodies):
+//   boids     — boid glow, eyes, beak, disease dot, birth ring
+//   predators — predator beak, eyes, family dot
+//   splashes  — death bursts, on top
+_gfx.boids     = new PIXI.Graphics(); app.stage.addChild(_gfx.boids);
 _gfx.predators = new PIXI.Graphics(); app.stage.addChild(_gfx.predators);
+_gfx.splashes  = new PIXI.Graphics(); app.stage.addChild(_gfx.splashes);
 // Body sprite texture embedded as base64 — no file loading needed
 _defaultTex = PIXI.Texture.from(_BOID_PNG);
 _boidTexM = _boidTexF = _predTex = _defaultTex;
@@ -2102,16 +2102,6 @@ if(idx>=_bodySprites.length){
 }
 return _bodySprites[idx];
 }
-// Predator sprite pool — white tint, own container above boid sprites
-function _getPredSprite(idx){
-if(idx>=_predBodySprites.length){
-  const spr=new PIXI.Sprite(_predTex);
-  spr.anchor.set(0.5,0.5);
-  _gfx.predSprites.addChild(spr);
-  _predBodySprites.push(spr);
-}
-return _predBodySprites[idx];
-}
 // Load a data URL into a PIXI texture (async when not yet decoded)
 function _loadTex(dataURL, assign){
 const tex=PIXI.Texture.from(dataURL);
@@ -2130,8 +2120,9 @@ if(RUN_MODE==='dash') return; // dashboard keeps data URLs only (for export + br
 const mSrc=_customBoidPNG_M||_customBoidPNG, fSrc=_customBoidPNG_F||_customBoidPNG;
 if(mSrc) _loadTex(mSrc, t=>{ _boidTexM=t; }); else _boidTexM=_defaultTex;
 if(fSrc) _loadTex(fSrc, t=>{ _boidTexF=t; }); else _boidTexF=_defaultTex;
-if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _predTex=t; for(const s of _predBodySprites) s.texture=t; });
-else { _predTex=_defaultTex; for(const s of _predBodySprites) s.texture=_defaultTex; }
+// predator texture is assigned to shared pool sprites each frame in drawPredator
+if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _predTex=t; });
+else _predTex=_defaultTex;
 }
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
@@ -2193,12 +2184,17 @@ const bit = Math.floor(Math.random() * 8);
 return (gene ^ (1 << bit)) & 0xFF;
 }
 // ── predator helpers ──────────────────────────────────────────────────────────
+let _predSeq=0; // monotonic predator counter → stable negative ids
 function makePredator(){
 const ang=Math.random()*Math.PI*2;
 const spd=SPEED*1.2;
 return {
+// _pred flags it in the shared draw pass; negative id gives a stable
+// depth-sort tie-break that never collides with boid ids (≥0)
+_pred:true, id:-(++_predSeq),
 x:PREDATOR_RADIUS+Math.random()*(canvas.width-PREDATOR_RADIUS*2),
 y:PREDATOR_RADIUS+Math.random()*(canvas.height-PREDATOR_RADIUS*2),
+z:Math.random()*DEPTH, vz:0,
 vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
 wanderAngle:ang,
 _drawAngle:ang,
@@ -2869,8 +2865,8 @@ const curSpd    = isHungry ? huntSpd : cruiseSpd;
 // clear lock when not hungry (predator picks a fresh target each time it gets hungry)
 if(!isHungry) pred.lockedBoidId=null;
 // target seeking or wander — angle-capped turns, same physics as boids
+let target=null; // hoisted so depth motion below can dive toward the prey's z
 if(isHungry && aliveBoids.length>0){
-let target=null;
 if(HUNT_MODE==='lock'){
   // validate existing lock — the target must still be alive
   if(pred.lockedBoidId!==null){
@@ -2931,6 +2927,22 @@ if(pred.y<margin) py+=(margin-pred.y)/margin;
 if(pred.y>h-margin) py-=(pred.y-(h-margin))/margin;
 if(px!==0||py!==0) _predSteer(pred, curSpd, pred.x+px*100, pred.y+py*100, 2.0);
 pred.x+=pred.vx; pred.y+=pred.vy;
+// ── depth motion ─────────────────────────────────────────────────────────
+// Random z-walk with soft near/far walls; when hunting, dive/climb toward the
+// prey's depth so the chase is genuinely 3D. z=0 pins to the plane in 2D mode.
+if(DEPTH>0){
+  const vzmax=predSpd*Z_SPEED_FRAC;
+  if(pred.vz===undefined) pred.vz=0;
+  pred.vz+=(Math.random()-0.5)*vzmax*0.25;
+  if(target) pred.vz+=(target.z-pred.z)*0.02;
+  const m=Math.min(Z_MARGIN,DEPTH/2);
+  if(pred.z<m)       pred.vz+=(m-pred.z)/m*vzmax*0.08;
+  if(pred.z>DEPTH-m) pred.vz-=(pred.z-(DEPTH-m))/m*vzmax*0.08;
+  pred.vz=Math.max(-vzmax,Math.min(vzmax,pred.vz));
+  pred.z+=pred.vz;
+  if(pred.z<0){ pred.z=0; pred.vz=Math.abs(pred.vz); }
+  if(pred.z>DEPTH){ pred.z=DEPTH; pred.vz=-Math.abs(pred.vz); }
+} else { pred.z=0; pred.vz=0; }
 // hard bounce at edges — snap drawAngle (same as clampToBounds for boids)
 if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
 if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
@@ -2943,7 +2955,7 @@ if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
 if(isHungry){
 const pAng=Math.atan2(pred.vy,pred.vx);
 const pCos=Math.cos(pAng), pSin=Math.sin(pAng);
-const noseEdge=PREDATOR_RADIUS*(_noseOffset/_bodyScale); // matches drawPredators geometry
+const noseEdge=PREDATOR_RADIUS*(_noseOffset/_bodyScale); // matches drawPredator geometry (world units, unscaled)
 const beakLen=PREDATOR_RADIUS*0.9;
 const tipX=pred.x+pCos*(noseEdge+beakLen);
 const tipY=pred.y+pSin*(noseEdge+beakLen);
@@ -2952,8 +2964,8 @@ for(const b of _sgNeighbors(tipX,tipY,RADIUS)){
 if(b.dying) continue;
 // in lock mode, only the locked target can be eaten — ignore bystanders
 if(HUNT_MODE==='lock' && pred.lockedBoidId!==null && b.id!==pred.lockedBoidId) continue;
-const dx=b.x-tipX, dy=b.y-tipY;
-if(dx*dx+dy*dy<eatR2){
+const dx=b.x-tipX, dy=b.y-tipY, dz=(b.z||0)-(pred.z||0);
+if(dx*dx+dy*dy+dz*dz<eatR2){
 const veryHungry=(simClock-pred.lastEaten)>FULL_DURATION*2;
 const edible = PREDATOR_DIET===1 || (PREDATOR_DIET===2 ? boidInPreferredFamily(b) : !boidInPreferredFamily(b)) || veryHungry;
 if(edible){
@@ -2971,17 +2983,13 @@ break;
 predators=predators.filter(p=>p.alive);
 }
 
-function drawPredators(){
-// Three layers (cleared at frame start):
-//   _gfx.predFin    — trail + forked tail fin  (below sprite)
-//   _gfx.predSprites — white teardrop body sprites
-//   _gfx.predators  — beak + eyes drawn on top of sprite
+// Draw one predator. Called from the shared depth-sorted pass so its body
+// sprite interleaves with the boids; fin/trail go to _gfx.predFin (below all
+// bodies) and beak/eyes to _gfx.predators (above all bodies).
+function drawPredator(pred){
 const g=_gfx.predators;   // overlay (beak, eyes, family dot)
 const gf=_gfx.predFin;    // trail + tail fin
-
-for(const pred of predators){
-if(!pred.alive) continue;
-
+{
 const ang=Math.atan2(pred.vy,pred.vx);
 // Smooth display angle — same lerp as boids, snapped on wall bounce
 if(pred._drawAngle===undefined) pred._drawAngle=ang;
@@ -2990,7 +2998,8 @@ if(_pda>Math.PI)_pda-=Math.PI*2; else if(_pda<-Math.PI)_pda+=Math.PI*2;
 pred._drawAngle+=_pda*0.18;
 const cos=Math.cos(pred._drawAngle), sin=Math.sin(pred._drawAngle);
 const px=-sin, py=cos; // perpendicular (left)
-const r=PREDATOR_RADIUS;
+const zs=zScaleOf(pred);      // perspective: near predators bigger, far smaller
+const r=PREDATOR_RADIUS*zs;
 const bx=pred.x, by=pred.y;
 
 // ── trail (same style as boid trail, white) ──────────────────────────────
@@ -2998,7 +3007,7 @@ if(pred.trail.length>=2){
   const n=pred.trail.length;
   for(let i=1;i<n;i++){
     const t=Math.pow(i/(n-1),0.5);
-    gf.lineStyle(t*7+0.8, 0xffffff, t*0.85*TRAIL_OPACITY);
+    gf.lineStyle((t*7+0.8)*zs, 0xffffff, t*0.85*TRAIL_OPACITY);
     gf.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
     gf.lineTo(pred.trail[i].x,  pred.trail[i].y);
   }
@@ -3024,13 +3033,15 @@ if(pred.trail.length>=2){
 }
 
 // ── body sprite (white teardrop — tint 0xffffff keeps PNG grey values) ───
-const spr=_getPredSprite(_predSpriteCount++);
+// shared body pool → interleaves with boids by depth
+const spr=_getBodySprite(_spriteCount++);
+if(spr.texture!==_predTex) spr.texture=_predTex;
 spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=UPRIGHT_SPRITE ? 0 : pred._drawAngle;
 spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
-spr.alpha=0.92;
-spr.scale.set(r/_bodyScale); // scale: r/_bodyScale; adjust _bodyScale if body looks too big/small
+spr.alpha=0.92*Math.min(1,0.45+0.55*zs); // dim with depth beyond the midplane
+spr.scale.set(r/_bodyScale); // r already includes the depth scale zs
 
 // ── beak (always present on predator — light grey) ───────────────────────
 const noseEdge=r*(_noseOffset/_bodyScale); // same geometry as boid; calibrated by _noseOffset/_bodyScale
@@ -3127,16 +3138,11 @@ const alpha=Math.min(
 );
 const fertile=isFertile(boid)&&isFertile(partner)&&boid.sex!==partner.sex;
 const flashTime=spawnFlashPairs.get(key)||0;
-let color,lw;
-if(flashTime>0){        color=0xff3030; lw=18; }
-else if(fertile){       color=0xffd32a; lw=14; }
-else {
-  // blend hue of the two partners (circular average)
-  let dh=partner.hue-boid.hue;
-  if(dh>180)dh-=360; else if(dh<-180)dh+=360;
-  color=hslToHex((boid.hue+dh*0.5+360)%360,70,55); lw=6;
-}
-g.lineStyle(lw*((zScaleOf(boid)+zScaleOf(partner))/2),color,alpha*0.75);
+// Subtle single-colour (white) bond thread. Fertile pairs and birth flashes
+// read a touch brighter/thicker, but all stay thin and white.
+const lw = flashTime>0 ? 2.4 : fertile ? 1.8 : 1.3;
+const a  = flashTime>0 ? 0.55 : fertile ? 0.40 : 0.28;
+g.lineStyle(lw*((zScaleOf(boid)+zScaleOf(partner))/2), 0xffffff, alpha*a);
 g.moveTo(boid.x,boid.y); g.lineTo(partner.x,partner.y);
 }
 g.lineStyle(0);
@@ -3816,8 +3822,6 @@ updateDisease(dt);
 // hide all pooled sprites then re-show only those needed this frame
 _spriteCount=0;
 for(const s of _bodySprites) s.visible=false;
-_predSpriteCount=0;
-for(const s of _predBodySprites) s.visible=false;
 _gfx.tails.clear();     // boid forked tail fins
 _gfx.predFin.clear();   // predator trail + tail fin
 _gfx.predators.clear(); // predator beak + eyes overlay
@@ -3825,15 +3829,18 @@ _gfx.boids.clear();     // boid Graphics overlay: glow, eyes, beak, disease, bir
 // build set of boid IDs currently locked by a predator (for white tail fin)
 _lockedBoidIds.clear();
 if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==null) _lockedBoidIds.add(p.lockedBoidId);
-// Painter's order, always applied: far boids first, in 16-unit z-bands with a
-// descending-id tie-break. Quantising stops the front/back flicker between
-// boids at nearly equal depth (their z random walks cross constantly), and the
-// tie-break keeps a stable order at depth 0 — newborns fade in BEHIND older
-// boids instead of popping over everything. ~57 µs/frame on a Pi 4 at N=200.
-boids.sort((a,b)=>(((b.z/16)|0)-((a.z/16)|0))||(b.id-a.id));
-for(const boid of boids) drawBoid(boid);
+// Painter's order, always applied: boids AND predators together, far first, in
+// 16-unit z-bands with a descending-id tie-break. One shared body pool + one
+// sorted pass means predators occlude and are occluded by boids at their depth.
+// Quantising stops flicker between entities at nearly equal depth; the tie-break
+// keeps order stable at depth 0 (predators have negative ids, so they never
+// collide with boid ids). ~60 µs/frame on a Pi 4 at N=200.
+_drawList.length=0;
+for(const b of boids) _drawList.push(b);
+for(const p of predators) if(p.alive) _drawList.push(p);
+_drawList.sort((a,b)=>(((b.z/16)|0)-((a.z/16)|0))||(b.id-a.id));
+for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
 drawDeathSplashes();
-drawPredators();
 if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
 drawPopPyramid();
