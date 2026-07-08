@@ -1532,8 +1532,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
-<label>bond lines</label>
-<button id="bondLinesBtn" title="Toggle bond lines" style="
+<label>event fx</label>
+<button id="bondLinesBtn" title="Toggle bond lines, birth rings and death splashes" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
 background:#555;position:relative;transition:background 0.2s;outline:none;">
 <span id="bondLinesKnob" style="
@@ -3109,6 +3109,7 @@ g.endFill();
 
 function drawDeathSplashes(){
 const g=_gfx.splashes; g.clear();
+if(!SHOW_BOND_LINES) return; // the bond-lines toggle also hides birth rings + splashes
 for(const s of deathSplashes){
 const t=s.age/s.duration;
 const alpha=1-t;
@@ -3195,6 +3196,7 @@ g.lineStyle(0);
 
 function drawBirthRings(){
 const g=_gfx.birthRings; g.clear();
+if(!SHOW_BOND_LINES) return; // the bond-lines toggle also hides birth rings + splashes
 for(const ring of birthRings){
 const t = ring.age / ring.duration;
 if(t >= 1) continue;
@@ -3392,7 +3394,8 @@ if(SHOW_DETAILS && boid.diseased){
 
 // birth ring (boid-level: expanding ring as newborn fades in)
 // immigrants always get a white ring so they stand out from natural births
-if(boid.birthTimer>0){
+// hidden with the bond-lines toggle (which also hides birth rings + splashes)
+if(boid.birthTimer>0 && SHOW_BOND_LINES){
   const bt=boid.birthTimer/BIRTH_DURATION;
   const ringCol = boid.immigrantGeneration===0 ? 0xffffff : boidHex(boid);
   g.lineStyle(bt*8*zs, ringCol, bt*bt*0.9);
