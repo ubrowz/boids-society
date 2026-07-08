@@ -2692,8 +2692,12 @@ for(const b of _sgNeighbors(a.x,a.y,RADIUS*2)){
 if(b.id<=a.id||!b.alive||b.dying) continue;
 const c=getCool(a.id,b.id);
 if(c>0){setCool(a.id,b.id,c-1);continue;}
-const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
-if(dx*dx+dy*dy+dz*dz>=r2) continue;
+// Bonding is an ON-SCREEN encounter (xy only), NOT 3D: the depth-layering force
+// (see separateBoid) deliberately pushes overlapping boids apart in z, so a 3D test
+// would keep courting pairs out of range and no bond could ever form. Using xy also
+// keeps bonding inside the 2D-tuned population feedback loop, unchanged by depth.
+const dx=b.x-a.x,dy=b.y-a.y;
+if(dx*dx+dy*dy>=r2) continue;
 if(a.partnerId!==null||b.partnerId!==null) continue;
 if(a.isSingle||b.isSingle) continue;
 if(a.isGay!==b.isGay) continue; // gay only bonds with gay, straight with straight
