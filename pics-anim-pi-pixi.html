@@ -2494,40 +2494,62 @@ if(bounced){
 }
 }
 
-// ── body separation (no-overlap mode) ────────────────────────────────────────
-// Approach: direct position displacement each frame (physics-engine "position projection").
-// This is far more effective than steerToward for preventing visual overlap because:
-//   • steerToward turns the boid by at most TURN_SPEED×cap per frame — too slow.
-//   • Position projection resolves overlap immediately, with no heading/velocity change,
-//     so it causes zero rotation jitter.
-// _SEP_D must stay ≤ RADIUS*2 (the bonding collision distance).
-// If _SEP_D > RADIUS*2 boids are pushed apart before they can ever bond.
-// The sprite body is visually larger than this radius — some visual overlap is unavoidable
-// while bonding is enabled; "no overlap" mode reduces crowding but can't fully prevent it.
+// ── body separation ───────────────────────────────────────────────────────────
+// Boids occupy volume and do not interpenetrate. Two independent forces, both
+// position-projection (direct displacement each frame — resolves overlap without
+// touching heading, so no rotation jitter):
+//
+//   (1) In-plane push — only fires when boids are actually close in 3D, so a boid
+//       far in front never shoves one far behind out of the plane. Runs whenever
+//       "no overlap" is on OR depth is enabled (in 3D, non-interpenetration is
+//       intrinsic — see design doc). A steerToward term also nudges heading so
+//       boids navigate around each other (cap TURN_SPEED×1.5, ≤0.84°/frame visual).
+//
+//   (2) Depth layering (depth > 0 only) — boids that overlap ON SCREEN repel each
+//       other in z toward distinct depths, strongest when they are nearly co-planar
+//       in z and scaled by how much they overlap in the plane. This is what keeps
+//       the painter's draw order both stable and meaningful and kills the pop-in-
+//       front flicker: two boids sharing screen space end up at clearly different
+//       depths. Bonded partners rest ~one body apart in the plane (they don't
+//       overlap on screen), so they get almost no z-push and stay near-coplanar with
+//       a short bond line — no special-casing needed. Note the collision that repels
+//       is the same event that banks a bonding hit (hits never decay), so repulsion
+//       only paces courtship, it can't prevent it.
+//
+// _SEP_Z is the target depth gap for fully-overlapping boids; Z_THICK is the boid's
+// z "thickness" relative to its on-screen radius (tunable).
 const _SEP_D  = RADIUS * 2;
 const _SEP_D2 = _SEP_D * _SEP_D;
+const Z_THICK = 2.0;                 // depth thickness ÷ on-screen radius (tune for feel)
+const _SEP_Z  = _SEP_D * Z_THICK;    // target z gap for boids fully overlapping on screen
 function separateBoid(boid){
-// Two-layer separation:
-//   1. Gentle position nudge — resolves hard overlaps immediately without touching heading.
-//   2. steerToward — changes heading so boids actually navigate around each other.
-//      With cap=TURN_SPEED×1.5 and _drawAngle lerp 0.20 the visual snap is ≤0.84°/frame.
-//      (The old jitter came from the old cap of TURN_SPEED×6 = 16.8°/frame, now gone.)
 let fx=0, fy=0;
 const cw=canvas.width, ch=canvas.height;
+const sepZ=DEPTH>0 ? Math.min(_SEP_Z, DEPTH) : 0; // don't demand a gap wider than the tank
 for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
   if(!nb.alive || nb===boid) continue;
-  // 3D distance: boids at different depths pass over each other without pushing
   const dx=boid.x-nb.x, dy=boid.y-nb.y, dz=boid.z-nb.z;
-  const d2=dx*dx+dy*dy+dz*dz;
+  const dxy2=dx*dx+dy*dy;
+  const d2=dxy2+dz*dz;
+  // (1) in-plane non-interpenetration — gated on true 3D proximity
   if(d2<_SEP_D2){
     const d=d2>0.25?Math.sqrt(d2):0.5;
-    const wt=(_SEP_D-d)/_SEP_D; // weight: 1 at same pos, 0 at edge
+    const wt=(_SEP_D-d)/_SEP_D; // 1 at same pos, 0 at edge
     fx+=dx/d*wt; fy+=dy/d*wt;
-    // Immediate position nudge: 8 % of overlap — prevents freezing in tight clusters
-    const push=(_SEP_D-d)*0.08;
+    const push=(_SEP_D-d)*0.08;  // 8 % of overlap — prevents freezing in tight clusters
     boid.x+=dx/d*push;
     boid.y+=dy/d*push;
-    boid.z+=dz/d*push; // z-push: resolves stacks aligned along the depth axis (dz=0 in 2D mode — no-op)
+  }
+  // (2) depth layering — fires on on-screen overlap, spreads boids across depth
+  if(DEPTH>0 && dxy2<_SEP_D2){
+    const adz=Math.abs(dz);
+    if(adz<sepZ){
+      const dxy=dxy2>0.25?Math.sqrt(dxy2):0.5;
+      const wxy=(_SEP_D-dxy)/_SEP_D;                 // in-plane overlap: 1 stacked, 0 at edge
+      const wz=(sepZ-adz)/sepZ;                      // depth closeness: 1 co-planar, 0 at gap
+      const sign=adz>0.5 ? (dz>0?1:-1) : (boid.id>nb.id?1:-1); // break exact-z ties by id
+      boid.z+=sign*wz*sepZ*0.08*wxy;
+    }
   }
 }
 if(fx!==0||fy!==0){
@@ -3802,7 +3824,7 @@ if(!boid.alive) continue;
 updateBreeding(boid,dt);
 if(!boid.dying){
 avoidWalls(boid); wander(boid); updateZ(boid); nearnessBehavior(boid); bondAttraction(boid);
-if(NO_OVERLAP) separateBoid(boid);
+if(NO_OVERLAP || DEPTH>0) separateBoid(boid); // 3D → non-interpenetration is intrinsic; 2D → only when "no overlap" is on
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
 // only actually rotate toward it by at most TURN_SPEED×6 per frame, preventing
 // multi-force compounding and sudden snaps from any single force.
