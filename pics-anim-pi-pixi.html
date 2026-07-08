@@ -1564,20 +1564,22 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <div class="ctrl-row">
 <label>shape (both)</label>
 <input type="file" id="bodyImgFile" accept="image/*" style="display:none">
-<button id="bodyImgBtn" title="Load a PNG for all boids and predators" class="mini-btn">load</button>
+<button id="bodyImgBtn" title="Load one PNG used by predators, and by either sex that has no images of its own" class="mini-btn">load</button>
 <span id="bodyImgName" class="mini-note">default</span>
 </div>
 <div class="ctrl-row">
-<label>♂ shape</label>
-<input type="file" id="bodyImgMFile" accept="image/*" style="display:none">
-<button id="bodyImgMBtn" title="Load a PNG for male boids only (overrides the shared shape)" class="mini-btn">load</button>
-<span id="bodyImgMName" class="mini-note">—</span>
+<label>♂ images</label>
+<input type="file" id="bodyImgMFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgMBtn" title="Add one or more PNGs to the male pool — each male picks one at random at birth" class="mini-btn">add</button>
+<button id="bodyImgMClear" title="Clear the male image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgMName" class="mini-note">0 imgs</span>
 </div>
 <div class="ctrl-row">
-<label>♀ shape</label>
-<input type="file" id="bodyImgFFile" accept="image/*" style="display:none">
-<button id="bodyImgFBtn" title="Load a PNG for female boids only (overrides the shared shape)" class="mini-btn">load</button>
-<span id="bodyImgFName" class="mini-note">—</span>
+<label>♀ images</label>
+<input type="file" id="bodyImgFFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgFBtn" title="Add one or more PNGs to the female pool — each female picks one at random at birth" class="mini-btn">add</button>
+<button id="bodyImgFClear" title="Clear the female image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgFName" class="mini-note">0 imgs</span>
 </div>
 <div class="ctrl-row">
 <label title="Pixels from image centre to nose tip">nose px</label>
@@ -1618,9 +1620,10 @@ let app;
 let _idleText = null;    // PIXI.Text shown on idle screen, hidden when sim starts
 const _BOID_PNG = 'data:image/png;base64,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';
 let _defaultTex = null;  // embedded teardrop texture
-let _boidTexM = null;    // male body texture   — per-sex override → shared image → default
-let _boidTexF = null;    // female body texture — per-sex override → shared image → default
-let _predTex  = null;    // predator body texture — follows the shared image only
+let _sharedTex  = null;  // shared image — predators + fallback for a sex with an empty pool
+let _predTex    = null;  // predator body texture (follows the shared image)
+const _boidPoolM = [];   // male body textures   — [{tex,data}]; each male picks one at birth
+const _boidPoolF = [];   // female body textures — [{tex,data}]
 const _bodySprites = []; // reusable Sprite pool — one per visible boid per frame
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
 // predators share the boid body pool (_bodySprites) so they interleave by depth
@@ -1630,9 +1633,9 @@ const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; re
 // ── body image calibration (user-adjustable) ──────────────────────────────────
 let _noseOffset = 32;   // pixels from image centre to nose tip (teardrop-v3: pixel 72, anchor 40 → 32)
 let _bodyScale  = 13;   // body-radius calibration: spr.scale = r/_bodyScale
-let _customBoidPNG = null;   // data URL of shared body image (both sexes + predators), or null
-let _customBoidPNG_M = null; // data URL male-only override, or null
-let _customBoidPNG_F = null; // data URL female-only override, or null
+let _customBoidPNG = null;   // data URL of shared body image (predators + fallback), or null
+const _poolPNG_M = [];       // male image data URLs   (baked into exports, bridged to tank)
+const _poolPNG_F = [];       // female image data URLs
 
 
 // ── slider state ──────────────────────────────────────────────────────────────
@@ -1820,35 +1823,52 @@ if(HUNT_MODE === 'lock'){
 
 
 // ── body image loader ─────────────────────────────────────────────────────────
-// Apply a new body PNG (data URL) to a slot: 'both' (shared, incl. predators),
-// 'M' or 'F' (per-sex override). Remembered for exports, resolved into live
-// textures. Used by the file pickers locally and by the tank bridge.
-function applyBodyPNG(slot, dataURL){
-if(slot==='M') _customBoidPNG_M = dataURL;
-else if(slot==='F') _customBoidPNG_F = dataURL;
-else _customBoidPNG = dataURL;
-_recomputeTextures();
-}
-// One file picker per slot — shared button + per-sex overrides
-function _wireBodyImg(btnId, fileId, nameId, slot){
+// ── body-image data model ────────────────────────────────────────────────────
+// Shared image = predators + fallback for a sex with an empty pool (single).
+// Per-sex pools = arrays of data URLs; a boid picks one at birth (see drawBoid).
+function applyBodySharedPNG(dataURL){ _customBoidPNG=dataURL; _recomputeTextures(); }
+function addBodyPoolPNG(sex, dataURL){ (sex==='M'?_poolPNG_M:_poolPNG_F).push(dataURL); _recomputeTextures(); }
+function clearBodyPool(sex){ (sex==='M'?_poolPNG_M:_poolPNG_F).length=0; _recomputeTextures(); }
+function _poolCount(sex){ return (sex==='M'?_poolPNG_M:_poolPNG_F).length; }
+
+// Shared single picker
+document.getElementById('bodyImgBtn').addEventListener('click', () => document.getElementById('bodyImgFile').click());
+document.getElementById('bodyImgFile').addEventListener('change', e => {
+const file=e.target.files[0]; if(!file) return;
+const r=new FileReader();
+r.onload=ev=>{
+  applyBodySharedPNG(ev.target.result);
+  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:'both',data:ev.target.result});
+  document.getElementById('bodyImgName').textContent=file.name.replace(/\.[^.]+$/,'').substring(0,14);
+};
+r.readAsDataURL(file); e.target.value='';
+});
+
+// Per-sex multi-image pools (add + clear)
+function _wirePool(sex, btnId, fileId, clearId, countId){
+const setCount=()=>{ document.getElementById(countId).textContent=_poolCount(sex)+' imgs'; };
 document.getElementById(btnId).addEventListener('click', () => document.getElementById(fileId).click());
 document.getElementById(fileId).addEventListener('change', e => {
-const file = e.target.files[0];
-if(!file) return;
-const reader = new FileReader();
-reader.onload = ev => {
-  applyBodyPNG(slot, ev.target.result);
-  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot,data:ev.target.result});
-  // Show filename (truncated, no extension)
-  document.getElementById(nameId).textContent =
-    file.name.replace(/\.[^.]+$/,'').substring(0,14);
-};
-reader.readAsDataURL(file);
+  const files=[...e.target.files]; if(!files.length) return;
+  for(const file of files){
+    const r=new FileReader();
+    r.onload=ev=>{
+      addBodyPoolPNG(sex, ev.target.result);
+      if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:sex,data:ev.target.result});
+      setCount();
+    };
+    r.readAsDataURL(file);
+  }
+  e.target.value=''; // let the same files be picked again later
+});
+document.getElementById(clearId).addEventListener('click', () => {
+  clearBodyPool(sex);
+  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyclear',slot:sex});
+  setCount();
 });
 }
-_wireBodyImg('bodyImgBtn','bodyImgFile','bodyImgName','both');
-_wireBodyImg('bodyImgMBtn','bodyImgMFile','bodyImgMName','M');
-_wireBodyImg('bodyImgFBtn','bodyImgFFile','bodyImgFName','F');
+_wirePool('M','bodyImgMBtn','bodyImgMFile','bodyImgMClear','bodyImgMName');
+_wirePool('F','bodyImgFBtn','bodyImgFFile','bodyImgFClear','bodyImgFName');
 document.getElementById('noseOffsetInput').addEventListener('input', e => {
 const v = parseFloat(e.target.value);
 if(v > 0) _noseOffset = v;
@@ -1945,7 +1965,7 @@ _gfx.predators = new PIXI.Graphics(); app.stage.addChild(_gfx.predators);
 _gfx.splashes  = new PIXI.Graphics(); app.stage.addChild(_gfx.splashes);
 // Body sprite texture embedded as base64 — no file loading needed
 _defaultTex = PIXI.Texture.from(_BOID_PNG);
-_boidTexM = _boidTexF = _predTex = _defaultTex;
+_sharedTex = _predTex = _defaultTex;
 } // end if(RUN_MODE!=='dash')
 
 window.addEventListener('resize', () => { if(RUN_MODE==='dash') return; resize(); if (!running) drawIdle(); });
@@ -2095,7 +2115,7 @@ function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 // Sprite pool — fetch or create the Nth sprite for this frame
 function _getBodySprite(idx){
 if(idx>=_bodySprites.length){
-  const spr=new PIXI.Sprite(_boidTexM);
+  const spr=new PIXI.Sprite(_defaultTex);
   spr.anchor.set(0.5,0.5); // pivot at canvas centre = near body arc centre
   _gfx.bodySprites.addChild(spr);
   _bodySprites.push(spr);
@@ -2111,18 +2131,21 @@ else {
   tex.baseTexture.on('error',  () => console.warn('Body image failed to load'));
 }
 }
-// Resolve the effective texture per sex (override → shared → default) and for
-// predators (shared → default). Boid sprites are pooled and reused across
-// boids, so drawBoid assigns the per-sex texture each frame; only the predator
-// pool is swept here.
+// Rebuild a texture pool from its data-URL array. Append order is preserved, so
+// a boid's stored imgIdx keeps pointing at the same image across rebuilds.
+function _rebuildPool(pool, urls){
+pool.length=0;
+for(const u of urls){ const e={tex:_defaultTex, data:u}; _loadTex(u, t=>{ e.tex=t; }); pool.push(e); }
+}
+// Resolve textures from the current data URLs. Boid sprites are pooled and
+// reused, so drawBoid selects each boid's pool texture per frame; predators use
+// the shared image, assigned per frame in drawPredator.
 function _recomputeTextures(){
 if(RUN_MODE==='dash') return; // dashboard keeps data URLs only (for export + bridge)
-const mSrc=_customBoidPNG_M||_customBoidPNG, fSrc=_customBoidPNG_F||_customBoidPNG;
-if(mSrc) _loadTex(mSrc, t=>{ _boidTexM=t; }); else _boidTexM=_defaultTex;
-if(fSrc) _loadTex(fSrc, t=>{ _boidTexF=t; }); else _boidTexF=_defaultTex;
-// predator texture is assigned to shared pool sprites each frame in drawPredator
-if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _predTex=t; });
-else _predTex=_defaultTex;
+if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _sharedTex=t; _predTex=t; });
+else { _sharedTex=_defaultTex; _predTex=_defaultTex; }
+_rebuildPool(_boidPoolM, _poolPNG_M);
+_rebuildPool(_boidPoolF, _poolPNG_F);
 }
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
@@ -3274,7 +3297,17 @@ const px=-sin, py=cos; // perpendicular (left)
 
 const spr=_getBodySprite(_spriteCount++);
 // pooled sprites are reused across boids — pick the per-sex body texture each frame
-const _bt = boid.sex==='M' ? _boidTexM : _boidTexF;
+// per-sex image pool: each boid picks one image at birth (lazily on first draw,
+// same frame it appears) via imgIdx and keeps it for life; empty pool → shared/default
+const _pool = boid.sex==='M' ? _boidPoolM : _boidPoolF;
+let _bt;
+if(_pool.length){
+  if(boid.imgIdx===undefined || boid.imgIdx<0 || boid.imgIdx>=_pool.length)
+    boid.imgIdx = Math.floor(Math.random()*_pool.length);
+  _bt = _pool[boid.imgIdx].tex;
+} else {
+  _bt = _sharedTex || _defaultTex;
+}
 if(spr.texture!==_bt) spr.texture=_bt;
 spr.visible=true;
 spr.x=bx; spr.y=by;
@@ -3978,9 +4011,9 @@ SENSING_RADIUS = ${SENSING_RADIUS};
 DEPTH          = ${DEPTH};
 _noseOffset    = ${_noseOffset};
 _bodyScale     = ${_bodyScale};
-${_customBoidPNG   ? `_customBoidPNG   = ${JSON.stringify(_customBoidPNG)};`   : '// no shared body image'}
-${_customBoidPNG_M ? `_customBoidPNG_M = ${JSON.stringify(_customBoidPNG_M)};` : '// no male body image'}
-${_customBoidPNG_F ? `_customBoidPNG_F = ${JSON.stringify(_customBoidPNG_F)};` : '// no female body image'}
+${_customBoidPNG ? `_customBoidPNG = ${JSON.stringify(_customBoidPNG)};` : '// no shared body image'}
+_poolPNG_M.length=0; _poolPNG_M.push(...${JSON.stringify(_poolPNG_M)});
+_poolPNG_F.length=0; _poolPNG_F.push(...${JSON.stringify(_poolPNG_F)});
 _recomputeTextures();
 window.addEventListener('resize', resize);
 resize();
@@ -4096,7 +4129,10 @@ window.addEventListener('message', e => {
     if(m.kind==='click') el.click();
     else { el.value=m.value; el.dispatchEvent(new Event('input',{bubbles:true})); }
   } else if(m.t==='bodyimg'){
-    applyBodyPNG(m.slot||'both', m.data);
+    if(m.slot==='M'||m.slot==='F') addBodyPoolPNG(m.slot, m.data);
+    else applyBodySharedPNG(m.data);
+  } else if(m.t==='bodyclear'){
+    clearBodyPool(m.slot);
   }
 });
 }
