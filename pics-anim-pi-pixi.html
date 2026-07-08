@@ -2001,8 +2001,6 @@ let DEPTH = parseInt(document.getElementById('depthSlider').value);
 const Z_FOCAL = 600;        // perspective focal length: scale = Z_FOCAL/(Z_FOCAL+z-DEPTH/2)
 const Z_SPEED_FRAC = 0.35;  // max |vz| as fraction of SPEED — depth drift slower than planar flight
 const Z_MARGIN = 60;        // soft-repulsion band at the near/far depth walls
-const Z_BAND = 16;          // painter's-sort depth quantum: boids in the same 16-unit z-band
-                            // are ordered by id (stable); different bands ordered by depth
 // denominator stays ≥ Z_FOCAL-DEPTH/2 = 300 at the slider max of 600 — never 0
 function zScaleOf(o){ return DEPTH>0 ? Z_FOCAL/(Z_FOCAL+(o.z||0)-DEPTH/2) : 1; }
 const BOND_STRENGTH = 3.0;
@@ -2518,26 +2516,31 @@ if(bounced){
 //       is the same event that banks a bonding hit (hits never decay), so repulsion
 //       only paces courtship, it can't prevent it.
 //
-// _SEP_Z is the target depth gap for fully-overlapping boids. It is derived from
-// the painter's-sort band width, not from the boid size: to stop jitter popping,
-// two boids that overlap on screen only need to sit in *different* z-bands, i.e. be
-// ≥ one Z_BAND apart. We target Z_LAYER_BANDS (1.5) bands so the soft force's
-// equilibrium fluctuation never lets the gap dip below one full band. This is the
-// minimal thickness that kills the pop — no need to make boids fat in z.
-const _SEP_D  = RADIUS * 2;
-const _SEP_D2 = _SEP_D * _SEP_D;
-const Z_LAYER_BANDS = 1.5;              // overlapping boids separate by this many z-bands
-const _SEP_Z  = Z_BAND * Z_LAYER_BANDS; // ⇒ 24 units ≈ 0.6 × body diameter
+// The draw order is a *continuous* depth sort (see _drawList.sort), so order always
+// matches on-screen size — a nearer (bigger) boid can never be drawn behind a farther
+// (smaller) one. The layering force below is the jitter damper: it separates boids
+// that overlap ON SCREEN so their z-values don't keep crossing frame-to-frame.
+// Crucially its reach is the *visual sprite footprint* (_SEP_VIS), not the physical
+// body (_SEP_D) — sprites draw ~2.5× the body radius, so a 2·RADIUS trigger would miss
+// most visible overlaps and leave them jittering. _SEP_Z is how far apart in depth
+// overlapping boids settle: it only needs to exceed the per-frame z random-walk so the
+// gap's sign stays put; small keeps the flock thin in depth (no need for fat boids).
+const _SEP_D   = RADIUS * 2;             // physical body — in-plane non-interpenetration
+const _SEP_D2  = _SEP_D * _SEP_D;
+const _SEP_VIS = RADIUS * 3;             // visual sprite footprint — depth-layering reach
+const _SEP_VIS2= _SEP_VIS * _SEP_VIS;
+const _SEP_Z   = RADIUS * 1.5;           // depth gap overlapping boids settle to (≈30 units)
 function separateBoid(boid){
 let fx=0, fy=0;
 const cw=canvas.width, ch=canvas.height;
 const sepZ=DEPTH>0 ? Math.min(_SEP_Z, DEPTH) : 0; // don't demand a gap wider than the tank
-for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
+const queryR=DEPTH>0 ? _SEP_VIS : _SEP_D;         // layering needs the wider visual reach
+for(const nb of _sgNeighbors(boid.x, boid.y, queryR)){
   if(!nb.alive || nb===boid) continue;
   const dx=boid.x-nb.x, dy=boid.y-nb.y, dz=boid.z-nb.z;
   const dxy2=dx*dx+dy*dy;
   const d2=dxy2+dz*dz;
-  // (1) in-plane non-interpenetration — gated on true 3D proximity
+  // (1) in-plane non-interpenetration — physical bodies, gated on true 3D proximity
   if(d2<_SEP_D2){
     const d=d2>0.25?Math.sqrt(d2):0.5;
     const wt=(_SEP_D-d)/_SEP_D; // 1 at same pos, 0 at edge
@@ -2546,15 +2549,15 @@ for(const nb of _sgNeighbors(boid.x, boid.y, _SEP_D)){
     boid.x+=dx/d*push;
     boid.y+=dy/d*push;
   }
-  // (2) depth layering — fires on on-screen overlap, spreads boids across depth
-  if(DEPTH>0 && dxy2<_SEP_D2){
+  // (2) depth layering — fires on VISUAL on-screen overlap, spreads boids across depth
+  if(DEPTH>0 && dxy2<_SEP_VIS2){
     const adz=Math.abs(dz);
     if(adz<sepZ){
       const dxy=dxy2>0.25?Math.sqrt(dxy2):0.5;
-      const wxy=(_SEP_D-dxy)/_SEP_D;                 // in-plane overlap: 1 stacked, 0 at edge
+      const wxy=(_SEP_VIS-dxy)/_SEP_VIS;             // visual overlap: 1 stacked, 0 at edge
       const wz=(sepZ-adz)/sepZ;                      // depth closeness: 1 co-planar, 0 at gap
       const sign=adz>0.5 ? (dz>0?1:-1) : (boid.id>nb.id?1:-1); // break exact-z ties by id
-      boid.z+=sign*wz*sepZ*0.08*wxy;
+      boid.z+=sign*wz*sepZ*0.12*wxy;                 // 0.12 > jitter step so the gap sign holds
     }
   }
 }
@@ -3902,7 +3905,7 @@ if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==nu
 _drawList.length=0;
 for(const b of boids) _drawList.push(b);
 for(const p of predators) if(p.alive) _drawList.push(p);
-_drawList.sort((a,b)=>(((b.z/Z_BAND)|0)-((a.z/Z_BAND)|0))||(b.id-a.id));
+_drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order always matches size (far first)
 for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
 drawDeathSplashes();
 if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
