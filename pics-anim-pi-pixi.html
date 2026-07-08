@@ -2001,6 +2001,8 @@ let DEPTH = parseInt(document.getElementById('depthSlider').value);
 const Z_FOCAL = 600;        // perspective focal length: scale = Z_FOCAL/(Z_FOCAL+z-DEPTH/2)
 const Z_SPEED_FRAC = 0.35;  // max |vz| as fraction of SPEED — depth drift slower than planar flight
 const Z_MARGIN = 60;        // soft-repulsion band at the near/far depth walls
+const Z_BAND = 16;          // painter's-sort depth quantum: boids in the same 16-unit z-band
+                            // are ordered by id (stable); different bands ordered by depth
 // denominator stays ≥ Z_FOCAL-DEPTH/2 = 300 at the slider max of 600 — never 0
 function zScaleOf(o){ return DEPTH>0 ? Z_FOCAL/(Z_FOCAL+(o.z||0)-DEPTH/2) : 1; }
 const BOND_STRENGTH = 3.0;
@@ -2516,12 +2518,16 @@ if(bounced){
 //       is the same event that banks a bonding hit (hits never decay), so repulsion
 //       only paces courtship, it can't prevent it.
 //
-// _SEP_Z is the target depth gap for fully-overlapping boids; Z_THICK is the boid's
-// z "thickness" relative to its on-screen radius (tunable).
+// _SEP_Z is the target depth gap for fully-overlapping boids. It is derived from
+// the painter's-sort band width, not from the boid size: to stop jitter popping,
+// two boids that overlap on screen only need to sit in *different* z-bands, i.e. be
+// ≥ one Z_BAND apart. We target Z_LAYER_BANDS (1.5) bands so the soft force's
+// equilibrium fluctuation never lets the gap dip below one full band. This is the
+// minimal thickness that kills the pop — no need to make boids fat in z.
 const _SEP_D  = RADIUS * 2;
 const _SEP_D2 = _SEP_D * _SEP_D;
-const Z_THICK = 2.0;                 // depth thickness ÷ on-screen radius (tune for feel)
-const _SEP_Z  = _SEP_D * Z_THICK;    // target z gap for boids fully overlapping on screen
+const Z_LAYER_BANDS = 1.5;              // overlapping boids separate by this many z-bands
+const _SEP_Z  = Z_BAND * Z_LAYER_BANDS; // ⇒ 24 units ≈ 0.6 × body diameter
 function separateBoid(boid){
 let fx=0, fy=0;
 const cw=canvas.width, ch=canvas.height;
@@ -3896,7 +3902,7 @@ if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==nu
 _drawList.length=0;
 for(const b of boids) _drawList.push(b);
 for(const p of predators) if(p.alive) _drawList.push(p);
-_drawList.sort((a,b)=>(((b.z/16)|0)-((a.z/16)|0))||(b.id-a.id));
+_drawList.sort((a,b)=>(((b.z/Z_BAND)|0)-((a.z/Z_BAND)|0))||(b.id-a.id));
 for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
 drawDeathSplashes();
 if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
