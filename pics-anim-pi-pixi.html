@@ -1628,7 +1628,8 @@ const _bodySprites = []; // reusable Sprite pool — one per visible boid per fr
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
 // predators share the boid body pool (_bodySprites) so they interleave by depth
 const _drawList = []; // reused each frame: boids + live predators, depth-sorted
-let _maxVisR = RADIUS; // largest boid rendered half-extent this frame (for the depth-layering neighbour query)
+let _maxVisR = 0;      // largest boid rendered half-extent this frame (for the depth-layering neighbour query);
+                       // placeholder value — RADIUS is defined later, and this is reset every draw frame anyway
 const _gfx = {}; // named Graphics layers, populated after app is created
 const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; rebuilt each frame
 // ── body image calibration (user-adjustable) ──────────────────────────────────
