@@ -1628,6 +1628,7 @@ const _bodySprites = []; // reusable Sprite pool — one per visible boid per fr
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
 // predators share the boid body pool (_bodySprites) so they interleave by depth
 const _drawList = []; // reused each frame: boids + live predators, depth-sorted
+let _maxVisR = RADIUS; // largest boid rendered half-extent this frame (for the depth-layering neighbour query)
 const _gfx = {}; // named Graphics layers, populated after app is created
 const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; rebuilt each frame
 // ── body image calibration (user-adjustable) ──────────────────────────────────
@@ -2278,6 +2279,7 @@ y: y!==undefined?y:RADIUS+Math.random()*(canvas.height-RADIUS*2),
 vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED, _sa:angle, _drawAngle:angle,
 // children are born at their parents' depth; everyone else at a random depth
 z:(parentA!==undefined&&parentB!==undefined)?(parentA.z+parentB.z)/2:Math.random()*DEPTH, vz:0,
+_visR:RADIUS, // on-screen rendered half-extent (px); set each frame in drawBoid, used by depth layering
 hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
 age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
 partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
@@ -2520,21 +2522,24 @@ if(bounced){
 // matches on-screen size — a nearer (bigger) boid can never be drawn behind a farther
 // (smaller) one. The layering force below is the jitter damper: it separates boids
 // that overlap ON SCREEN so their z-values don't keep crossing frame-to-frame.
-// Crucially its reach is the *visual sprite footprint* (_SEP_VIS), not the physical
-// body (_SEP_D) — sprites draw ~2.5× the body radius, so a 2·RADIUS trigger would miss
-// most visible overlaps and leave them jittering. _SEP_Z is how far apart in depth
-// overlapping boids settle: it only needs to exceed the per-frame z random-walk so the
-// gap's sign stays put; small keeps the flock thin in depth (no need for fat boids).
+// Crucially its reach is the *true rendered footprint* of each boid's image, not a
+// constant — pool images can differ in pixel size, so each boid carries its own
+// on-screen half-extent (_visR, set in drawBoid). Two boids overlap on screen when
+// their centre distance is below the sum of their footprints; a fixed trigger would
+// miss big-image boids and leave them jittering. The physical in-plane push keeps its
+// fixed 2·RADIUS body reach. _SEP_Z is how far apart in depth overlapping boids
+// settle: it only needs to exceed the per-frame z random-walk so the gap's sign stays
+// put; small keeps the flock thin in depth (no need for fat boids).
 const _SEP_D   = RADIUS * 2;             // physical body — in-plane non-interpenetration
 const _SEP_D2  = _SEP_D * _SEP_D;
-const _SEP_VIS = RADIUS * 3;             // visual sprite footprint — depth-layering reach
-const _SEP_VIS2= _SEP_VIS * _SEP_VIS;
 const _SEP_Z   = RADIUS * 1.5;           // depth gap overlapping boids settle to (≈30 units)
 function separateBoid(boid){
 let fx=0, fy=0;
 const cw=canvas.width, ch=canvas.height;
 const sepZ=DEPTH>0 ? Math.min(_SEP_Z, DEPTH) : 0; // don't demand a gap wider than the tank
-const queryR=DEPTH>0 ? _SEP_VIS : _SEP_D;         // layering needs the wider visual reach
+const myVisR=boid._visR||RADIUS;
+// layering can reach any neighbour whose footprint could overlap mine → my extent + the largest
+const queryR=DEPTH>0 ? Math.max(_SEP_D, myVisR + _maxVisR) : _SEP_D;
 for(const nb of _sgNeighbors(boid.x, boid.y, queryR)){
   if(!nb.alive || nb===boid) continue;
   const dx=boid.x-nb.x, dy=boid.y-nb.y, dz=boid.z-nb.z;
@@ -2549,15 +2554,18 @@ for(const nb of _sgNeighbors(boid.x, boid.y, queryR)){
     boid.x+=dx/d*push;
     boid.y+=dy/d*push;
   }
-  // (2) depth layering — fires on VISUAL on-screen overlap, spreads boids across depth
-  if(DEPTH>0 && dxy2<_SEP_VIS2){
-    const adz=Math.abs(dz);
-    if(adz<sepZ){
-      const dxy=dxy2>0.25?Math.sqrt(dxy2):0.5;
-      const wxy=(_SEP_VIS-dxy)/_SEP_VIS;             // visual overlap: 1 stacked, 0 at edge
-      const wz=(sepZ-adz)/sepZ;                      // depth closeness: 1 co-planar, 0 at gap
-      const sign=adz>0.5 ? (dz>0?1:-1) : (boid.id>nb.id?1:-1); // break exact-z ties by id
-      boid.z+=sign*wz*sepZ*0.12*wxy;                 // 0.12 > jitter step so the gap sign holds
+  // (2) depth layering — fires on real on-screen overlap (sum of rendered footprints)
+  if(DEPTH>0){
+    const visSum=myVisR+(nb._visR||RADIUS);
+    if(dxy2<visSum*visSum){
+      const adz=Math.abs(dz);
+      if(adz<sepZ){
+        const dxy=dxy2>0.25?Math.sqrt(dxy2):0.5;
+        const wxy=(visSum-dxy)/visSum;                 // visual overlap: 1 stacked, 0 at edge
+        const wz=(sepZ-adz)/sepZ;                      // depth closeness: 1 co-planar, 0 at gap
+        const sign=adz>0.5 ? (dz>0?1:-1) : (boid.id>nb.id?1:-1); // break exact-z ties by id
+        boid.z+=sign*wz*sepZ*0.12*wxy;                 // 0.12 > jitter step so the gap sign holds
+      }
     }
   }
 }
@@ -3352,6 +3360,10 @@ spr.rotation=UPRIGHT_SPRITE ? 0 : boid._drawAngle;
 spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
+// true on-screen half-extent of THIS boid's image (px) — pool images can differ in
+// pixel size, so the depth layering measures each boid's real footprint, not a constant
+boid._visR = 0.5 * Math.max(spr.texture.width, spr.texture.height) * spr.scale.x;
+if(boid._visR > _maxVisR) _maxVisR = boid._visR;
 
 // ── forked tail fin (drawn in _gfx.tails, below the sprite so it peeks out behind) ──
 // Sprite tail tip is at (35/13)*r ≈ 2.69r behind boid centre.
@@ -3900,12 +3912,13 @@ _gfx.boids.clear();     // boid Graphics overlay: glow, eyes, beak, disease, bir
 // build set of boid IDs currently locked by a predator (for white tail fin)
 _lockedBoidIds.clear();
 if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==null) _lockedBoidIds.add(p.lockedBoidId);
-// Painter's order, always applied: boids AND predators together, far first, in
-// 16-unit z-bands with a descending-id tie-break. One shared body pool + one
+// Painter's order, always applied: boids AND predators together, far first, on
+// continuous depth with a descending-id tie-break. One shared body pool + one
 // sorted pass means predators occlude and are occluded by boids at their depth.
-// Quantising stops flicker between entities at nearly equal depth; the tie-break
-// keeps order stable at depth 0 (predators have negative ids, so they never
-// collide with boid ids). ~60 µs/frame on a Pi 4 at N=200.
+// Draw order matches on-screen size; flicker between entities at nearly equal
+// depth is damped by the depth-layering force (predators have negative ids, so
+// they never collide with boid ids). ~60 µs/frame on a Pi 4 at N=200.
+_maxVisR=RADIUS; // recomputed as each boid draws below; read by next frame's separation
 _drawList.length=0;
 for(const b of boids) _drawList.push(b);
 for(const p of predators) if(p.alive) _drawList.push(p);
