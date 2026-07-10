@@ -4156,7 +4156,12 @@ function _tankSend(m){ if(_tankAlive()) try{ tankWin.postMessage(m,'*'); }catch(
 function openAquarium(){
 if(_tankAlive()){ tankWin.focus(); return; }
 const html = buildStandaloneHTML('tank');
-tankWin = window.open('about:blank','boidAquarium');
+// Unique window name per call. A FIXED name ('boidAquarium') could silently target
+// a leftover aquarium tab from an earlier (reloaded) dashboard session whose opener
+// is now stale — the browser then spawns an orphaned blank tab while the sim loads
+// into the wrong window. _tankAlive() still dedups within the current session via the
+// tankWin reference, so this never opens two tanks for one live dashboard.
+tankWin = window.open('about:blank','boidAquarium_'+Date.now());
 if(!tankWin){ alert('The browser blocked the aquarium pop-up — allow pop-ups for this page and try again.'); return; }
 tankWin.document.open();
 tankWin.document.write(html);
