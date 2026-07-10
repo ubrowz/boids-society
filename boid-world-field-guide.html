@@ -177,7 +177,9 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
     <span class="chip">gay <b>10%</b> — same-sex bonds, no offspring</span>
     <span class="chip">bond after <b>≥1 hit</b> (slider)</span>
     <span class="chip">family target <b>≈ N(4, 0.8)</b> children</span>
-    <span class="chip">divorce <b>5% per s</b></span>
+    <span class="chip">divorce <b>5% per s</b> — or drift past <b>split dist</b></span>
+    <span class="chip">no offspring beyond <b>breed dist</b></span>
+    <span class="chip">reel-in ramp reels strays back before they split</span>
     <span class="chip">no parent–child or sibling pairs</span>
   </div>
 </section>
@@ -273,13 +275,16 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <h3>A third dimension, rented cheaply</h3>
   <p class="note">Depth is one extra coordinate, not a new engine. Each boid drifts through z on a slow random walk;
   the legacy 2D plane sits at mid-depth, so boids swim <em>toward</em> you past full size and shrink away behind it.
-  Hard collisions — bonding, disease, personal space — are 3D; steering stays 2D so the ecosystem needs no retuning.</p>
+  Disease and personal space are the 3D collisions; <em>bonding stays 2D</em> — an on-screen encounter — and steering
+  stays 2D too, so the ecosystem needs no retuning. Boids that overlap on screen gently push apart in z, so the
+  draw order stays honest and the front/back flicker disappears.</p>
   <div class="panel"><canvas id="depthC" aria-label="Side view of the depth model: boid size falling with z, legacy plane at mid-depth"></canvas></div>
   <div class="chips">
     <span class="chip">z range <b>0–600</b> (slider, 0 = classic 2D)</span>
     <span class="chip">scale = <b>600 / (600 + z − DEPTH/2)</b></span>
     <span class="chip">z drift ≤ <b>35%</b> of swim speed</span>
-    <span class="chip">draw order <b>far → near</b> (painter sort)</span>
+    <span class="chip">draw order <b>far → near</b> (continuous depth sort)</span>
+    <span class="chip">overlapping boids <b>layer apart</b> in z — no flicker</span>
     <span class="chip">predators ignore z <b>(v1)</b></span>
   </div>
 </section>
@@ -290,9 +295,9 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <h3>What you're seeing</h3>
   <p class="note">Six recurring glyphs carry the story. Once you can read them, the tank narrates itself.</p>
   <div class="fx">
-    <figure><canvas id="fx1"></canvas><figcaption><b>Tinted body</b> — one teardrop texture, tinted per-boid at HSL&nbsp;L85; beak length and eye size are the genes made visible.</figcaption></figure>
+    <figure><canvas id="fx1"></canvas><figcaption><b>Tinted body</b> — one teardrop texture, tinted per-boid at HSL&nbsp;L85; beak length and eye size are the genes made visible. Or swap in your own images — one pool per sex, picked at birth, sized by a scale slider.</figcaption></figure>
     <figure><canvas id="fx2"></canvas><figcaption><b>Aura glow</b> — amber for bonded pairs, own-hue for fertile adults still searching.</figcaption></figure>
-    <figure><canvas id="fx3"></canvas><figcaption><b>Bond line</b> — thin in the pair's blended hue; thick amber while fertile; flashes red at each birth.</figcaption></figure>
+    <figure><canvas id="fx3"></canvas><figcaption><b>Bond line</b> — a thin white thread between partners, a touch brighter while fertile or at a birth. One <em>event fx</em> switch hides bond lines, birth rings and splashes together.</figcaption></figure>
     <figure><canvas id="fx4"></canvas><figcaption><b>Birth ring</b> — expanding pulse in the newborn's colour; white when the newcomer is an immigrant.</figcaption></figure>
     <figure><canvas id="fx5"></canvas><figcaption><b>Death splash</b> — rings and particles in the deceased's hue, scaled by its depth.</figcaption></figure>
     <figure><canvas id="fx6"></canvas><figcaption><b>Motion trail</b> — a tapering wake; the white dot on a body marks disease.</figcaption></figure>
@@ -302,8 +307,8 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
 </main>
 
 <footer>
-  <p><b>Boid World — field guide.</b> Drawn from <span class="mono2">pics-anim-pi-pixi.html</span> as of July 2026
-  (commits <span class="mono2">cf43871</span>, <span class="mono2">88d1093</span>). Numbers shown are slider defaults —
+  <p><b>Boid World — field guide.</b> Drawn from <span class="mono2">pics-anim-pi-pixi.html</span> as of July 2026,
+  with the 2.5D depth, per-sex image pools and bond-distance model. Numbers shown are slider defaults —
   nearly every one of them is tunable live, which is rather the point.</p>
 </footer>
 
