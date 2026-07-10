@@ -326,13 +326,22 @@ hitProb  = min(1, hitProb × eyeMult × beakMult)   # combined 0.56..1.56</code>
 
 <!-- ───────────────────────────── DIVORCE ────────────────────────────────── -->
 <h2 id="divorce">Divorce</h2>
-<p>Each frame, each bonded pair has a small chance to split equal to <code>DIVORCE_RATE × dt</code>. When a divorce occurs:</p>
+<p>A pair splits on either of two triggers: the random <code>DIVORCE_RATE × dt</code> chance each frame, <em>or</em> the distance limit below (they "grew apart"). When a divorce occurs:</p>
 <ul>
   <li>Both partners become unbonded and their hit/children records for that pair are cleared</li>
   <li>Each partner's breed timer is reset with a random offset</li>
   <li><code>pairFamilyTarget</code> is reset to 0 for both</li>
 </ul>
 <p>The <strong>divorce rate</strong> slider (0–50%, default 5%) sets the per-second probability.</p>
+
+<h3>Bond distance limits &amp; reconvergence ramp</h3>
+<p>The bond is a soft spring (steer toward partner beyond <code>BOND_DIST = 90&nbsp;px</code>), not a rigid leash, so partners can be pulled apart by competing forces. Two distance limits give that drift consequences, and a turn-rate ramp keeps most couples from ever reaching them:</p>
+<ul>
+  <li><strong>Limit A — no offspring (<code>BOND_BREED_DIST = 2·BOND_DIST = 180&nbsp;px</code>).</strong> A couple farther apart than this cannot conceive: <code>updateBreeding</code> bails on a squared-distance check (no <code>sqrt</code>) before decrementing the breed timer, so conception simply pauses while they are separated and resumes when they close up.</li>
+  <li><strong>Limit B — divorce (<code>BOND_DIVORCE_DIST = 3.5·BOND_DIST = 315&nbsp;px</code>).</strong> Beyond this the pair divorces ("grew apart"), via the same split path as a random divorce. Checked in <code>updateDivorce</code> with a squared distance.</li>
+  <li><strong>Reconvergence ramp (<code>BOND_TURN_RAMP = 4</code>).</strong> Raising <code>BOND_STRENGTH</code> alone does nothing — the update loop's smooth-angle cap (<code>TURN_SPEED×1.5</code>) overrides it, so a boid heading away turns back only ~4°/frame, which is <em>why</em> couples drift. Instead, <code>bondAttraction</code> lifts that cap with distance: <code>_turnBoost = 1 + urg·BOND_TURN_RAMP</code> where <code>urg</code> ramps 0→1 from <code>BOND_DIST</code> to <code>BOND_DIVORCE_DIST</code>. A far-strayed boid U-turns up to 5× faster and reels back before hitting limit B — so ordinary wandering apart does <em>not</em> automatically end the marriage; only a sustained, strong pull does.</li>
+</ul>
+<p>All three are constants derived from <code>BOND_DIST</code> (not sliders), so they need no bridging or export baking. Cost is negligible on the Pi: the breeding check adds one squared-distance test per fertile pair; <code>updateDivorce</code> adds one per pair but now skips its per-frame <code>Set</code> allocation (using an <code>id&lt;partner.id</code> guard), so it is net neutral-to-cheaper; the ramp is one multiply per boid.</p>
 
 <!-- ───────────────────────────── FERTILITY ──────────────────────────────── -->
 <h2 id="fertility">Sex and Fertility</h2>

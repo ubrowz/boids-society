@@ -2003,8 +2003,8 @@ const BOND_DIST = 90;
 // sits at mid-depth z=DEPTH/2 — boids nearer than the midplane grow BEYOND
 // normal size (up to 2× at z=0 with DEPTH=600), farther ones shrink.
 // DEPTH=0 → pure 2D (every dz below is 0, every scale is 1 — exact legacy).
-// z affects hard collisions (bonding, disease, separation) and rendering only;
-// xy steering (nearness, cohesion, walls) stays 2D so flock dynamics don't
+// z affects hard collisions (disease, separation) and rendering only; bonding is
+// xy-only, and xy steering (nearness, cohesion, walls) stays 2D so flock dynamics don't
 // need retuning when depth changes. Predators ignore z entirely in v1.
 let DEPTH = parseInt(document.getElementById('depthSlider').value);
 const Z_FOCAL = 600;        // perspective focal length: scale = Z_FOCAL/(Z_FOCAL+z-DEPTH/2)
@@ -2013,6 +2013,9 @@ const Z_MARGIN = 60;        // soft-repulsion band at the near/far depth walls
 // denominator stays ≥ Z_FOCAL-DEPTH/2 = 300 at the slider max of 600 — never 0
 function zScaleOf(o){ return DEPTH>0 ? Z_FOCAL/(Z_FOCAL+(o.z||0)-DEPTH/2) : 1; }
 const BOND_STRENGTH = 3.0;
+const BOND_BREED_DIST   = BOND_DIST * 2;    // 180 px — a couple farther apart than this cannot conceive
+const BOND_DIVORCE_DIST = BOND_DIST * 3.5;  // 315 px — beyond this the pair divorces ("grew apart")
+const BOND_TURN_RAMP    = 4;                // reconvergence urgency: turn cap ×(1 .. 1+ramp) as distance → divorce
 const COOLDOWN_FRAMES = 30;
 const FADE_DURATION = 2.0;
 const BIRTH_DURATION = 1.5;
@@ -2290,7 +2293,7 @@ z:(parentA!==undefined&&parentB!==undefined)?(parentA.z+parentB.z)/2:Math.random
 _visR:RADIUS, // on-screen rendered half-extent (px); set each frame in drawBoid, used by depth layering
 hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
 age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
-partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()),
+partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()), _turnBoost:1,
 isChild:!!isChild, localPressure:0, globalPressure:0, popPressure:0,
 effectiveLifespan:BASE_LIFESPAN,
 maxLifespan:Math.max(BASE_LIFESPAN*0.3, gaussianRandom(BASE_LIFESPAN, BASE_LIFESPAN*0.2)),
@@ -2464,13 +2467,20 @@ steerToward(boid,2*boid.x-cx/count,2*boid.y-cy/count,-strength);
 }
 
 function bondAttraction(boid){
+boid._turnBoost=1;                       // reset each frame; only far-apart partners raise it
 if(boid.partnerId===null) return;
 const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive) return;
 const dx=partner.x-boid.x, dy=partner.y-boid.y;
 const dist=Math.sqrt(dx*dx+dy*dy);
 if(dist>BOND_DIST){
-// too far — pull toward partner
+// too far — pull toward partner, and ramp the turn cap up with distance so a boid
+// heading away U-turns harder the farther it strays. (Raising BOND_STRENGTH alone
+// does nothing — the smooth-angle cap in the update loop overrides it — so we ramp
+// that cap via _turnBoost instead.) This lets most couples reel back before the
+// divorce limit, so drifting apart doesn't automatically end the marriage.
+const urg=Math.min((dist-BOND_DIST)/(BOND_DIVORCE_DIST-BOND_DIST),1); // 0 at BOND_DIST → 1 at divorce dist
+boid._turnBoost=1+urg*BOND_TURN_RAMP;
 steerToward(boid,partner.x,partner.y,BOND_STRENGTH);
 } else if(dist < BOND_DIST * 0.4){
 // too close — steer away to maintain natural separation
@@ -2647,6 +2657,9 @@ const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive||boid.id>partner.id) return;
 if(boid.sex===partner.sex) return;
 if(!isFertile(boid)||!isFertile(partner)) return;
+// limit A: a couple drifted farther apart than BOND_BREED_DIST cannot conceive (squared, no sqrt)
+{ const _dx=boid.x-partner.x, _dy=boid.y-partner.y;
+  if(_dx*_dx+_dy*_dy > BOND_BREED_DIST*BOND_BREED_DIST) return; }
 const female=boid.sex==='F'?boid:partner;
 const gp=(boid.globalPressure+partner.globalPressure)/2;
 const t=(gp+1)/2;
@@ -2753,15 +2766,18 @@ b.pairFamilyTarget = target;
 }
 
 // ── divorce ───────────────────────────────────────────────────────────────────
+// Two triggers: the random DIVORCE_RATE, and limit B — a pair drifted past
+// BOND_DIVORCE_DIST "grows apart" and splits. Each pair is handled once via the
+// id<partner.id guard (no per-frame Set allocation — cheaper on the Pi).
 function updateDivorce(dt){
-if(DIVORCE_RATE===0) return;
-const seen=new Set();
+const B2=BOND_DIVORCE_DIST*BOND_DIVORCE_DIST;
 for(const boid of boids){
-if(!boid.alive||boid.dying||boid.partnerId===null||seen.has(boid.id)) continue;
+if(!boid.alive||boid.dying||boid.partnerId===null) continue;
 const partner=boidMap.get(boid.partnerId);
-if(!partner||!partner.alive) continue;
-seen.add(boid.id); seen.add(partner.id);
-if(Math.random() < DIVORCE_RATE * dt){
+if(!partner||!partner.alive||boid.id>partner.id) continue;
+const dx=partner.x-boid.x, dy=partner.y-boid.y;
+const tornApart = (dx*dx+dy*dy) > B2;                                // limit B
+if(tornApart || (DIVORCE_RATE>0 && Math.random() < DIVORCE_RATE*dt)){
 // split the pair
 clearPairChildren(boid.id, partner.id);
 clearPair(boid.id, partner.id);
@@ -3863,7 +3879,7 @@ if(NO_OVERLAP || DEPTH>0) separateBoid(boid); // 3D → non-interpenetration is 
 // multi-force compounding and sudden snaps from any single force.
 let _da=Math.atan2(boid.vy,boid.vx)-boid._sa;
 if(_da>Math.PI)_da-=Math.PI*2; else if(_da<-Math.PI)_da+=Math.PI*2;
-const _cap=TURN_SPEED*1.5; // ×1.5 (was ×6) — limits snap to ≤4.2°/frame at speed 7
+const _cap=TURN_SPEED*1.5*(boid._turnBoost||1); // ×1.5 base; bondAttraction raises it for far-apart partners
 boid._sa+=Math.max(-_cap,Math.min(_cap,_da));
 boid.vx=Math.cos(boid._sa)*SPEED; boid.vy=Math.sin(boid._sa)*SPEED;
 boid.x+=boid.vx; boid.y+=boid.vy;
