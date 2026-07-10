@@ -1359,6 +1359,21 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="divorceSlider" min="0" max="50" value="5" step="5">
 <span class="ctrl-val" id="divorceVal">5%</span>
 </div>
+<div class="ctrl-row">
+<label title="A couple farther apart than this (px) cannot conceive">breed dist</label>
+<input type="range" id="breedDistSlider" min="90" max="400" value="180" step="10">
+<span class="ctrl-val" id="breedDistVal">180 px</span>
+</div>
+<div class="ctrl-row">
+<label title="A couple farther apart than this (px) divorces — grew apart">split dist</label>
+<input type="range" id="divorceDistSlider" min="120" max="600" value="315" step="5">
+<span class="ctrl-val" id="divorceDistVal">315 px</span>
+</div>
+<div class="ctrl-row">
+<label title="How much harder far-apart partners turn back toward each other (0 = off)">reel-in</label>
+<input type="range" id="bondRampSlider" min="0" max="8" value="4" step="0.5">
+<span class="ctrl-val" id="bondRampVal">4.0×</span>
+</div>
 </section>
 
 <section class="panel">
@@ -1914,6 +1929,9 @@ wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION
 wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
 wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
 wire('divorceSlider',      'divorceVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DIVORCE_RATE=v/100; });
+wire('breedDistSlider',    'breedDistVal',    v=>parseInt(v),   v=>v+' px', v=>{ BOND_BREED_DIST=v; });
+wire('divorceDistSlider',  'divorceDistVal',  v=>parseInt(v),   v=>v+' px', v=>{ BOND_DIVORCE_DIST=v; });
+wire('bondRampSlider',     'bondRampVal',     v=>parseFloat(v), v=>parseFloat(v).toFixed(1)+'×', v=>{ BOND_TURN_RAMP=v; });
 wire('diseaseThreshSlider','diseaseThreshVal', v=>parseInt(v),   v=>v,      v=>{ DISEASE_THRESHOLD=v; });
 wire('diseaseDurSlider',   'diseaseDurVal',    v=>parseInt(v),   v=>v+' s', v=>{ DISEASE_DURATION=v; });
 wire('fatalitySlider',     'fatalityVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DISEASE_FATALITY=v/100; });
@@ -2013,9 +2031,9 @@ const Z_MARGIN = 60;        // soft-repulsion band at the near/far depth walls
 // denominator stays ≥ Z_FOCAL-DEPTH/2 = 300 at the slider max of 600 — never 0
 function zScaleOf(o){ return DEPTH>0 ? Z_FOCAL/(Z_FOCAL+(o.z||0)-DEPTH/2) : 1; }
 const BOND_STRENGTH = 3.0;
-const BOND_BREED_DIST   = BOND_DIST * 2;    // 180 px — a couple farther apart than this cannot conceive
-const BOND_DIVORCE_DIST = BOND_DIST * 3.5;  // 315 px — beyond this the pair divorces ("grew apart")
-const BOND_TURN_RAMP    = 4;                // reconvergence urgency: turn cap ×(1 .. 1+ramp) as distance → divorce
+let BOND_BREED_DIST   = parseInt(document.getElementById('breedDistSlider').value);     // px — beyond this a couple cannot conceive
+let BOND_DIVORCE_DIST = parseInt(document.getElementById('divorceDistSlider').value);   // px — beyond this the pair divorces
+let BOND_TURN_RAMP    = parseFloat(document.getElementById('bondRampSlider').value);    // reconvergence urgency: turn cap ×(1 .. 1+ramp)
 const COOLDOWN_FRAMES = 30;
 const FADE_DURATION = 2.0;
 const BIRTH_DURATION = 1.5;
@@ -4087,6 +4105,9 @@ DEPTH          = ${DEPTH};
 _noseOffset    = ${_noseOffset};
 _bodyScale     = ${_bodyScale};
 IMG_SCALE      = ${IMG_SCALE};
+BOND_BREED_DIST   = ${BOND_BREED_DIST};
+BOND_DIVORCE_DIST = ${BOND_DIVORCE_DIST};
+BOND_TURN_RAMP    = ${BOND_TURN_RAMP};
 ${_customBoidPNG ? `_customBoidPNG = ${JSON.stringify(_customBoidPNG)};` : '// no shared body image'}
 _poolPNG_M.length=0; _poolPNG_M.push(...${JSON.stringify(_poolPNG_M)});
 _poolPNG_F.length=0; _poolPNG_F.push(...${JSON.stringify(_poolPNG_F)});
