@@ -818,6 +818,7 @@ PREDATOR_RADIUS = RADIUS * 0.7 = 14    // same size as a single boid</code></pre
 <thead><tr><th>Slider</th><th>Range</th><th>Default</th><th>Effect</th></tr></thead>
 <tbody>
 <tr><td>Target population</td><td>2–200</td><td>30</td><td>Equilibrium point for all feedback arms</td></tr>
+<tr><td>Start pop</td><td>2–200</td><td>10</td><td>How many boids the simulation is <em>seeded</em> with (<code>INIT_POP</code>, used in <code>startSim</code>); the feedback loop then grows or shrinks it toward the target. Set below target to watch a founding population expand, above it to watch a crowd die back. Applies on the next start — a page reload, an export, or pause→play (which reseeds). Bridged to the aquarium tab and baked into exports.</td></tr>
 <tr><td>Pop ceiling</td><td>0–150 (0 = off)</td><td>off</td><td>Hard population cap: each frame, if the number of non-fading boids exceeds this value, one random boid is immediately set dying. At 0 the check is skipped entirely. Works in exported files (value is baked in at export time).</td></tr>
 <tr><td>Bond after</td><td>1–20 hits</td><td>1</td><td>Collisions required to form a bond</td></tr>
 <tr><td>Base lifespan</td><td>5–80 s</td><td>80 s</td><td>Lifespan at target population</td></tr>

@@ -1309,6 +1309,11 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <span class="ctrl-val" id="targetVal">30</span>
 </div>
 <div class="ctrl-row">
+<label title="How many boids the simulation is seeded with at start (applies on restart / play after pause)">start pop</label>
+<input type="range" id="initPopSlider" min="2" max="200" value="10">
+<span class="ctrl-val" id="initPopVal">10</span>
+</div>
+<div class="ctrl-row">
 <label>pop ceiling</label>
 <input type="range" id="popCeilSlider" min="0" max="150" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
@@ -1663,6 +1668,7 @@ const _poolPNG_F = [];       // female image data URLs
 
 // ── slider state ──────────────────────────────────────────────────────────────
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
+let INIT_POP = parseInt(document.getElementById('initPopSlider').value); // boids seeded at startSim (grows/shrinks toward TARGET_POP)
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
 let AURA_GRADIENT = true;
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
@@ -1911,6 +1917,7 @@ const el=document.getElementById(id), vl=document.getElementById(valId);
 el.addEventListener('input',()=>{ onSet(parse(el.value)); vl.textContent=fmt(el.value); });
 }
 wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
+wire('initPopSlider','initPopVal', v=>parseInt(v), v=>v, v=>{ INIT_POP=v; }); // takes effect on the next startSim (restart / play after pause)
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
 wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
@@ -3706,7 +3713,7 @@ hits.clear(); cooldown.clear(); pairChildren.clear(); spawnFlashPairs.clear(); d
 smoothPressure=0.5; smoothGlobalPressure=0.0; lastTime=null; immigrationTimer=10;
 birthEvents=[]; deathEvents=[]; immigrantEvents=[]; simClock=0; rHistory=[]; diseaseDeathEvents=[]; lastPyramidUpdate=-Infinity; _cachedDiversity=0.3; _cachedEffectiveBreeders=0;
 for(let i=0;i<N_PREDATORS;i++) predators.push(makePredator());
-for(let i=0;i<TARGET_POP;i++){
+for(let i=0;i<INIT_POP;i++){
 const b=makeBoid();
 b.age=Math.random()*b.maxLifespan*0.9;
 b.birthTimer=0;
@@ -4101,6 +4108,7 @@ resize = function(){
   if(app) app.renderer.resize(canvas.width, canvas.height);
 };
 SENSING_RADIUS = ${SENSING_RADIUS};
+INIT_POP       = ${INIT_POP};
 DEPTH          = ${DEPTH};
 _noseOffset    = ${_noseOffset};
 _bodyScale     = ${_bodyScale};
