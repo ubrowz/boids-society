@@ -1582,6 +1582,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="bodyImgFName" class="mini-note">0 imgs</span>
 </div>
 <div class="ctrl-row">
+<label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
+<input type="range" id="imgScaleSlider" min="0.1" max="3" value="1" step="0.05">
+<span class="ctrl-val" id="imgScaleVal">1.00×</span>
+</div>
+<div class="ctrl-row">
 <label title="Pixels from image centre to nose tip">nose px</label>
 <input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1">
 </div>
@@ -1635,6 +1640,7 @@ const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; re
 // ── body image calibration (user-adjustable) ──────────────────────────────────
 let _noseOffset = 32;   // pixels from image centre to nose tip (teardrop-v3: pixel 72, anchor 40 → 32)
 let _bodyScale  = 13;   // body-radius calibration: spr.scale = r/_bodyScale
+let IMG_SCALE   = parseFloat(document.getElementById('imgScaleSlider').value)||1; // user size multiplier on loaded images
 let _customBoidPNG = null;   // data URL of shared body image (predators + fallback), or null
 const _poolPNG_M = [];       // male image data URLs   (baked into exports, bridged to tank)
 const _poolPNG_F = [];       // female image data URLs
@@ -1903,6 +1909,7 @@ WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
 });
 wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v; });
 wire('depthSlider', 'depthVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ DEPTH=v; });
+wire('imgScaleSlider','imgScaleVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(2)+'×', v=>{ IMG_SCALE=v; });
 wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
 wire('gaySlider',    'gayVal',    v=>parseInt(v), v=>v+'%', v=>{ GAY_FRACTION=v/100; updateViability(); });
 wire('familySlider', 'familyVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ FAMILY_SIZE=v; updateViability(); });
@@ -3360,7 +3367,7 @@ spr.x=bx; spr.y=by;
 spr.rotation=UPRIGHT_SPRITE ? 0 : boid._drawAngle;
 spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
 spr.alpha=baseAlpha;
-spr.scale.set(r/_bodyScale); // scale calibrated by _bodyScale (body image loader control)
+spr.scale.set(r/_bodyScale*IMG_SCALE); // _bodyScale calibration × user image-scale slider
 // true on-screen half-extent of THIS boid's image (px) — pool images can differ in
 // pixel size, so the depth layering measures each boid's real footprint, not a constant
 boid._visR = 0.5 * Math.max(spr.texture.width, spr.texture.height) * spr.scale.x;
@@ -4063,6 +4070,7 @@ SENSING_RADIUS = ${SENSING_RADIUS};
 DEPTH          = ${DEPTH};
 _noseOffset    = ${_noseOffset};
 _bodyScale     = ${_bodyScale};
+IMG_SCALE      = ${IMG_SCALE};
 ${_customBoidPNG ? `_customBoidPNG = ${JSON.stringify(_customBoidPNG)};` : '// no shared body image'}
 _poolPNG_M.length=0; _poolPNG_M.push(...${JSON.stringify(_poolPNG_M)});
 _poolPNG_F.length=0; _poolPNG_F.push(...${JSON.stringify(_poolPNG_F)});
