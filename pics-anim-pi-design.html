@@ -216,7 +216,7 @@ spread     = ±0.55r sideways at the tips</code></pre>
 <table>
 <thead><tr><th>State</th><th>Visual</th><th>Hidden by details toggle?</th></tr></thead>
 <tbody>
-<tr><td>Fertile or bonded</td><td>Three concentric circles approximating a radial glow (gold if bonded, boid colour if just fertile)</td><td>Yes — hidden when details off</td></tr>
+<tr><td>Fertile or bonded</td><td>Three concentric circles approximating a radial glow, in the boid's own hue (via <code>_drawHex</code>, so it greys with the colour toggle); bonded boids glow a touch brighter (L60 vs L50)</td><td>Yes — hidden when details off</td></tr>
 <tr><td>Infertile, unbonded</td><td>55% opacity, no glow</td><td>—</td></tr>
 <tr><td>Diseased</td><td>Small white spot at body centre (radius 0.28r)</td><td>Yes — hidden when details off</td></tr>
 <tr><td>Fading in/out</td><td>Sprite alpha ramps over BIRTH_DURATION / FADE_DURATION</td><td>—</td></tr>
@@ -903,7 +903,7 @@ barWidth = min(count / maxCount × halfWidth, halfWidth)</code></pre>
 <tr><td>White forked V-tail (on a coloured boid)</td><td>This boid is the locked target of a predator in <em>lock</em> hunt mode</td></tr>
 <tr><td>Two dark eyes with highlight (both sexes)</td><td>Eye size encodes eyeGene; same gene inherited by both sexes. Hidden when details toggle is off.</td></tr>
 <tr><td>Small body (0.7× size)</td><td>Single boid — will never bond</td></tr>
-<tr><td>Gold glow around body</td><td>Bonded boid. Hidden when details toggle is off.</td></tr>
+<tr><td>Brighter own-hue glow around body</td><td>Bonded boid (glows slightly brighter than a fertile unbonded boid, same hue). Hidden when details toggle is off.</td></tr>
 <tr><td>Coloured glow around body</td><td>Fertile unbonded boid. Hidden when details toggle is off.</td></tr>
 <tr><td>Dimmed opacity (55%), no glow</td><td>Outside fertile window (juvenile or post-reproductive)</td></tr>
 <tr><td>Small white spot (centre)</td><td>Diseased boid — currently infectious. Hidden when details toggle is off.</td></tr>

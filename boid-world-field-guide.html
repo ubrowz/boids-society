@@ -301,7 +301,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <p class="note">Six recurring glyphs carry the story. Once you can read them, the tank narrates itself.</p>
   <div class="fx">
     <figure><canvas id="fx1"></canvas><figcaption><b>Tinted body</b> — one teardrop texture, tinted per-boid at HSL&nbsp;L85; beak length and eye size are the genes made visible. Or swap in your own images — one pool per sex, picked at birth, sized by a scale slider.</figcaption></figure>
-    <figure><canvas id="fx2"></canvas><figcaption><b>Aura glow</b> — amber for bonded pairs, own-hue for fertile adults still searching.</figcaption></figure>
+    <figure><canvas id="fx2"></canvas><figcaption><b>Aura glow</b> — the boid's own hue; a touch brighter for bonded pairs than for fertile adults still searching.</figcaption></figure>
     <figure><canvas id="fx3"></canvas><figcaption><b>Bond line</b> — a thin white thread between partners, a touch brighter while fertile or at a birth. One <em>event fx</em> switch cycles three states — all events, bond lines only, then none.</figcaption></figure>
     <figure><canvas id="fx4"></canvas><figcaption><b>Birth ring</b> — expanding pulse in the newborn's colour; white when the newcomer is an immigrant.</figcaption></figure>
     <figure><canvas id="fx5"></canvas><figcaption><b>Death splash</b> — rings and particles in the deceased's hue, scaled by its depth.</figcaption></figure>
@@ -649,8 +649,8 @@ function drawFx(){
   const amber=cssv('--amber');
   { const {ctx,w,h}=setupCanvas('fx1');            /* tinted body */
     drawBoid(ctx,w/2,h/2,17,-0.1,cssv('--f-blu'),{beak:0.9,eye:0.24}); }
-  { const {ctx,w,h}=setupCanvas('fx2');            /* glow */
-    glow(ctx,w/2,h/2,44,amber,1);
+  { const {ctx,w,h}=setupCanvas('fx2');            /* glow — own hue, matching the boid */
+    glow(ctx,w/2,h/2,44,cssv('--f-mag'),1);
     drawBoid(ctx,w/2,h/2,15,-0.1,cssv('--f-mag'),{eye:0.2}); }
   { const {ctx,w,h}=setupCanvas('fx3');            /* bond line */
     ctx.strokeStyle=amber; ctx.lineWidth=5; ctx.globalAlpha=0.85;

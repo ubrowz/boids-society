@@ -3394,7 +3394,9 @@ const baseAlpha = alpha * ((fertile||!DIM_INFERTILE) ? 1.0 : 0.55) * Math.min(1,
 // glow — three concentric circles approximate radial gradient
 if(SHOW_DETAILS && (isBonded||fertile)){
   const glowR=RADIUS*2.0*zs;
-  const glowCol = isBonded ? 0xffcc44 : _drawHex(boid,50);
+  // aura follows the boid's own hue (and greys out with the colour toggle, via _drawHex);
+  // bonded boids just glow a touch brighter (L60) so they still read as paired, in-palette.
+  const glowCol = _drawHex(boid, isBonded ? 60 : 50);
   g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
   g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
   g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
