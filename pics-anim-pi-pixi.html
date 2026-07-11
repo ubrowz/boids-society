@@ -1162,6 +1162,15 @@ canvas#c { display:none; }
   width:42px; height:42px; border-radius:8px; font-size:16px; cursor:pointer;
   background:rgba(11,232,129,0.10); border:2px solid rgba(11,232,129,0.45); color:var(--good); }
 #exportBtn:hover{ background:rgba(11,232,129,0.2); }
+#recBtn{
+  width:42px; height:42px; border-radius:50%; padding:0; cursor:pointer;
+  background:rgba(255,85,85,0.10); border:2px solid rgba(255,85,85,0.5);
+  display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
+#recBtn:hover{ background:rgba(255,85,85,0.2); }
+#recBtn .rec-icon{ width:15px; height:15px; border-radius:50%; background:var(--bad,#ff5555);
+  display:block; transition:border-radius 0.18s ease, width 0.18s ease, height 0.18s ease; }
+#recBtn.recording{ border-color:rgba(255,85,85,0.85); background:rgba(255,85,85,0.18); }
+#recBtn.recording .rec-icon{ width:13px; height:13px; border-radius:3px; } /* dot → square while recording */
 
 /* ── panel columns (masonry-style: panels pack without holes) ───────────── */
 #dbGrid{ columns:258px; column-gap:14px; }
@@ -1248,7 +1257,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
   <div id="dbActions">
     <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
-    <button id="recBtn" title="Record the aquarium to a video file (downloads a new clip each time you stop)">⏺</button>
+    <button id="recBtn" title="Record the aquarium to a video file (downloads a new clip each time you stop)"><span class="rec-icon"></span></button>
     <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi)">⬇</button>
   </div>
 </header>
@@ -3804,8 +3813,7 @@ statusEl.textContent='';
 let _mediaRec=null, _recChunks=[], _recStream=null, _dashRecOn=false;
 function _setRecBtn(on){
 const btn=document.getElementById('recBtn'); if(!btn) return;
-btn.textContent = on ? '⏹' : '⏺';
-btn.style.color = on ? '#ff5555' : '';
+btn.classList.toggle('recording', on); // CSS morphs the inner red dot ↔ red square
 btn.title = on ? 'Stop recording & save the clip' : 'Record the aquarium to a video file (downloads a new clip each time you stop)';
 }
 document.getElementById('recBtn').addEventListener('click',()=>{
