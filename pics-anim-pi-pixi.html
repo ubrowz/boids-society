@@ -1248,6 +1248,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
   <div id="dbActions">
     <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
+    <button id="recBtn" title="Record the aquarium to a video file (downloads a new clip each time you stop)">⏺</button>
     <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi)">⬇</button>
   </div>
 </header>
@@ -1551,7 +1552,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>aura</label>
-<button id="auraGradBtn" title="Toggle aura gradient" style="
+<button id="auraGradBtn" title="Cycle the bonded/fertile aura: off → flat → gradient" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
 background:#35d78a;position:relative;transition:background 0.2s;outline:none;">
 <span id="auraGradKnob" style="
@@ -1680,7 +1681,7 @@ const _poolPNG_F = [];       // female image data URLs
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let INIT_POP = parseInt(document.getElementById('initPopSlider').value); // boids seeded at startSim (grows/shrinks toward TARGET_POP)
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
-let AURA_GRADIENT = true;
+let AURA_MODE = 2; // aura render mode: 0 = off, 1 = flat disc, 2 = gradient (3 concentric circles)
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
@@ -1729,15 +1730,18 @@ immigrationLabel.style.color = '#c0392b';
 const auraGradBtn   = document.getElementById('auraGradBtn');
 const auraGradKnob  = document.getElementById('auraGradKnob');
 const auraGradLabel = document.getElementById('auraGradLabel');
-auraGradBtn.addEventListener('click',()=>{
-AURA_GRADIENT = !AURA_GRADIENT;
-if(AURA_GRADIENT){
-  auraGradBtn.style.background='#35d78a'; auraGradKnob.style.left='25px';
-  auraGradLabel.textContent='gradient'; auraGradLabel.style.color='#35d78a';
-} else {
-  auraGradBtn.style.background='#f9ca24'; auraGradKnob.style.left='3px';
-  auraGradLabel.textContent='flat'; auraGradLabel.style.color='#c8a000';
+function _applyAura(){
+  let bg,left,txt,col;
+  if(AURA_MODE===2){ bg='#35d78a'; left='25px'; txt='gradient'; col='#35d78a'; }   // knob right — green
+  else if(AURA_MODE===1){ bg='#f9ca24'; left='14px'; txt='flat'; col='#c8a000'; }   // knob middle — amber
+  else { bg='#555'; left='3px'; txt='off'; col='#555'; }                            // knob left — grey
+  auraGradBtn.style.background=bg; auraGradKnob.style.left=left;
+  auraGradLabel.textContent=txt; auraGradLabel.style.color=col;
 }
+_applyAura(); // init UI to the current mode
+auraGradBtn.addEventListener('click',()=>{
+  AURA_MODE = (AURA_MODE + 1) % 3; // cycle off → flat → gradient → off
+  _applyAura();
 });
 
 // ── background colour ─────────────────────────────────────────────────────────
@@ -3391,15 +3395,19 @@ const zs = zScaleOf(boid);
 const r = (boid.isSingle ? RADIUS*0.7 : RADIUS) * zs;
 const baseAlpha = alpha * ((fertile||!DIM_INFERTILE) ? 1.0 : 0.55) * Math.min(1, 0.45+0.55*zs); // dim beyond the midplane only
 
-// glow — three concentric circles approximate radial gradient
-if(SHOW_DETAILS && (isBonded||fertile)){
+// aura glow — mode 0 = off, 1 = flat disc, 2 = gradient (three concentric circles)
+if(SHOW_DETAILS && AURA_MODE>0 && (isBonded||fertile)){
   const glowR=RADIUS*2.0*zs;
   // aura follows the boid's own hue (and greys out with the colour toggle, via _drawHex);
   // bonded boids just glow a touch brighter (L60) so they still read as paired, in-palette.
   const glowCol = _drawHex(boid, isBonded ? 60 : 50);
-  g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
-  g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
-  g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
+  if(AURA_MODE===2){ // gradient — soft radial falloff
+    g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
+    g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
+    g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
+  } else { // flat — a single even disc
+    g.beginFill(glowCol, baseAlpha*0.18); g.drawCircle(boid.x,boid.y,glowR*0.6); g.endFill();
+  }
 }
 
 // Body sprite — positioned, rotated, and tinted to the boid's colour.
@@ -3789,6 +3797,52 @@ infectBoid(target);
 statusEl.textContent='';
 });
 
+// ── canvas video recorder ──────────────────────────────────────────────────────
+// Captures the actual WebGL canvas (not the screen) to a .webm/.mp4 via MediaRecorder.
+// The click is forwarded dashboard→tank by the control bridge, so the capture always
+// happens where the canvas lives; each Stop downloads a fresh timestamped file.
+let _mediaRec=null, _recChunks=[], _recStream=null, _dashRecOn=false;
+function _setRecBtn(on){
+const btn=document.getElementById('recBtn'); if(!btn) return;
+btn.textContent = on ? '⏹' : '⏺';
+btn.style.color = on ? '#ff5555' : '';
+btn.title = on ? 'Stop recording & save the clip' : 'Record the aquarium to a video file (downloads a new clip each time you stop)';
+}
+document.getElementById('recBtn').addEventListener('click',()=>{
+if(RUN_MODE==='dash'){
+  // No canvas here — the recording runs in the aquarium tab (bridge forwards this click).
+  if(!_tankAlive()) return;              // nothing to record until the aquarium is open
+  _dashRecOn=!_dashRecOn; _setRecBtn(_dashRecOn);
+  return;
+}
+// tank / standalone: do the real capture on this document's canvas
+if(_mediaRec && _mediaRec.state!=='inactive'){ _mediaRec.stop(); return; } // Stop → onstop downloads
+if(!canvas || typeof canvas.captureStream!=='function'){ console.warn('canvas capture not supported'); return; }
+try{
+  _recStream = canvas.captureStream(30); // 30 fps
+  const types=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+  const mime = types.find(t=>window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  _mediaRec = mime ? new MediaRecorder(_recStream,{mimeType:mime,videoBitsPerSecond:12000000})
+                   : new MediaRecorder(_recStream);
+}catch(err){ console.warn('recording unavailable:',err); _recStream=null; return; }
+_recChunks=[];
+_mediaRec.ondataavailable=e=>{ if(e.data && e.data.size) _recChunks.push(e.data); };
+_mediaRec.onstop=()=>{
+  const type=(_mediaRec&&_mediaRec.mimeType)||'video/webm';
+  const ext = type.indexOf('mp4')>=0 ? 'mp4' : 'webm';
+  const blob=new Blob(_recChunks,{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='boids-'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)+'.'+ext;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(_recStream){ _recStream.getTracks().forEach(t=>t.stop()); _recStream=null; }
+  _mediaRec=null; _setRecBtn(false);
+};
+_mediaRec.start(1000); // collect data every 1s so long clips survive
+_setRecBtn(true);
+});
+
 drawIdle();
 updateViability();
 
@@ -4057,7 +4111,8 @@ const bootScript = `<script>
 MAX_TRAIL         = ${MAX_TRAIL};
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
-AURA_GRADIENT     = ${AURA_GRADIENT};
+AURA_MODE         = ${AURA_MODE};
+_applyAura(); // sync the aura button visual to the exported mode
 NO_OVERLAP        = ${NO_OVERLAP};
 // Sync the no-overlap button visual to match the exported NO_OVERLAP state
 if(NO_OVERLAP){
@@ -4203,7 +4258,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn']);
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn','recBtn']);
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
