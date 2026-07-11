@@ -191,11 +191,16 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <p class="note">Every frame the tank takes its own census. Crowding above the target raises pressure; pressure
   pushes back through three independent arms — all negative feedback, so the population orbits the target
   instead of exploding or collapsing.</p>
+  <p class="note">Arm 1 is also what draws the flock together. It pulls each boid toward its local centre with a
+  <b>conservative spring</b> (a position nudge whose pulls cancel across the flock) — so clusters form tightly
+  but never creep into a corner — while a thermal <b>temperature</b> jitters every heading so a cluster's centre
+  wanders. The result: clusters that <b>breathe and roam</b>, loosening as they crowd and drifting as a whole.</p>
   <div class="panel scrollx"><svg id="dgFeed" class="dg" viewBox="0 0 960 360" role="img" aria-label="Negative feedback loop between population and pressure with three return arms: nearness, lifespan and breeding rate"></svg></div>
   <div class="chips">
     <span class="chip">arm 1 · nearness <b>4.0 → 0.05</b> — fewer meetings, fewer bonds</span>
     <span class="chip">arm 2 · lifespan <b>×1.25 → ×0.4</b> — deaths rise</span>
     <span class="chip">arm 3 · breeding interval <b>×3^p</b> — births slow</span>
+    <span class="chip">cohesion = conservative spring · <b>temp</b> keeps clusters roaming</span>
   </div>
 </section>
 

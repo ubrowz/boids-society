@@ -245,14 +245,20 @@ spread     = ±0.55r sideways at the tips</code></pre>
 
 <!-- ───────────────────────────── MOVEMENT ───────────────────────────────── -->
 <h2 id="movement">Movement</h2>
-<p>Each boid moves at a constant speed, direction updated every frame by four competing steering forces applied in sequence:</p>
+<p>Each boid moves at a constant speed, direction updated every frame by competing steering forces applied in sequence:</p>
 <ol>
   <li><strong>Wall avoidance</strong> — soft repulsion begins 40 px from any wall; hard bounce at the wall itself</li>
   <li><strong>Wander</strong> — a random-walk steering target projected ahead of the boid on a circle, jittered each frame</li>
-  <li><strong>Nearness</strong> — attraction toward the local flock centre (see Feedback Arm 1)</li>
+  <li><strong>Nearness / cohesion</strong> — pulls the boid toward the local flock centre. Applied as a <strong>conservative position-projection spring</strong> (see Feedback Arm 1), not a heading-steer.</li>
   <li><strong>Bond attraction</strong> — bonded partners stay within 45 px of each other</li>
 </ol>
 <p>Speed is user-controlled via a slider (1–10, mapped to 0.45–4.5 px/frame).</p>
+
+<h3>Thermal mixing (Boltzmann temperature)</h3>
+<p>After the smooth-angle cap sets each boid's heading, a Gaussian kick <code>gaussianRandom(0, _BOLTZ_ROT)</code> is added to the heading — a <strong>rotational diffusion</strong> term that gives the swarm a "temperature". Without it the fixed-speed boids are near-ballistic (they fly almost straight until a wall), so the flock mixes very slowly and early asymmetries never wash out. The thermal kick keeps headings decorrelating, so a cluster's centre-of-mass does Brownian motion — it <em>roams</em> rather than freezing in place. Exposed as the <strong>temp (mix)</strong> slider (0–1.5, default 0.20). At 0 the motion is the original near-ballistic behaviour; higher values mix more (too high reads as a gas rather than a flock).</p>
+
+<h3>Why cohesion is conservative</h3>
+<p>Cohesion used to be a fixed-speed <code>steerToward</code> the local centroid. That is <strong>non-conservative</strong>: every boid translates at full <code>SPEED</code>, so a boid far from the centroid is yanked inward at full speed while the dense core is not pushed out to match. The net effect is a systematic drift of the whole flock toward its own densest edge — which, against the walls, made the flock reliably collapse into a corner and stay there. Replacing it with a <strong>linear spring applied as a direct position projection</strong> (<code>x += k·(centre − x)</code>, the attractive mirror of body separation) fixes this: a linear spring's displacements sum to ~0 across the flock, so it is <strong>centre-of-mass preserving</strong> — the flock clusters tightly but no longer creeps into a corner. The spring coefficient is the <strong>cohere k</strong> slider (0–0.10, default 0.020); it is multiplied by the density-scaled nearness <code>strength</code> (Arm 1), so crowding still eases attraction. Heading is left to wander + thermal noise, so clusters read as a swarm drawn together rather than a column all facing one way.</p>
 
 <!-- ───────────────────────────── DEPTH ──────────────────────────────────── -->
 <h2 id="depth">Depth (2.5D)</h2>
@@ -404,7 +410,7 @@ globalPressure = clamp(fertilePairs / targetPairs − 1, −1, +1)</code></pre>
 
 <div class="arm">
 <h3>Arm 1 — Nearness (birth rate, indirect)</h3>
-<p><strong>Signals:</strong> <code>localPressure</code> and <code>popPressure</code> — controls how strongly boids steer toward each other. Cohesion is computed from neighbours within <code>BOND_DIST</code> (90 px), not the full <code>SENSING_RADIUS</code>, keeping flocking attraction local and preventing distant groups from pulling each other across the arena.</p>
+<p><strong>Signals:</strong> <code>localPressure</code> and <code>popPressure</code> — control how strongly boids are pulled toward each other. Cohesion is computed from neighbours within <code>BOND_DIST</code> (90 px), not the full <code>SENSING_RADIUS</code>, keeping attraction local and preventing distant groups from pulling each other across the arena. The <code>strength</code> below multiplies the conservative-cohesion spring coefficient (<em>cohere k</em>): the flock is pulled together by <code>x += cohere_k · strength · (centre − x)</code> (see “Why cohesion is conservative”).</p>
 <pre><code>combinedPressure = min(localPressure + max(popPressure, 0), 1)
 strength = (MIN_NEARNESS + (BASE_NEARNESS − MIN_NEARNESS) × (1 − combinedPressure))
            × thresholdScale</code></pre>
@@ -415,6 +421,7 @@ strength = (MIN_NEARNESS + (BASE_NEARNESS − MIN_NEARNESS) × (1 − combinedPr
 <tr><td>1 (dense)</td><td>Low (0.05)</td><td>Boids spread out → fewer collisions</td></tr>
 </tbody>
 </table>
+<p>Because this drops cohesion to ~1.25% of full strength (0.05 of 4.0) when a cluster gets dense, tight clusters visibly <strong>breathe</strong> — they loosen as they crowd and re-tighten as they thin. Raising <em>cohere k</em> holds a cluster together through that dip; lowering it (or raising the sensing radius) lets density regulate the cluster size more aggressively.</p>
 </div>
 
 <div class="arm">
@@ -841,6 +848,8 @@ PREDATOR_RADIUS = RADIUS * 0.7 = 14    // same size as a single boid</code></pre
 <tr><td>Prey</td><td>1–3 (step 1)</td><td>3 (other)</td><td>Predator diet: 1 = any boid; 2 = favored (eats preferred-family boids, works against the colour cycle); 3 = other (eats non-preferred-family boids, reinforces the colour cycle)</td></tr>
 <tr><td>Hunt</td><td>toggle (bump / lock)</td><td>bump</td><td><strong>bump</strong>: predator re-targets the nearest edible boid every frame. <strong>lock</strong>: on becoming hungry the predator picks a random edible boid in range and commits to chasing only that boid (shown with a white tail fin) until it is eaten; bystanders are ignored. Lock releases on eating or when full.</td></tr>
 <tr><td>Sensing radius</td><td>30–300 px</td><td>130 px</td><td>How far boids can sense neighbours for pressure, cohesion, collision, and disease. Smaller values reduce CPU load (smaller spatial grid queries); larger values give a more globally-aware flock. Exported (baked into boot script).</td></tr>
+<tr><td>Cohere k</td><td>0–0.10</td><td>0.020</td><td>Conservative-cohesion spring coefficient (<code>_COH_K</code>). Higher = tighter clusters. Multiplied by the density-scaled nearness strength, and applied as a CoM-preserving position projection so clusters don't creep into a corner (see <a href="#movement">Movement</a>). Live to the aquarium; exported (baked into boot script).</td></tr>
+<tr><td>Temp (mix)</td><td>0–1.5</td><td>0.20</td><td>Boltzmann rotational-diffusion "temperature" (<code>_BOLTZ_ROT</code>) — Gaussian jitter on each boid's heading per frame. 0 = near-ballistic (slow-mixing); higher mixes the swarm so clusters roam. Too high reads as a gas. Live to the aquarium; exported (baked into boot script).</td></tr>
 <tr><td>Depth</td><td>0–600 (0 = off)</td><td>off</td><td>Depth of the 2.5D z-range (see <a href="#depth">Depth</a>). At 0 the simulation is exactly the legacy 2D behaviour. Can be changed live — boids drift into the new range. Exported (baked into boot script).</td></tr>
 <tr><td>Trail opacity</td><td>0–100%</td><td>40%</td><td>Scales core trail alpha for both boids and predators</td></tr>
 <tr><td>Trail length</td><td>5–150</td><td>30</td><td>Number of past positions retained in the trail buffer</td></tr>
