@@ -1305,17 +1305,17 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <h2>Population</h2>
 <div class="ctrl-row">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="200" value="30">
+<input type="range" id="targetSlider" min="2" max="1000" value="30">
 <span class="ctrl-val" id="targetVal">30</span>
 </div>
 <div class="ctrl-row">
 <label title="How many boids the simulation is seeded with at start (applies on restart / play after pause)">start pop</label>
-<input type="range" id="initPopSlider" min="2" max="200" value="10">
+<input type="range" id="initPopSlider" min="2" max="1000" value="10">
 <span class="ctrl-val" id="initPopVal">10</span>
 </div>
 <div class="ctrl-row">
 <label>pop ceiling</label>
-<input type="range" id="popCeilSlider" min="0" max="150" value="0">
+<input type="range" id="popCeilSlider" min="0" max="1000" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
@@ -1553,7 +1553,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>event fx</label>
-<button id="bondLinesBtn" title="Toggle bond lines, birth rings and death splashes" style="
+<button id="bondLinesBtn" title="Cycle event fx: all (bond lines + birth rings + death splashes) → bond lines only → none" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
 background:#555;position:relative;transition:background 0.2s;outline:none;">
 <span id="bondLinesKnob" style="
@@ -1813,23 +1813,32 @@ if(UPRIGHT_SPRITE){
 }
 });
 
-// ── bond-lines toggle ─────────────────────────────────────────────────────────
-let SHOW_BOND_LINES = true;
+// ── event-fx toggle (3-state) ─────────────────────────────────────────────────
+// EVENT_FX: 2 = all events (bond lines + birth rings + death splashes)
+//           1 = bond lines only
+//           0 = nothing shown
+// Two derived flags drive the draw code so the rest of the file stays simple.
+let EVENT_FX    = 2;
+let SHOW_BONDS  = true;   // derived — bond lines drawn
+let SHOW_EVENTS = true;   // derived — birth rings + death splashes drawn
 const bondLinesBtn   = document.getElementById('bondLinesBtn');
 const bondLinesKnob  = document.getElementById('bondLinesKnob');
 const bondLinesLabel = document.getElementById('bondLinesLabel');
-// init UI to ON state
-bondLinesBtn.style.background='#54a0ff'; bondLinesKnob.style.left='25px';
-bondLinesLabel.textContent='on'; bondLinesLabel.style.color='#54a0ff';
-bondLinesBtn.addEventListener('click', () => {
-SHOW_BOND_LINES = !SHOW_BOND_LINES;
-if(SHOW_BOND_LINES){
-  bondLinesBtn.style.background='#54a0ff'; bondLinesKnob.style.left='25px';
-  bondLinesLabel.textContent='on'; bondLinesLabel.style.color='#54a0ff';
-} else {
-  bondLinesBtn.style.background='#555'; bondLinesKnob.style.left='3px';
-  bondLinesLabel.textContent='off'; bondLinesLabel.style.color='#555';
+function _applyEventFx(){
+  SHOW_BONDS  = EVENT_FX >= 1;
+  SHOW_EVENTS = EVENT_FX >= 2;
+  let bg,left,txt;
+  if(EVENT_FX===2){ bg='#54a0ff'; left='25px'; txt='all';   }   // knob right — blue
+  else if(EVENT_FX===1){ bg='#f0932b'; left='14px'; txt='bonds'; }   // knob middle — amber
+  else { bg='#555'; left='3px'; txt='off'; }                        // knob left — grey
+  if(bondLinesBtn)  bondLinesBtn.style.background=bg;
+  if(bondLinesKnob) bondLinesKnob.style.left=left;
+  if(bondLinesLabel){ bondLinesLabel.textContent=txt; bondLinesLabel.style.color=bg; }
 }
+_applyEventFx(); // init UI to "all"
+bondLinesBtn.addEventListener('click', () => {
+  EVENT_FX = (EVENT_FX + 2) % 3; // cycle all → bonds → none → all
+  _applyEventFx();
 });
 
 // ── hunt mode toggle ──────────────────────────────────────────────────────────
@@ -3201,7 +3210,7 @@ g.endFill();
 
 function drawDeathSplashes(){
 const g=_gfx.splashes; g.clear();
-if(!SHOW_BOND_LINES) return; // the bond-lines toggle also hides birth rings + splashes
+if(!SHOW_EVENTS) return; // shown only in event-fx mode "all"
 for(const s of deathSplashes){
 const t=s.age/s.duration;
 const alpha=1-t;
@@ -3240,7 +3249,7 @@ g.beginFill(hexFromCSS(BG_COLOR)); g.drawRect(0,0,canvas.width,canvas.height); g
 
 function drawBondLines(){
 const g=_gfx.bondLines; g.clear();
-if(!SHOW_BOND_LINES) return;
+if(!SHOW_BONDS) return; // hidden only in event-fx mode "off"
 const drawn=new Set();
 for(const boid of boids){
 if(!boid.alive||boid.partnerId===null) continue;
@@ -3288,7 +3297,7 @@ g.lineStyle(0);
 
 function drawBirthRings(){
 const g=_gfx.birthRings; g.clear();
-if(!SHOW_BOND_LINES) return; // the bond-lines toggle also hides birth rings + splashes
+if(!SHOW_EVENTS) return; // shown only in event-fx mode "all"
 for(const ring of birthRings){
 const t = ring.age / ring.duration;
 if(t >= 1) continue;
@@ -3414,6 +3423,11 @@ spr.scale.set(r/_bodyScale*IMG_SCALE); // _bodyScale calibration × user image-s
 boid._visR = 0.5 * Math.max(spr.texture.width, spr.texture.height) * spr.scale.x;
 if(boid._visR > _maxVisR) _maxVisR = boid._visR;
 
+// decorations (tail, beak, eyes, disease spot) attach to the rendered body, so they
+// track the image-scale slider too — otherwise they detach when the body is resized.
+// At IMG_SCALE=1 rDeco===r, so the default view is unchanged.
+const rDeco = r * IMG_SCALE;
+
 // ── forked tail fin (drawn in _gfx.tails, below the sprite so it peeks out behind) ──
 // Sprite tail tip is at (35/13)*r ≈ 2.69r behind boid centre.
 // The junction where the fork starts is at 1.7r back (inside the narrow tail of the sprite).
@@ -3426,19 +3440,19 @@ if(SHOW_DETAILS){
   const gt=_gfx.tails;
   gt.beginFill(tailCol, baseAlpha*0.88);
   // top of junction
-  gt.moveTo(bx - cos*r*junc + px*r*juncW, by - sin*r*junc + py*r*juncW);
+  gt.moveTo(bx - cos*rDeco*junc + px*rDeco*juncW, by - sin*rDeco*junc + py*rDeco*juncW);
   // upper lobe — curve out to upper fork tip
   gt.quadraticCurveTo(
-    bx - cos*r*mid + px*r*forkW*1.15, by - sin*r*mid + py*r*forkW*1.15,
-    bx - cos*r*tip + px*r*forkW,      by - sin*r*tip + py*r*forkW);
+    bx - cos*rDeco*mid + px*rDeco*forkW*1.15, by - sin*rDeco*mid + py*rDeco*forkW*1.15,
+    bx - cos*rDeco*tip + px*rDeco*forkW,      by - sin*rDeco*tip + py*rDeco*forkW);
   // down to centre notch
-  gt.lineTo(bx - cos*r*notch, by - sin*r*notch);
+  gt.lineTo(bx - cos*rDeco*notch, by - sin*rDeco*notch);
   // out to lower fork tip
-  gt.lineTo(bx - cos*r*tip - px*r*forkW, by - sin*r*tip - py*r*forkW);
+  gt.lineTo(bx - cos*rDeco*tip - px*rDeco*forkW, by - sin*rDeco*tip - py*rDeco*forkW);
   // lower lobe — curve back in to bottom of junction
   gt.quadraticCurveTo(
-    bx - cos*r*mid - px*r*forkW*1.15, by - sin*r*mid - py*r*forkW*1.15,
-    bx - cos*r*junc - px*r*juncW,     by - sin*r*junc - py*r*juncW);
+    bx - cos*rDeco*mid - px*rDeco*forkW*1.15, by - sin*rDeco*mid - py*rDeco*forkW*1.15,
+    bx - cos*rDeco*junc - px*rDeco*juncW,     by - sin*rDeco*junc - py*rDeco*juncW);
   gt.closePath();
   gt.endFill();
 }
@@ -3447,15 +3461,15 @@ if(SHOW_DETAILS){
 // teardrop-v3.png (v3): shape bbox left=5 right=72 top=22 bottom=56
 // Nose (right/forward) at pixel 72 → 32px ahead of anchor.
 // In world coords at scale r/13: nose is (32/13)*r ≈ 2.46r ahead of boid centre.
-const noseEdge = r * (_noseOffset / _bodyScale);
+const noseEdge = rDeco * (_noseOffset / _bodyScale);
 
 // beak: males only — attaches at the sprite nose edge, points further forward
 if(SHOW_DETAILS && boid.sex==='M'){
-  const beakLen=r*(0.3+boid.beakGene/255*1.7);
+  const beakLen=rDeco*(0.3+boid.beakGene/255*1.7);
   const bkBx=boid.x+cos*noseEdge*0.93, bkBy=boid.y+sin*noseEdge*0.93; // base just inside nose
   const bkTx=boid.x+cos*(noseEdge+beakLen), bkTy=boid.y+sin*(noseEdge+beakLen);
   const bkCpx=boid.x+cos*(noseEdge+beakLen*0.5), bkCpy=boid.y+sin*(noseEdge+beakLen*0.5);
-  const bkW=r*0.18;
+  const bkW=rDeco*0.18;
   const beakCol=_drawHex(boid,56);
   g.beginFill(beakCol, baseAlpha);
   g.moveTo(bkBx+px*bkW, bkBy+py*bkW);
@@ -3467,8 +3481,8 @@ if(SHOW_DETAILS && boid.sex==='M'){
 
 // eyes at ≈55% of nose distance — wide middle-front region of the body
 if(SHOW_DETAILS){
-const er=r*(0.15+(boid.eyeGene/255)*0.4);
-const eyeSpread=r*0.35+er*0.4;
+const er=rDeco*(0.15+(boid.eyeGene/255)*0.4);
+const eyeSpread=rDeco*0.35+er*0.4;
 const eyeFwd=noseEdge*0.55;                           // ≈1.35r ahead
 const elx=boid.x+cos*eyeFwd+px*eyeSpread, ely=boid.y+sin*eyeFwd+py*eyeSpread;
 const erx=boid.x+cos*eyeFwd-px*eyeSpread, ery=boid.y+sin*eyeFwd-py*eyeSpread;
@@ -3484,14 +3498,14 @@ g.endFill();
 // disease spot
 if(SHOW_DETAILS && boid.diseased){
   g.beginFill(0xffffff, alpha*0.95);
-  g.drawCircle(boid.x,boid.y,r*0.28);
+  g.drawCircle(boid.x,boid.y,rDeco*0.28);
   g.endFill();
 }
 
 // birth ring (boid-level: expanding ring as newborn fades in)
 // immigrants always get a white ring so they stand out from natural births
-// hidden with the bond-lines toggle (which also hides birth rings + splashes)
-if(boid.birthTimer>0 && SHOW_BOND_LINES){
+// shown only in event-fx mode "all" (birth rings + splashes)
+if(boid.birthTimer>0 && SHOW_EVENTS){
   const bt=boid.birthTimer/BIRTH_DURATION;
   const ringCol = boid.immigrantGeneration===0 ? 0xffffff : boidHex(boid);
   g.lineStyle(bt*8*zs, ringCol, bt*bt*0.9);
@@ -4052,22 +4066,8 @@ if(UPRIGHT_SPRITE){
   if(knob) knob.style.left='25px';
   if(lbl){ lbl.textContent='on'; lbl.style.color='#ffb142'; }
 }
-SHOW_BOND_LINES   = ${SHOW_BOND_LINES};
-// Sync the bond-lines button visual to match the exported SHOW_BOND_LINES state
-{
-  const btn=document.getElementById('bondLinesBtn');
-  const knob=document.getElementById('bondLinesKnob');
-  const lbl=document.getElementById('bondLinesLabel');
-  if(SHOW_BOND_LINES){
-    if(btn)  btn.style.background='#54a0ff';
-    if(knob) knob.style.left='25px';
-    if(lbl){ lbl.textContent='on'; lbl.style.color='#54a0ff'; }
-  } else {
-    if(btn)  btn.style.background='#555';
-    if(knob) knob.style.left='3px';
-    if(lbl){ lbl.textContent='off'; lbl.style.color='#555'; }
-  }
-}
+EVENT_FX          = ${EVENT_FX};
+_applyEventFx(); // sync derived flags (SHOW_BONDS/SHOW_EVENTS) + button visual to exported state
 SHOW_COLOR        = ${SHOW_COLOR};
 SPRITE_L          = ${SPRITE_L};
 document.getElementById('spriteLSlider').value=${SPRITE_L}; document.getElementById('spriteLVal').textContent=${SPRITE_L};

@@ -171,7 +171,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <p class="note">Bonds form by literally bumping into the right stranger. Every touch within two radii counts as a
   hit; the odds of a hit landing are shaped by colour-family preference and by morphology — females favour long
   beaks, males favour big eyes. Enough hits and the pair bonds, glows, and starts a family.</p>
-  <div class="panel scrollx"><svg id="dgCourt" class="dg" viewBox="0 0 960 400" role="img" aria-label="Courtship state machine from birth through single or unbonded pool, collision courtship, bonded pair, breeding loop, divorce and widowhood"></svg></div>
+  <div class="panel scrollx"><svg id="dgCourt" class="dg" viewBox="0 0 960 400" role="img" aria-label="Courtship state machine from birth through single or unbonded pool, collision courtship, bonded pair, breeding loop, divorce, drifting past the split distance, and widowhood"></svg></div>
   <div class="chips">
     <span class="chip">singles <b>20%</b> — never bond, drawn 0.7×</span>
     <span class="chip">gay <b>10%</b> — same-sex bonds, no offspring</span>
@@ -297,7 +297,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <div class="fx">
     <figure><canvas id="fx1"></canvas><figcaption><b>Tinted body</b> — one teardrop texture, tinted per-boid at HSL&nbsp;L85; beak length and eye size are the genes made visible. Or swap in your own images — one pool per sex, picked at birth, sized by a scale slider.</figcaption></figure>
     <figure><canvas id="fx2"></canvas><figcaption><b>Aura glow</b> — amber for bonded pairs, own-hue for fertile adults still searching.</figcaption></figure>
-    <figure><canvas id="fx3"></canvas><figcaption><b>Bond line</b> — a thin white thread between partners, a touch brighter while fertile or at a birth. One <em>event fx</em> switch hides bond lines, birth rings and splashes together.</figcaption></figure>
+    <figure><canvas id="fx3"></canvas><figcaption><b>Bond line</b> — a thin white thread between partners, a touch brighter while fertile or at a birth. One <em>event fx</em> switch cycles three states — all events, bond lines only, then none.</figcaption></figure>
     <figure><canvas id="fx4"></canvas><figcaption><b>Birth ring</b> — expanding pulse in the newborn's colour; white when the newcomer is an immigrant.</figcaption></figure>
     <figure><canvas id="fx5"></canvas><figcaption><b>Death splash</b> — rings and particles in the deceased's hue, scaled by its depth.</figcaption></figure>
     <figure><canvas id="fx6"></canvas><figcaption><b>Motion trail</b> — a tapering wake; the white dot on a body marks disease.</figcaption></figure>
@@ -381,8 +381,11 @@ flow('dgCourt', {
   {d:'M844,214 L844,288',cls:'edge-amber',marker:'arrA',label:'fertile M+F',lx:856,ly:255,lanchor:'start'},
   {d:'M746,300 C400,340 120,300 76,206',cls:'edge-green',marker:'arr',label:'newborn joins the tank',lx:390,ly:352},
   {d:'M800,150 C700,84 480,96 396,136',cls:'edge-dash',label:'divorce · 5% per s',lx:600,ly:92},
-  {d:'M880,150 C820,40 420,20 300,138',cls:'edge-dash',label:'widowed',lx:560,ly:38},
-]);
+  {d:'M806,150 C706,60 468,62 350,138',cls:'edge-dash',label:'drift past split dist',lx:466,ly:58},
+  {d:'M880,150 C820,26 420,8 300,138',cls:'edge-dash',label:'widowed',lx:560,ly:24},
+], svg=>{
+  txt(svg, 844, 374, 'mono', 'no offspring past breed dist', 'middle');
+});
 
 flow('dgFeed', {
   pop:{x:50,y:110,w:240,h:96,label:'Population',sub:['live boid count','vs target (30)']},
