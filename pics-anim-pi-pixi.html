@@ -1446,6 +1446,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="cohKVal">0.020</span>
 </div>
 <div class="ctrl-row">
+<label title="Alignment (Vicsek): each boid steers toward its neighbours' average heading. 0 = static clumps; higher = clusters spontaneously pick a direction and wander. Competes with temp — high temp keeps them meandering/reorienting.">align / roam</label>
+<input type="range" id="alignSlider" min="0" max="50" value="0" step="1">
+<span class="ctrl-val" id="alignVal">0.00</span>
+</div>
+<div class="ctrl-row">
 <label>depth</label>
 <input type="range" id="depthSlider" min="0" max="600" value="0" step="25">
 <span class="ctrl-val" id="depthVal">off</span>
@@ -1722,6 +1727,10 @@ let _BOLTZ_ROT = parseInt(document.getElementById('boltzRotSlider').value) / 100
 // as a direct position projection (CoM-preserving, so the flock clusters without creeping into a
 // corner — see nearnessBehavior). Live via the "cohere k" slider.
 let _COH_K = parseInt(document.getElementById('cohKSlider').value) / 1000;
+// Alignment (Vicsek collective motion): each boid steers toward its neighbours' average heading. This
+// makes headings correlated, so a dense cluster's average velocity is no longer ~0 and the whole cluster
+// self-propels/wanders instead of sitting still. 0 = off (today's static clumps). Live via "align / roam".
+let _ALIGN_K = parseInt(document.getElementById('alignSlider').value) / 100;
 let pyramidRefreshInterval = 3;
 let lastPyramidUpdate = -Infinity;
 
@@ -1979,6 +1988,7 @@ WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
 wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v; });
 wire('boltzRotSlider', 'boltzRotVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _BOLTZ_ROT=v; });
 wire('cohKSlider', 'cohKVal', v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3), v=>{ _COH_K=v; });
+wire('alignSlider', 'alignVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _ALIGN_K=v; });
 wire('depthSlider', 'depthVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ DEPTH=v; });
 wire('imgScaleSlider','imgScaleVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(2)+'×', v=>{ IMG_SCALE=v; });
 wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
@@ -2518,19 +2528,24 @@ const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure)
 
 // cohesion radius = BOND_DIST so nearness stays local
 const _cohR2=BOND_DIST*BOND_DIST;
-let cx=0,cy=0,count=0;
+let cx=0,cy=0,count=0,hx=0,hy=0;
 for(const o of _sgNeighbors(boid.x,boid.y,BOND_DIST)){
 if(!o.alive||o===boid) continue;
 const dx=o.x-boid.x, dy=o.y-boid.y;
-if(dx*dx+dy*dy<_cohR2){ cx+=o.x; cy+=o.y; count++; }
+if(dx*dx+dy*dy<_cohR2){ cx+=o.x; cy+=o.y; count++; if(_ALIGN_K>0){ hx+=o.vx; hy+=o.vy; } }
 }
 if(count===0){
+boid._hasAlign=false;
 // lone emigrant — weak pull toward the global flock centre so it doesn't get permanently lost
 let gx=0,gy=0,gc=0;
 for(const o of boids){ if(o.alive&&!o.dying&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
 if(gc>0){ const k=_COH_K*EMIG_RETURN; boid.x+=k*(gx/gc-boid.x); boid.y+=k*(gy/gc-boid.y); }
 return;
 }
+
+// Alignment target: the neighbours' average heading, stored for the movement loop to steer _sa toward.
+boid._hasAlign = (_ALIGN_K>0 && (hx!==0||hy!==0));
+if(boid._hasAlign) boid._alignAng = Math.atan2(hy,hx);
 
 // Conservative cohesion: a linear spring toward the local centroid, applied as a direct position
 // projection (like separateBoid, but attractive). Because a linear spring's displacements sum to ~0
@@ -4062,6 +4077,11 @@ let _da=Math.atan2(boid.vy,boid.vx)-boid._sa;
 if(_da>Math.PI)_da-=Math.PI*2; else if(_da<-Math.PI)_da+=Math.PI*2;
 const _cap=TURN_SPEED*1.5*(boid._turnBoost||1); // ×1.5 base; bondAttraction raises it for far-apart partners
 boid._sa+=Math.max(-_cap,Math.min(_cap,_da));
+if(_ALIGN_K>0 && boid._hasAlign){ // Vicsek alignment: steer toward neighbours' avg heading → clusters wander coherently
+  let _al=boid._alignAng-boid._sa;
+  if(_al>Math.PI)_al-=Math.PI*2; else if(_al<-Math.PI)_al+=Math.PI*2;
+  boid._sa+=_ALIGN_K*_al;
+}
 if(_BOLTZ_ROT>0) boid._sa += gaussianRandom(0,_BOLTZ_ROT); // Boltzmann thermal rotational diffusion → keeps the swarm mixing
 boid.vx=Math.cos(boid._sa)*SPEED; boid.vy=Math.sin(boid._sa)*SPEED;
 boid.x+=boid.vx; boid.y+=boid.vy;
@@ -4259,6 +4279,7 @@ _bodyScale     = ${_bodyScale};
 IMG_SCALE      = ${IMG_SCALE};
 _COH_K         = ${_COH_K};
 _BOLTZ_ROT     = ${_BOLTZ_ROT};
+_ALIGN_K       = ${_ALIGN_K};
 BOND_BREED_DIST   = ${BOND_BREED_DIST};
 BOND_DIVORCE_DIST = ${BOND_DIVORCE_DIST};
 BOND_TURN_RAMP    = ${BOND_TURN_RAMP};
