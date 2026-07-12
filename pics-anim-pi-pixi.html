@@ -1171,6 +1171,11 @@ canvas#c { display:none; }
   display:block; transition:border-radius 0.18s ease, width 0.18s ease, height 0.18s ease; }
 #recBtn.recording{ border-color:rgba(255,85,85,0.85); background:rgba(255,85,85,0.18); }
 #recBtn.recording .rec-icon{ width:13px; height:13px; border-radius:3px; } /* dot → square while recording */
+#saveBtn,#loadBtn{
+  height:42px; padding:0 14px; border-radius:8px; cursor:pointer;
+  font:600 12px system-ui,sans-serif; letter-spacing:0.03em;
+  color:var(--muted); background:var(--panel); border:1px solid var(--line2); }
+#saveBtn:hover,#loadBtn:hover{ color:var(--ink); border-color:var(--accent); }
 
 /* ── panel columns (masonry-style: panels pack without holes) ───────────── */
 #dbGrid{ columns:258px; column-gap:14px; }
@@ -1258,6 +1263,9 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
     <button id="recBtn" title="Record the aquarium to a video file (downloads a new clip each time you stop)"><span class="rec-icon"></span></button>
+    <button id="saveBtn" title="Save all current sliders &amp; toggles to a settings file (a new file each time)">Save</button>
+    <button id="loadBtn" title="Load sliders &amp; toggles from a settings file">Load</button>
+    <input type="file" id="loadFileInput" accept="application/json,.json" style="display:none">
     <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi)">⬇</button>
   </div>
 </header>
@@ -3849,6 +3857,57 @@ _mediaRec.onstop=()=>{
 };
 _mediaRec.start(1000); // collect data every 1s so long clips survive
 _setRecBtn(true);
+});
+
+// ── settings save / load ───────────────────────────────────────────────────────
+// Save every slider/number/colour input plus the toggle states to a JSON file, and
+// restore them by re-driving the same controls (which also forwards to the aquarium
+// via the existing input/click bridge). Body images are NOT included (too large).
+function _gatherSettings(){
+const inputs={};
+document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
+return { app:'boid-world', v:1, inputs,
+  toggles:{ EVENT_FX, AURA_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE } };
+}
+function _applySettings(s){
+if(!s || typeof s!=='object') return;
+if(s.inputs) for(const id in s.inputs){
+  const el=document.getElementById(id);
+  if(el && (el.type==='range'||el.type==='number'||el.type==='color')){
+    el.value=s.inputs[id];
+    el.dispatchEvent(new Event('input',{bubbles:true})); // runs wire() + forwards to the tank
+  }
+}
+const t=s.toggles||{};
+// Each toggle is restored by clicking its button to the saved state — this reuses the real
+// handler (updates var + UI) and the click is forwarded to the aquarium, keeping both in sync.
+const clickTo=(differs,id)=>{ if(differs){ const b=document.getElementById(id); if(b) b.click(); } };
+if(t.SHOW_COLOR!==undefined)        clickTo(!!SHOW_COLOR       !== !!t.SHOW_COLOR,        'colorBtn');
+if(t.SHOW_DETAILS!==undefined)      clickTo(!!SHOW_DETAILS     !== !!t.SHOW_DETAILS,      'detailsBtn');
+if(t.NO_OVERLAP!==undefined)        clickTo(!!NO_OVERLAP       !== !!t.NO_OVERLAP,        'noOverlapBtn');
+if(t.DIM_INFERTILE!==undefined)     clickTo(!!DIM_INFERTILE    !== !!t.DIM_INFERTILE,     'dimBtn');
+if(t.UPRIGHT_SPRITE!==undefined)    clickTo(!!UPRIGHT_SPRITE   !== !!t.UPRIGHT_SPRITE,    'uprightBtn');
+if(t.immigrationEnabled!==undefined)clickTo(!!immigrationEnabled!== !!t.immigrationEnabled,'immigrationBtn');
+if(t.HUNT_MODE!==undefined)         clickTo(t.HUNT_MODE!==HUNT_MODE,'huntModeBtn');
+if(t.EVENT_FX!==undefined){ let n=((t.EVENT_FX-EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); }
+if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
+}
+document.getElementById('saveBtn').addEventListener('click',()=>{
+const blob=new Blob([JSON.stringify(_gatherSettings(),null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url; a.download='boid-settings-'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)+'.json';
+document.body.appendChild(a); a.click(); a.remove();
+setTimeout(()=>URL.revokeObjectURL(url),10000);
+});
+const _loadFileInput=document.getElementById('loadFileInput');
+document.getElementById('loadBtn').addEventListener('click',()=> _loadFileInput.click());
+_loadFileInput.addEventListener('change',e=>{
+const f=e.target.files && e.target.files[0]; if(!f) return;
+const r=new FileReader();
+r.onload=()=>{ try{ _applySettings(JSON.parse(r.result)); }catch(err){ console.warn('could not load settings file:',err); } };
+r.readAsText(f);
+e.target.value=''; // let the same file be picked again later
 });
 
 drawIdle();
