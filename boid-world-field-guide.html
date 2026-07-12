@@ -691,5 +691,9 @@ new MutationObserver(()=>{ drawDepth(); drawFx(); if(reduced){ drawTank(); } })
   .observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ drawDepth(); drawFx(); if(reduced) drawTank(); });
 </script>
+
+<!-- GoatCounter — privacy-friendly analytics (public site only; kept off app/export files) -->
+<script data-goatcounter="https://boids-society.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
