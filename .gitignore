@@ -1,0 +1,17 @@
+# OS / editor cruft
+.DS_Store
+*.psd
+
+# Backup / duplicate copies (never publish to Pages)
+* copy.html
+* copy.*
+*-mychanges.html
+pics save.html
+
+# Personal / scratch assets not part of the site
+Oog.png
+joep.png
+Jeanne-Edit.*
+teardrop.png
+teardrop-v3.png
+gompertz-pdf.html
