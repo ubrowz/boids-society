@@ -95,6 +95,25 @@ section{padding:84px 0}
 .final h2{font-size:clamp(30px,5vw,54px);font-weight:800;letter-spacing:-0.02em;max-width:16ch;margin:0 auto}
 .final p{margin:18px auto 0;max-width:48ch;color:var(--muted);font-size:18px}
 .final .cta-row{justify-content:center}
+.demo-clip{margin:38px auto 16px;max-width:920px;border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;background:#040b13;box-shadow:0 18px 60px rgba(0,0,0,0.45)}
+.clip-stage{position:relative;aspect-ratio:16/9;background:#040b13}
+.clip-stage video,.clip-stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.clip-stage video{object-fit:cover}
+.clip-run{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;cursor:pointer;border:0;text-align:center;color:var(--ink);
+  background:radial-gradient(ellipse at center,rgba(5,14,24,0.30) 0%,rgba(5,14,24,0.72) 100%);transition:background .2s}
+.clip-run:hover{background:radial-gradient(ellipse at center,rgba(5,14,24,0.18) 0%,rgba(5,14,24,0.60) 100%)}
+.clip-run:focus-visible{outline:2px solid var(--amber);outline-offset:-4px}
+.clip-run .ico{display:flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:50%;
+  background:var(--amber);color:#0a1420;font-size:20px;padding-left:4px;box-shadow:0 8px 30px rgba(255,211,42,0.35)}
+.clip-run .lbl{font:700 17px 'Instrument Sans',sans-serif;margin-top:4px}
+.clip-run .sub{font:500 12.5px 'IBM Plex Mono',monospace;color:var(--muted)}
+.demo-cap{margin:14px auto 0;max-width:56ch;color:var(--faint);font:500 13px 'IBM Plex Mono',monospace;line-height:1.6}
+.demo-cap b{color:var(--muted)}
+.demo-cap a,.clip-back{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.demo-cap a:hover,.clip-back:hover{color:var(--ink)}
+.clip-back{margin-left:6px;background:none;border:0;cursor:pointer;font:inherit;padding:0}
 
 footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--faint);
   font:400 13px 'IBM Plex Mono',monospace}
@@ -233,6 +252,26 @@ footer .spacer{margin-left:auto}
   <p class="eyebrow">Pull up a chair</p>
   <h2>Watch a society run its course.</h2>
   <p>Set the rules, open the glass, and see whether your population thrives, drifts inbred, or gets eaten.</p>
+  <figure class="demo-clip">
+    <div class="clip-stage" id="clipStage">
+      <video autoplay muted loop playsinline preload="metadata"
+             aria-label="Recorded clip of the Boids Aquarium running">
+        <source src="boids-2026-07-12T17-33-00.webm" type="video/webm">
+        Your browser can't play this clip —
+        <a href="boids-2026-07-12T17-33-00.webm">download the recording</a> instead.
+      </video>
+      <button class="clip-run" id="clipRun" type="button"
+              aria-label="Run the live simulation in your browser">
+        <span class="ico">▶</span>
+        <span class="lbl">Run it live</span>
+        <span class="sub">the real simulation, right in your browser</span>
+      </button>
+    </div>
+  </figure>
+  <p class="demo-cap" id="demoCap">Above is a short recorded clip, looping. Press <b>Run it live</b> to embed
+    the real simulation — then <b>give it a couple of minutes</b>: the cluster dynamics take time to unfold as
+    groups form, drift, merge and break apart. A five-second glance won't show it. ·
+    <a href="boids-2026-07-12T17-33-00.webm">open clip full size ↗</a></p>
   <div class="cta-row">
     <a class="btn btn-primary" href="pics-anim-pi-pixi.html">Open the aquarium&nbsp;↗</a>
     <a class="btn btn-ghost" href="boid-world-field-guide.html">Read the field guide</a>
@@ -355,6 +394,40 @@ function draw(){
 function loop(){ step(); draw(); if(!reduced) requestAnimationFrame(loop); }
 init(); draw(); if(!reduced) requestAnimationFrame(loop);
 let rt; addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(init,160); });
+</script>
+
+<script>
+/* Closing demo: click-to-run. The video is a lightweight placeholder; on "Run it live"
+   we swap in the exported standalone (boids-society.html) as an iframe so the real sim
+   runs continuously. Kept out of the DOM until asked, so it never competes with the hero
+   canvas or burns CPU while the page is just being read. "Back to clip" tears it down. */
+(function(){
+  const stage=document.getElementById('clipStage');
+  const run=document.getElementById('clipRun');
+  const cap=document.getElementById('demoCap');
+  if(!stage||!run||!cap) return;
+  const video=stage.querySelector('video');
+  const capHTML=cap.innerHTML;
+  let frame=null;
+  run.addEventListener('click',function(){
+    if(video){ try{ video.pause(); }catch(e){} video.style.display='none'; }
+    run.style.display='none';
+    frame=document.createElement('iframe');
+    frame.src='boids-society.html';
+    frame.title='Live Boids Aquarium simulation';
+    frame.setAttribute('allow','fullscreen');
+    stage.appendChild(frame);
+    cap.innerHTML='Running live — <b>let it settle for a couple of minutes</b> to watch the clusters '
+      +'form, drift, merge and break apart. <button class="clip-back" id="clipBack" type="button">↺ back to the clip</button>';
+    const back=document.getElementById('clipBack');
+    if(back) back.addEventListener('click',function(){
+      if(frame){ frame.src='about:blank'; frame.remove(); frame=null; } // stop the sim
+      run.style.display='';
+      if(video){ video.style.display=''; try{ video.play(); }catch(e){} }
+      cap.innerHTML=capHTML;
+    });
+  });
+})();
 </script>
 </body>
 </html>
