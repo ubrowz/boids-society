@@ -4183,7 +4183,15 @@ function _getAstroBallTex(){
   g.destroy();
   return _astroBallTex;
 }
-function _astroRadiusPx(b){ return RADIUS*0.45*IMG_SCALE*Math.cbrt(b.m); } // body radius: tracks image-scale slider × cbrt(mass)
+function _astroRadiusPx(b){
+  // Physical (merge) radius = the DRAWN ball's world-space radius, so what visibly touches is
+  // what merges — previously the physics radius was ~7× smaller than the rendered ball, and two
+  // giants could sail through each other and pop out the far side without triggering accretion.
+  // 36 = the ball's disc radius within its 80 px texture; camera factors (√Z, perspective) are
+  // display-only and deliberately excluded. Also fixes the giant glow, which was computed from
+  // the old tiny radius and rendered invisibly INSIDE the body.
+  return 36*(RADIUS/_bodyScale)*IMG_SCALE*Math.cbrt(b.m);
+}
 
 function astroSeed(){
   if(_idleText) _idleText.visible=false;
@@ -4285,7 +4293,15 @@ function astroView(){ // auto-framing: track CoM + frame the HALF-MASS core, so 
     let acc=0; for(const e of ds){ acc+=e.m; if(acc>=M/2){ Rh=Math.max(e.d,30); break; } }
   }
   _astroRh=Rh;
-  const tZoom=Math.max(0.05, Math.min(4, 0.40*Math.min(canvas.width,canvas.height)/(Rh*2.5)));
+  // Endgame framing: with only a few bodies left, half-mass framing collapses onto the single
+  // dominant giant and its light companions orbit invisibly outside the view ("3 bodies but I
+  // only see 1"). With ≤12 bodies, widen the frame to include every remaining body.
+  let frameR=Rh*2.5;
+  if(boids.length<=12){
+    let dmax=30; for(const b of boids){ const d=Math.hypot(b.x-cx,b.y-cy,b.z-cz); if(d>dmax) dmax=d; }
+    frameR=Math.max(frameR, dmax*1.15);
+  }
+  const tZoom=Math.max(0.05, Math.min(4, 0.40*Math.min(canvas.width,canvas.height)/frameR));
   if(_astroSnap){ _astroCx=cx; _astroCy=cy; _astroZoom=tZoom; _astroSnap=false; }
   else { _astroCx+=(cx-_astroCx)*0.10; _astroCy+=(cy-_astroCy)*0.10; _astroZoom+=(tZoom-_astroZoom)*0.05; }
 }
@@ -4355,6 +4371,19 @@ function astroFrame(dt){
   // cull far escapers: slingshot ejecta beyond 12× the half-mass radius never come back —
   // they only waste O(N²) force work. (Skipped for small N so wide binaries survive.)
   if(boids.length>16) boids=boids.filter(b=>Math.hypot(b.x-_astroCx,b.y-_astroCy,b.z-_astroCz)<12*_astroRh);
+  else if(boids.length>2){
+    // Small-N cull: endgame framing includes every body, so a true escaper would drag the view
+    // out forever. Remove only bodies that are provably UNBOUND (positive orbital energy),
+    // receding, and far — a bound orbiting companion always fails this test and is never culled.
+    const G=_ASTRO_G*0.03; let M=0; for(const b of boids) M+=b.m;
+    boids=boids.filter(b=>{
+      const dx=b.x-_astroCx, dy=b.y-_astroCy, dz=b.z-_astroCz;
+      const r=Math.hypot(dx,dy,dz); if(r<Math.max(6*_astroRh,600)) return true;
+      const receding=dx*b.vx+dy*b.vy+dz*b.vz>0;
+      const unbound=0.5*(b.vx*b.vx+b.vy*b.vy+b.vz*b.vz) > G*(M-b.m)/r;
+      return !(receding&&unbound);
+    });
+  }
   for(const b of boids){ b.trail.push({x:b.x,y:b.y}); if(b.trail.length>MAX_TRAIL) b.trail.shift(); } // record orbital path
   drawBackground();
   _spriteCount=0;
