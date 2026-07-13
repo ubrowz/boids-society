@@ -3986,10 +3986,15 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 return { app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE } };
+  toggles:{ EVENT_FX, AURA_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE } };
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
+// Restore SIM_MODE FIRST: the mode click swaps the per-mode pop/scale stash, so it must run
+// before the file's input values are applied — otherwise the swap would overwrite them.
+if(s.toggles && s.toggles.SIM_MODE!==undefined && s.toggles.SIM_MODE!==SIM_MODE){
+  const b=document.getElementById('astroModeBtn'); if(b) b.click();
+}
 if(s.inputs) for(const id in s.inputs){
   const el=document.getElementById(id);
   if(el && (el.type==='range'||el.type==='number'||el.type==='color')){
@@ -4008,6 +4013,7 @@ if(t.DIM_INFERTILE!==undefined)     clickTo(!!DIM_INFERTILE    !== !!t.DIM_INFER
 if(t.UPRIGHT_SPRITE!==undefined)    clickTo(!!UPRIGHT_SPRITE   !== !!t.UPRIGHT_SPRITE,    'uprightBtn');
 if(t.immigrationEnabled!==undefined)clickTo(!!immigrationEnabled!== !!t.immigrationEnabled,'immigrationBtn');
 if(t.HUNT_MODE!==undefined)         clickTo(t.HUNT_MODE!==HUNT_MODE,'huntModeBtn');
+if(t.ASTRO_MERGE!==undefined)       clickTo(!!_ASTRO_MERGE         !== !!t.ASTRO_MERGE,   'astroMergeBtn');
 if(t.EVENT_FX!==undefined){ let n=((t.EVENT_FX-EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); }
 if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
 }
