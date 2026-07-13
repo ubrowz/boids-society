@@ -292,8 +292,8 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <p class="eyebrow">Render model · Layer stack</p>
   <h3>Ten layers, one WebGL frame</h3>
   <p class="note">PixiJS draws the tank painter-style, bottom to top. Bodies are pooled, tinted sprites of a single
-  teardrop texture; everything else is retessellated <span class="mono2">PIXI.Graphics</span>. On a Raspberry&nbsp;Pi&nbsp;4
-  the sprite batching is what buys the framerate.</p>
+  teardrop texture; everything else is retessellated <span class="mono2">PIXI.Graphics</span>. On low-power
+  hardware the sprite batching is what buys the framerate.</p>
   <div class="panel scrollx"><svg id="dgStack" class="dg" viewBox="0 0 960 430" role="img" aria-label="Exploded stack of the ten render layers from background fill up to predators"></svg></div>
 </section>
 

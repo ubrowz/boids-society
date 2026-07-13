@@ -62,7 +62,7 @@ Everything (including the PixiJS engine and fonts) is embedded, so it runs fully
 
 The dashboard has three run modes: a **dashboard** (controls only), a **live tank** (opened in its own
 tab and steered live from the dashboard), and a **standalone export** — a UI-less, auto-starting kiosk
-build that runs offline on a **Raspberry Pi 4** driving an LED panel.
+build that runs fullscreen and fully offline in any WebGL browser.
 
 ## Repo layout
 
