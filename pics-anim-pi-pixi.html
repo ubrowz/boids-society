@@ -4144,7 +4144,7 @@ pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
 // Newtonian gravity (1/r²), integrate with real inertia so they fall in, overshoot
 // and orbit, and merge on contact (conserving mass + momentum) so they accrete into
 // growing "planets/stars". Society subsystems (breeding/disease/predators) don't run.
-let _astroZoom=1, _astroCx=0, _astroCy=0, _astroSnap=false, _astroRh=30; // auto-framing state (Rh = half-mass radius)
+let _astroZoom=1, _astroCx=0, _astroCy=0, _astroCz=0, _astroSnap=false, _astroRh=30; // auto-framing state (Rh = half-mass radius)
 // Ball sprite for astro bodies — the teardrop "fish" looks odd orbiting a disk. Drawn once
 // as a soft-shaded white sphere (80×80, same dims as the teardrop so all scale math holds);
 // white so the normal per-body tint colours it. Lazy: only built where a PIXI app exists.
@@ -4154,11 +4154,15 @@ function _getAstroBallTex(){
   const g=new PIXI.Graphics();
   // Solid, crisp-edged sphere. Shading lives in the GREYS (tint multiplies: grey = darker
   // tint, white = full tint), not in alpha — translucent shading made small bodies fuzzy/dim.
-  g.beginFill(0x8a8a8a,1); g.drawCircle(40,40,36); g.endFill(); // darkest rim
-  g.beginFill(0xb4b4b4,1); g.drawCircle(38.5,38.5,29); g.endFill();
-  g.beginFill(0xdcdcdc,1); g.drawCircle(37,37,21); g.endFill();
-  g.beginFill(0xffffff,1); g.drawCircle(35,35,11); g.endFill(); // offset highlight → lit from upper-left
-  _astroBallTex=app.renderer.generateTexture(g,{region:new PIXI.Rectangle(0,0,80,80)});
+  // 9 steps (few enough to batch, enough to read as a smooth gradient when magnified) from a
+  // dark rim to a white highlight drifting toward the upper-left → lit sphere.
+  for(let i=0;i<9;i++){
+    const t=i/8, g8=Math.round(0x88+(0xff-0x88)*t), col=(g8<<16)|(g8<<8)|g8;
+    g.beginFill(col,1); g.drawCircle(40-5*t,40-5*t,36-25*t); g.endFill();
+  }
+  // resolution 4: texture reports 80×80 (so all scale math is unchanged) but carries 320×320
+  // pixels — accreted giants magnify ~5×, and at resolution 1 they went blurry.
+  _astroBallTex=app.renderer.generateTexture(g,{region:new PIXI.Rectangle(0,0,80,80),resolution:4});
   g.destroy();
   return _astroBallTex;
 }
@@ -4177,15 +4181,18 @@ function astroSeed(){
   for(let i=0;i<N;i++){
     const a=Math.random()*Math.PI*2, rr=Math.sqrt(Math.random())*R;
     const b=makeBoid(cx+Math.cos(a)*rr, cy+Math.sin(a)*rr);
-    b.z=0; b.vz=0; b.m=1; b.ax=0; b.ay=0; b.birthTimer=0; b.age=0; b.partnerId=null;
-    const tx=-Math.sin(a), ty=Math.cos(a);      // tangential → spin gives a disk
+    // depth>0 → seed a 3D blob: spin supports the cloud only in its plane, so a rotating
+    // 3D cloud flattens itself into a disk (why planetary systems and galaxies are flat)
+    b.z=DEPTH>0?Math.random()*DEPTH:0; b.vz=DEPTH>0?gaussianRandom(0,disp):0;
+    b.m=1; b.ax=0; b.ay=0; b.az=0; b.birthTimer=0; b.age=0; b.partnerId=null;
+    const tx=-Math.sin(a), ty=Math.cos(a);      // tangential (about the screen axis) → spin gives a disk
     b.vx=tx*baseV*_ASTRO_SPIN + gaussianRandom(0,disp);
     b.vy=ty*baseV*_ASTRO_SPIN + gaussianRandom(0,disp);
     boids.push(b);
   }
   // zero net momentum so the cloud doesn't drift off-frame
-  let M=0,px=0,py=0; for(const b of boids){M+=b.m;px+=b.m*b.vx;py+=b.m*b.vy;}
-  if(M>0){ const vmx=px/M, vmy=py/M; for(const b of boids){b.vx-=vmx; b.vy-=vmy;} }
+  let M=0,px=0,py=0,pz=0; for(const b of boids){M+=b.m;px+=b.m*b.vx;py+=b.m*b.vy;pz+=b.m*b.vz;}
+  if(M>0){ const vmx=px/M, vmy=py/M, vmz=pz/M; for(const b of boids){b.vx-=vmx; b.vy-=vmy; b.vz-=vmz;} }
   running=true;
   playBtn.innerHTML='&#9646;&#9646;'; playBtn.classList.add('running'); playBtn.title='Pause simulation';
   if(rafId) cancelAnimationFrame(rafId); rafId=requestAnimationFrame(loop); // single loop only
@@ -4193,22 +4200,22 @@ function astroSeed(){
 
 function astroStep(h){
   const n=boids.length, G=_ASTRO_G*0.03, e2=_ASTRO_SOFT*_ASTRO_SOFT;
-  for(let i=0;i<n;i++){ boids[i].ax=0; boids[i].ay=0; }
+  for(let i=0;i<n;i++){ boids[i].ax=0; boids[i].ay=0; boids[i].az=0; }
   for(let i=0;i<n;i++){ const bi=boids[i];
     for(let j=i+1;j<n;j++){ const bj=boids[j];
-      const dx=bj.x-bi.x, dy=bj.y-bi.y;
-      const r2=dx*dx+dy*dy+e2, inv=1/Math.sqrt(r2), s=G*inv/r2; // softened 1/r²
-      bi.ax+=s*bj.m*dx; bi.ay+=s*bj.m*dy;
-      bj.ax-=s*bi.m*dx; bj.ay-=s*bi.m*dy;
+      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z; // dz≡0 at depth 0 → exactly the 2D maths
+      const r2=dx*dx+dy*dy+dz*dz+e2, inv=1/Math.sqrt(r2), s=G*inv/r2; // softened 1/r²
+      bi.ax+=s*bj.m*dx; bi.ay+=s*bj.m*dy; bi.az+=s*bj.m*dz;
+      bj.ax-=s*bi.m*dx; bj.ay-=s*bi.m*dy; bj.az-=s*bi.m*dz;
     }
   }
   // semi-implicit Euler (symplectic-ish, stable with softening). inertia<1 adds drag →
   // overdamped collapse like the flock; inertia=1 keeps full momentum → orbits persist.
   const dragK=(1-_ASTRO_INERTIA)*0.5;
   for(const b of boids){
-    b.vx+=b.ax*h; b.vy+=b.ay*h;
-    if(dragK>0){ b.vx-=b.vx*dragK; b.vy-=b.vy*dragK; }
-    b.x+=b.vx*h; b.y+=b.vy*h;
+    b.vx+=b.ax*h; b.vy+=b.ay*h; b.vz+=b.az*h;
+    if(dragK>0){ b.vx-=b.vx*dragK; b.vy-=b.vy*dragK; b.vz-=b.vz*dragK; }
+    b.x+=b.vx*h; b.y+=b.vy*h; b.z+=b.vz*h;
   }
 }
 
@@ -4217,11 +4224,11 @@ function astroMerge(){
   const dead=new Uint8Array(n); let any=false;
   for(let i=0;i<n;i++){ if(dead[i])continue; const bi=boids[i];
     for(let j=i+1;j<n;j++){ if(dead[j])continue; const bj=boids[j];
-      const dx=bj.x-bi.x, dy=bj.y-bi.y, mr=_astroRadiusPx(bi)+_astroRadiusPx(bj);
-      if(dx*dx+dy*dy < mr*mr){ // inelastic merge — conserve mass & momentum
+      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z, mr=_astroRadiusPx(bi)+_astroRadiusPx(bj);
+      if(dx*dx+dy*dy+dz*dz < mr*mr){ // inelastic merge — conserve mass & momentum (3D contact test)
         const m=bi.m+bj.m;
-        bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m;
-        bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m;
+        bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m; bi.z=(bi.z*bi.m+bj.z*bj.m)/m;
+        bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m; bi.vz=(bi.vz*bi.m+bj.vz*bj.m)/m;
         bi.m=m; dead[j]=1; any=true;
       }
     }
@@ -4230,13 +4237,13 @@ function astroMerge(){
 }
 
 function astroView(){ // auto-framing: track CoM + frame the HALF-MASS core, so ejected escapers can't drag the camera out
-  let M=0,cx=0,cy=0; for(const b of boids){M+=b.m;cx+=b.m*b.x;cy+=b.m*b.y;}
-  if(M<=0) return; cx/=M; cy/=M;
-  // half-mass radius Rh: sort by distance from CoM, walk outward until half the total mass is enclosed.
-  // Mass-weighted, so once accretion builds heavy bodies the camera frames the mass, not the dust.
+  let M=0,cx=0,cy=0,cz=0; for(const b of boids){M+=b.m;cx+=b.m*b.x;cy+=b.m*b.y;cz+=b.m*b.z;}
+  if(M<=0) return; cx/=M; cy/=M; cz/=M; _astroCz=cz;
+  // half-mass radius Rh (3D): sort by distance from CoM, walk outward until half the total mass is
+  // enclosed. Mass-weighted, so once accretion builds heavy bodies the camera frames the mass, not the dust.
   let Rh=30;
   if(boids.length>1){
-    const ds=boids.map(b=>({d:Math.hypot(b.x-cx,b.y-cy),m:b.m})).sort((a,b)=>a.d-b.d);
+    const ds=boids.map(b=>({d:Math.hypot(b.x-cx,b.y-cy,b.z-cz),m:b.m})).sort((a,b)=>a.d-b.d);
     let acc=0; for(const e of ds){ acc+=e.m; if(acc>=M/2){ Rh=Math.max(e.d,30); break; } }
   }
   _astroRh=Rh;
@@ -4251,9 +4258,12 @@ function astroDraw(){
   // visible when the camera pulls far out and don't balloon when it dives in; distances remain
   // faithful while rendered dot size is semi-symbolic (like star markers in astronomy software).
   const Zs=Math.sqrt(Z);
-  for(const b of boids){
+  // depth>0: painter's order (far first) + the flock's perspective shrink, so the 3D blob reads as 3D
+  const list = DEPTH>0 ? [...boids].sort((a,b)=>b.z-a.z) : boids;
+  for(const b of list){
+    const zsp=zScaleOf(b); // 1 at depth 0
     const sx=cw+(b.x-_astroCx)*Z, sy=ch+(b.y-_astroCy)*Z;
-    let scale=(RADIUS/_bodyScale*IMG_SCALE)*Math.cbrt(b.m)*Zs;
+    let scale=(RADIUS/_bodyScale*IMG_SCALE)*Math.cbrt(b.m)*Zs*zsp;
     const _pool = b.sex==='M' ? _boidPoolM : _boidPoolF;
     let bt;
     if(_pool.length){ if(b.imgIdx===undefined||b.imgIdx<0||b.imgIdx>=_pool.length) b.imgIdx=Math.floor(Math.random()*_pool.length); bt=_pool[b.imgIdx].tex; }
@@ -4267,7 +4277,7 @@ function astroDraw(){
     spr.alpha=1;
     spr.scale.set(scale);
     if(SHOW_DETAILS && b.m>3){ // glow around accreted "stars"
-      const gr=_astroRadiusPx(b)*2.4*Zs, col=_drawHex(b,60); // glow tracks the √Z body size
+      const gr=_astroRadiusPx(b)*2.4*Zs*zsp, col=_drawHex(b,60); // glow tracks the √Z body size (and depth)
       g.beginFill(col,0.05); g.drawCircle(sx,sy,gr);     g.endFill();
       g.beginFill(col,0.10); g.drawCircle(sx,sy,gr*0.5); g.endFill();
     }
@@ -4280,10 +4290,10 @@ function astroTrails(){ // orbital paths — what makes spin / inertia / gravity
   const cw=canvas.width/2, ch=canvas.height/2, Z=_astroZoom, Zs=Math.sqrt(Z);
   for(const b of boids){
     const n=b.trail.length; if(n<2) continue;
-    const col=_drawHex(b,50);
+    const col=_drawHex(b,50), zsb=zScaleOf(b); // trail width follows the body's depth (1 at depth 0)
     for(let i=1;i<n;i++){
       const t=Math.pow(i/(n-1),0.5);
-      g.lineStyle(Math.max((t*2.4+0.5)*Zs,0.7), col, t*0.85*TRAIL_OPACITY); // width uses √Z like body size, with a visibility floor
+      g.lineStyle(Math.max((t*2.4+0.5)*Zs*zsb,0.7), col, t*0.85*TRAIL_OPACITY); // width uses √Z like body size, with a visibility floor
       g.moveTo(cw+(b.trail[i-1].x-_astroCx)*Z, ch+(b.trail[i-1].y-_astroCy)*Z);
       g.lineTo(cw+(b.trail[i].x-_astroCx)*Z,   ch+(b.trail[i].y-_astroCy)*Z);
     }
@@ -4306,7 +4316,7 @@ function astroFrame(dt){
   astroView();
   // cull far escapers: slingshot ejecta beyond 12× the half-mass radius never come back —
   // they only waste O(N²) force work. (Skipped for small N so wide binaries survive.)
-  if(boids.length>16) boids=boids.filter(b=>Math.hypot(b.x-_astroCx,b.y-_astroCy)<12*_astroRh);
+  if(boids.length>16) boids=boids.filter(b=>Math.hypot(b.x-_astroCx,b.y-_astroCy,b.z-_astroCz)<12*_astroRh);
   for(const b of boids){ b.trail.push({x:b.x,y:b.y}); if(b.trail.length>MAX_TRAIL) b.trail.shift(); } // record orbital path
   drawBackground();
   _spriteCount=0;
