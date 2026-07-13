@@ -1504,6 +1504,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="astroSpinVal">0.80</span>
 </div>
 <div class="ctrl-row">
+<label title="Gas-like dissipation of vertical motion (needs depth > 0). Stars are collisionless and stay a 3D ball forever; gas radiates energy away and settles into the rotation plane. 0 = stars; higher = gas — a spinning 3D cloud flattens into a disk.">settle (gas)</label>
+<input type="range" id="astroSettleSlider" min="0" max="100" value="20" step="1">
+<span class="ctrl-val" id="astroSettleVal">0.020</span>
+</div>
+<div class="ctrl-row">
 <label title="Integration substeps per frame — higher advances sim time faster / more accurately.">sim speed</label>
 <input type="range" id="astroStepSlider" min="1" max="8" value="1" step="1">
 <span class="ctrl-val" id="astroStepVal">1</span>
@@ -1787,6 +1792,7 @@ let _ASTRO_INERTIA  = parseInt(document.getElementById('astroInertiaSlider').val
 let _ASTRO_SOFT     = parseInt(document.getElementById('astroSoftSlider').value);
 let _ASTRO_SPIN     = parseInt(document.getElementById('astroSpinSlider').value) / 100;
 let _ASTRO_SUBSTEPS = parseInt(document.getElementById('astroStepSlider').value);
+let _ASTRO_SETTLE   = parseInt(document.getElementById('astroSettleSlider').value) / 1000;
 let _ASTRO_MERGE    = true;
 let pyramidRefreshInterval = 3;
 let lastPyramidUpdate = -Infinity;
@@ -2057,6 +2063,7 @@ wire('astroInertiaSlider', 'astroInertiaVal', v=>parseInt(v)/100,  v=>(parseInt(
 wire('astroSoftSlider',    'astroSoftVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SOFT=v; });
 wire('astroSpinSlider',    'astroSpinVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_SPIN=v; });
 wire('astroStepSlider',    'astroStepVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SUBSTEPS=v; });
+wire('astroSettleSlider',  'astroSettleVal',  v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3),  v=>{ _ASTRO_SETTLE=v; });
 // Mode switch: [✦ Astro] ⇄ [← Active Matter]. Toggles which control groups show and
 // relabels the header/speed control. Physics branching + tank-forward come next increment.
 function _applySimMode(){
@@ -4145,9 +4152,18 @@ pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
 // and orbit, and merge on contact (conserving mass + momentum) so they accrete into
 // growing "planets/stars". Society subsystems (breeding/disease/predators) don't run.
 let _astroZoom=1, _astroCx=0, _astroCy=0, _astroCz=0, _astroSnap=false, _astroRh=30; // auto-framing state (Rh = half-mass radius)
+let _astroAxis={x:0,y:0,z:1}; // spin axis (set at seed): tilted from the viewing axis so the disk forms edge-on-visible
 // Ball sprite for astro bodies — the teardrop "fish" looks odd orbiting a disk. Drawn once
 // as a soft-shaded white sphere (80×80, same dims as the teardrop so all scale math holds);
 // white so the normal per-body tint colours it. Lazy: only built where a PIXI app exists.
+// Perspective for astro bodies. Astro has no z-walls (unlike the flock, which clamps z to
+// [0,DEPTH]), so the raw zScaleOf blows up as an oscillating body flies toward the viewer —
+// bodies were filling the whole screen. Measure z relative to the cloud's CoM and clamp.
+function _astroPersp(b){
+  if(DEPTH<=0) return 1;
+  const s=Z_FOCAL/(Z_FOCAL+(b.z-_astroCz));
+  return (s<=0 || s>2.2) ? 2.2 : Math.max(0.25, s);
+}
 let _astroBallTex=null;
 function _getAstroBallTex(){
   if(_astroBallTex) return _astroBallTex;
@@ -4178,16 +4194,27 @@ function astroSeed(){
   const Geff=_ASTRO_G*0.03;
   const baseV=Math.sqrt(Geff*N/Math.max(R,1)); // ~circular speed at the cloud edge
   const disp=SPEED*0.15;                        // "initial spread" (reused speed slider)
+  // Spin axis: with depth on, tilt it 65° from the viewing axis. A disk whose spin axis points
+  // at the viewer forms face-on — the flattening happens along the line of sight and is invisible
+  // (a face-on pancake is just a circle). Tilted, the cloud visibly collapses into a thin band.
+  const _tilt=DEPTH>0?65*Math.PI/180:0;
+  _astroAxis={x:0, y:Math.sin(_tilt), z:Math.cos(_tilt)};
+  const zHalf=DEPTH>0?Math.min(R,DEPTH/2):0; // z half-extent of the seeded blob
   for(let i=0;i<N;i++){
-    const a=Math.random()*Math.PI*2, rr=Math.sqrt(Math.random())*R;
-    const b=makeBoid(cx+Math.cos(a)*rr, cy+Math.sin(a)*rr);
-    // depth>0 → seed a 3D blob: spin supports the cloud only in its plane, so a rotating
-    // 3D cloud flattens itself into a disk (why planetary systems and galaxies are flat)
-    b.z=DEPTH>0?Math.random()*DEPTH:0; b.vz=DEPTH>0?gaussianRandom(0,disp):0;
-    b.m=1; b.ax=0; b.ay=0; b.az=0; b.birthTimer=0; b.age=0; b.partnerId=null;
-    const tx=-Math.sin(a), ty=Math.cos(a);      // tangential (about the screen axis) → spin gives a disk
+    // uniform 3D ball (z compressed into the depth range), centred on (cx, cy, DEPTH/2)
+    let px,py,pz;
+    do{ px=Math.random()*2-1; py=Math.random()*2-1; pz=Math.random()*2-1; }while(px*px+py*py+pz*pz>1);
+    px*=R; py*=R; pz*=zHalf;
+    const b=makeBoid(cx+px, cy+py);
+    b.z=DEPTH/2+pz; b.m=1; b.ax=0; b.ay=0; b.az=0; b.birthTimer=0; b.age=0; b.partnerId=null;
+    // tangential direction about the spin axis: n × p (normalised); at depth 0 this reduces
+    // exactly to the old in-plane tangential seeding
+    const nx=_astroAxis.x, ny=_astroAxis.y, nz=_astroAxis.z;
+    let tx=ny*pz-nz*py, ty=nz*px-nx*pz, tz=nx*py-ny*px;
+    const tl=Math.hypot(tx,ty,tz)||1; tx/=tl; ty/=tl; tz/=tl;
     b.vx=tx*baseV*_ASTRO_SPIN + gaussianRandom(0,disp);
     b.vy=ty*baseV*_ASTRO_SPIN + gaussianRandom(0,disp);
+    b.vz=DEPTH>0?(tz*baseV*_ASTRO_SPIN + gaussianRandom(0,disp)):0;
     boids.push(b);
   }
   // zero net momentum so the cloud doesn't drift off-frame
@@ -4212,9 +4239,19 @@ function astroStep(h){
   // semi-implicit Euler (symplectic-ish, stable with softening). inertia<1 adds drag →
   // overdamped collapse like the flock; inertia=1 keeps full momentum → orbits persist.
   const dragK=(1-_ASTRO_INERTIA)*0.5;
+  // Gas settling: dissipate VERTICAL motion only. A collisionless (stellar) system conserves
+  // energy, so z-oscillations never die and no disk forms — physically correct but pancake-free.
+  // Gas collides and radiates that energy away while angular momentum keeps the in-plane
+  // rotation, so the cloud flattens. _ASTRO_SETTLE = the "gas-ness" of the medium.
+  const settleK=(DEPTH>0)?_ASTRO_SETTLE*h:0;
   for(const b of boids){
     b.vx+=b.ax*h; b.vy+=b.ay*h; b.vz+=b.az*h;
     if(dragK>0){ b.vx-=b.vx*dragK; b.vy-=b.vy*dragK; b.vz-=b.vz*dragK; }
+    if(settleK>0){ // damp the velocity component along the spin axis (the disk normal) —
+      // in-plane rotation is untouched, so the cloud flattens instead of decaying
+      const n=_astroAxis, vn=b.vx*n.x+b.vy*n.y+b.vz*n.z;
+      b.vx-=vn*settleK*n.x; b.vy-=vn*settleK*n.y; b.vz-=vn*settleK*n.z;
+    }
     b.x+=b.vx*h; b.y+=b.vy*h; b.z+=b.vz*h;
   }
 }
@@ -4261,7 +4298,7 @@ function astroDraw(){
   // depth>0: painter's order (far first) + the flock's perspective shrink, so the 3D blob reads as 3D
   const list = DEPTH>0 ? [...boids].sort((a,b)=>b.z-a.z) : boids;
   for(const b of list){
-    const zsp=zScaleOf(b); // 1 at depth 0
+    const zsp=_astroPersp(b); // CoM-relative, clamped; 1 at depth 0
     const sx=cw+(b.x-_astroCx)*Z, sy=ch+(b.y-_astroCy)*Z;
     let scale=(RADIUS/_bodyScale*IMG_SCALE)*Math.cbrt(b.m)*Zs*zsp;
     const _pool = b.sex==='M' ? _boidPoolM : _boidPoolF;
@@ -4290,7 +4327,7 @@ function astroTrails(){ // orbital paths — what makes spin / inertia / gravity
   const cw=canvas.width/2, ch=canvas.height/2, Z=_astroZoom, Zs=Math.sqrt(Z);
   for(const b of boids){
     const n=b.trail.length; if(n<2) continue;
-    const col=_drawHex(b,50), zsb=zScaleOf(b); // trail width follows the body's depth (1 at depth 0)
+    const col=_drawHex(b,50), zsb=_astroPersp(b); // trail width follows the body's depth (1 at depth 0)
     for(let i=1;i<n;i++){
       const t=Math.pow(i/(n-1),0.5);
       g.lineStyle(Math.max((t*2.4+0.5)*Zs*zsb,0.7), col, t*0.85*TRAIL_OPACITY); // width uses √Z like body size, with a visibility floor
@@ -4596,6 +4633,7 @@ _ASTRO_INERTIA  = ${_ASTRO_INERTIA};
 _ASTRO_SOFT     = ${_ASTRO_SOFT};
 _ASTRO_SPIN     = ${_ASTRO_SPIN};
 _ASTRO_SUBSTEPS = ${_ASTRO_SUBSTEPS};
+_ASTRO_SETTLE   = ${_ASTRO_SETTLE};
 _ASTRO_MERGE    = ${_ASTRO_MERGE};
 _applySimMode();
 if(SIM_MODE==='astro') astroSeed(); else startSim();
