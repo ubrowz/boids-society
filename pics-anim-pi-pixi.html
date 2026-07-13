@@ -1284,7 +1284,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 
 <div id="dbGrid">
 
-<section class="panel" id="statusPanel">
+<section class="panel flock-only" id="statusPanel">
 <h2>Live status</h2>
 <div id="statusGrid">
   <div class="stat-block">
@@ -1333,7 +1333,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 
 <section class="panel">
 <h2>Population</h2>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label>target pop</label>
 <input type="range" id="targetSlider" min="2" max="1000" value="30">
 <span class="ctrl-val" id="targetVal">30</span>
@@ -1343,12 +1343,12 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <input type="range" id="initPopSlider" min="2" max="1000" value="10">
 <span class="ctrl-val" id="initPopVal">10</span>
 </div>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label>pop ceiling</label>
 <input type="range" id="popCeilSlider" min="0" max="1000" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
+<div class="ctrl-row flock-only" style="gap:8px;">
 <label>immigration</label>
 <button id="immigrationBtn" title="Toggle immigration" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1360,7 +1360,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="immigrationLabel" style="color:#c0392b;font-weight:700;">off</span>
 </div>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label>emigr. return</label>
 <input type="range" id="emigReturnSlider" min="0" max="10" value="4" step="1">
 <span class="ctrl-val" id="emigReturnVal">0.4</span>
@@ -1598,7 +1598,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
+<div class="ctrl-row flock-only" style="gap:8px;">
 <label>dim infertile</label>
 <button id="dimBtn" title="Draw infertile boids at 55% opacity (off = everyone fully opaque; fertility still shows via the glow)" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1610,7 +1610,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="dimLabel" style="font-size:10px;font-weight:700;color:#ff9f43;letter-spacing:0.5px;text-transform:uppercase;">on</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
+<div class="ctrl-row flock-only" style="gap:8px;">
 <label>upright</label>
 <button id="uprightBtn" title="Keep the body image upright instead of rotating with the movement direction" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1622,7 +1622,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="uprightLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
+<div class="ctrl-row flock-only" style="gap:8px;">
 <label>aura</label>
 <button id="auraGradBtn" title="Cycle the bonded/fertile aura: off → flat → gradient" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1634,7 +1634,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
 </div>
-<div class="ctrl-row" style="gap:8px;">
+<div class="ctrl-row flock-only" style="gap:8px;">
 <label>event fx</label>
 <button id="bondLinesBtn" title="Cycle event fx: all (bond lines + birth rings + death splashes) → bond lines only → none" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1670,14 +1670,14 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <button id="bodyImgBtn" title="Load one PNG used by predators, and by either sex that has no images of its own" class="mini-btn">load</button>
 <span id="bodyImgName" class="mini-note">default</span>
 </div>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label>♂ images</label>
 <input type="file" id="bodyImgMFile" accept="image/*" multiple style="display:none">
 <button id="bodyImgMBtn" title="Add one or more PNGs to the male pool — each male picks one at random at birth" class="mini-btn">add</button>
 <button id="bodyImgMClear" title="Clear the male image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgMName" class="mini-note">0 imgs</span>
 </div>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label>♀ images</label>
 <input type="file" id="bodyImgFFile" accept="image/*" multiple style="display:none">
 <button id="bodyImgFBtn" title="Add one or more PNGs to the female pool — each female picks one at random at birth" class="mini-btn">add</button>
@@ -1689,17 +1689,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="imgScaleSlider" min="0.1" max="3" value="1" step="0.05">
 <span class="ctrl-val" id="imgScaleVal">1.00×</span>
 </div>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label title="Pixels from image centre to nose tip">nose px</label>
 <input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1">
 </div>
-<div class="ctrl-row">
+<div class="ctrl-row flock-only">
 <label title="Sprite scale = r ÷ this value">body scale</label>
 <input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5">
 </div>
 </section>
 
-<section class="panel" id="pyramidPanel">
+<section class="panel flock-only" id="pyramidPanel">
 <h2>Demographics</h2>
 <canvas id="popPyramid" width="260" height="200"></canvas>
 <div class="ctrl-row" style="margin-top:6px;">
@@ -2077,7 +2077,8 @@ function _applySimMode(){
 // bodies (small scale also = small merge radius → gradual accretion); the flock doesn't.
 // Entering astro stashes the flock values and applies the astro ones; leaving restores.
 let _flockCtlStash=null;
-const _astroCtlStash={ initPopSlider:'700', imgScaleSlider:'0.2' };
+const _astroCtlStash={ initPopSlider:'700', imgScaleSlider:'0.1', depthSlider:'400',
+                       trailLengthSlider:'150', bgColorInput:'#000000' };
 function _setCtl(id,val){ const el=document.getElementById(id); if(el){ el.value=val; el.dispatchEvent(new Event('input',{bubbles:true})); } }
 function _swapModeCtls(toAstro){
   const ids=Object.keys(_astroCtlStash);
@@ -4301,10 +4302,10 @@ function astroDraw(){
     const zsp=_astroPersp(b); // CoM-relative, clamped; 1 at depth 0
     const sx=cw+(b.x-_astroCx)*Z, sy=ch+(b.y-_astroCy)*Z;
     let scale=(RADIUS/_bodyScale*IMG_SCALE)*Math.cbrt(b.m)*Zs*zsp;
-    const _pool = b.sex==='M' ? _boidPoolM : _boidPoolF;
-    let bt;
-    if(_pool.length){ if(b.imgIdx===undefined||b.imgIdx<0||b.imgIdx>=_pool.length) b.imgIdx=Math.floor(Math.random()*_pool.length); bt=_pool[b.imgIdx].tex; }
-    else bt=(_customBoidPNG&&_sharedTex)||_getAstroBallTex(); // user-LOADED image wins; the built-in teardrop does not (_sharedTex falls back to it, so test _customBoidPNG)
+    // Astro ignores the per-sex pools (bodies have no meaningful sex; the pool rows are hidden
+    // in this mode, and fish loaded for the flock shouldn't leak in). User-LOADED shared image
+    // wins; the built-in teardrop does not (_sharedTex falls back to it, so test _customBoidPNG).
+    const bt=(_customBoidPNG&&_sharedTex)||_getAstroBallTex();
     scale=Math.max(scale, 6/Math.max((bt&&bt.width)||80,1)); // never render below ~6px, whatever the zoom
     const spr=_getBodySprite(_spriteCount++);
     if(spr.texture!==bt) spr.texture=bt;
