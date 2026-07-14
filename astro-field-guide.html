@@ -246,6 +246,8 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   </div>
   <div class="chips">
     <span class="chip">stick below <b>stickiness × v<sub>esc</sub></b> · harder hits bounce (e 0.4)</span>
+    <span class="chip">growth <b>0.10</b> — chance per frame a bound pair fuses; the timeline dial</span>
+    <span class="chip">grains collide <b>compact</b> (35% of drawn size) — the disk phase survives</span>
     <span class="chip">merge radius tracks <b>image scale</b> — 0.1× default keeps accretion gradual</span>
     <span class="chip">stickiness <b>0</b> = bouncing gravel — nothing ever sticks</span>
     <span class="chip">accretion <b>off</b> = fully collisionless — bodies pass through</span>
@@ -265,7 +267,8 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   (astronomy software draws stars by brightness, not true angular size): bodies stay visible when the camera pulls far
   out and don't balloon when it dives in. Floors guarantee nothing ever renders below ~6&nbsp;px or a hairline trail.</p>
   <div class="chips">
-    <span class="chip">frame ≈ <b>2.5 × R½</b>, smoothed</span>
+    <span class="chip">frame ≈ <b>2.5 × R½</b>, envelope-smoothed — widens instantly, contracts slowly</span>
+    <span class="chip">endgame (≤12 bodies): every survivor stays in shot</span>
     <span class="chip">zoom clamped <b>0.05–4×</b> · sizes ∝ <b>√zoom</b></span>
     <span class="chip">perspective CoM-relative, clamped <b>0.25–2.2×</b></span>
     <span class="chip">bodies are shaded balls; your loaded image wins if present</span>

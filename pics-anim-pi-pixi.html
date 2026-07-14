@@ -1411,7 +1411,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </section>
 
-<section class="panel">
+<section class="panel flock-only">
 <h2>Society &amp; genetics</h2>
 <div class="ctrl-row">
 <label>singles</label>
@@ -1517,6 +1517,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label title="Collisions stick only below this fraction of the mutual escape speed; harder hits bounce inelastically. 1.0 = the physical criterion, lower = slower accretion, 0 = nothing ever sticks (bouncing gravel).">stickiness</label>
 <input type="range" id="astroStickSlider" min="0" max="200" value="100" step="5">
 <span class="ctrl-val" id="astroStickVal">1.00</span>
+</div>
+<div class="ctrl-row">
+<label title="Chance per frame that a touching, below-escape-speed pair actually coalesces. Lower = slower growth and longer-lived disks; 1.0 = merge on first touch.">growth</label>
+<input type="range" id="astroGrowSlider" min="1" max="100" value="10" step="1">
+<span class="ctrl-val" id="astroGrowVal">0.10</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>accretion</label>
@@ -1799,6 +1804,7 @@ let _ASTRO_SPIN     = parseInt(document.getElementById('astroSpinSlider').value)
 let _ASTRO_SUBSTEPS = parseInt(document.getElementById('astroStepSlider').value);
 let _ASTRO_SETTLE   = parseInt(document.getElementById('astroSettleSlider').value) / 1000;
 let _ASTRO_STICK    = parseInt(document.getElementById('astroStickSlider').value) / 100;
+let _ASTRO_GROW     = parseInt(document.getElementById('astroGrowSlider').value) / 100;
 let _ASTRO_MERGE    = true;
 let pyramidRefreshInterval = 3;
 let lastPyramidUpdate = -Infinity;
@@ -2071,6 +2077,7 @@ wire('astroSpinSlider',    'astroSpinVal',    v=>parseInt(v)/100,  v=>(parseInt(
 wire('astroStepSlider',    'astroStepVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SUBSTEPS=v; });
 wire('astroSettleSlider',  'astroSettleVal',  v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3),  v=>{ _ASTRO_SETTLE=v; });
 wire('astroStickSlider',   'astroStickVal',   v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_STICK=v; });
+wire('astroGrowSlider',    'astroGrowVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_GROW=v; });
 // Mode switch: [✦ Astro] ⇄ [← Active Matter]. Toggles which control groups show and
 // relabels the header/speed control. Physics branching + tank-forward come next increment.
 function _applySimMode(){
@@ -4160,6 +4167,7 @@ pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
 // and orbit, and merge on contact (conserving mass + momentum) so they accrete into
 // growing "planets/stars". Society subsystems (breeding/disease/predators) don't run.
 let _astroZoom=1, _astroCx=0, _astroCy=0, _astroCz=0, _astroSnap=false, _astroRh=30; // auto-framing state (Rh = half-mass radius)
+let _astroFrameR=0; // envelope-followed frame radius: expands instantly, contracts slowly — kills zoom pumping
 let _astroAxis={x:0,y:0,z:1}; // spin axis (set at seed): tilted from the viewing axis so the disk forms edge-on-visible
 // Ball sprite for astro bodies — the teardrop "fish" looks odd orbiting a disk. Drawn once
 // as a soft-shaded white sphere (80×80, same dims as the teardrop so all scale math holds);
@@ -4280,15 +4288,22 @@ function astroMerge(){
   // disk resists clumping, each bounce dissipates energy so accretion accelerates as the disk
   // cools (like real disks), and massive bodies capture more readily (gravitational focusing).
   const G=_ASTRO_G*0.03, s2=_ASTRO_STICK*_ASTRO_STICK;
+  // Compact grains: small bodies collide at a fraction of their DRAWN radius (their rendering is
+  // dominated by the 6px visibility floor anyway, so no visible tunneling), growing back to the
+  // full drawn radius for giants — where visual contact must equal physical contact. Slows early
+  // grain-grain growth so the disk phase survives long enough to be watched.
+  const _mrOf=b=>{ const f=Math.min(1, 0.35+0.22*(Math.cbrt(b.m)-1)); return _astroRadiusPx(b)*f; };
   const dead=new Uint8Array(n); let any=false;
   for(let i=0;i<n;i++){ if(dead[i])continue; const bi=boids[i];
     for(let j=i+1;j<n;j++){ if(dead[j])continue; const bj=boids[j];
-      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z, mr=_astroRadiusPx(bi)+_astroRadiusPx(bj);
+      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z, mr=_mrOf(bi)+_mrOf(bj);
       const d2=dx*dx+dy*dy+dz*dz;
       if(d2 >= mr*mr) continue;
       const m=bi.m+bj.m;
       const dvx=bj.vx-bi.vx, dvy=bj.vy-bi.vy, dvz=bj.vz-bi.vz;
-      if(dvx*dvx+dvy*dvy+dvz*dvz <= (2*G*m/mr)*s2){
+      // gentle (sub-escape) hits coalesce with probability _ASTRO_GROW per frame — a touching
+      // bound pair keeps bouncing softly until it fuses, stretching the accretion timeline
+      if(dvx*dvx+dvy*dvy+dvz*dvz <= (2*G*m/mr)*s2 && Math.random()<_ASTRO_GROW){
         // stick: inelastic merge — conserve mass & momentum
         bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m; bi.z=(bi.z*bi.m+bj.z*bj.m)/m;
         bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m; bi.vz=(bi.vz*bi.m+bj.vz*bj.m)/m;
@@ -4325,12 +4340,16 @@ function astroView(){ // auto-framing: track CoM + frame the HALF-MASS core, so 
   // Endgame framing: with only a few bodies left, half-mass framing collapses onto the single
   // dominant giant and its light companions orbit invisibly outside the view ("3 bodies but I
   // only see 1"). With ≤12 bodies, widen the frame to include every remaining body.
-  let frameR=Rh*2.5;
+  let needR=Rh*2.5;
   if(boids.length<=12){
     let dmax=30; for(const b of boids){ const d=Math.hypot(b.x-cx,b.y-cy,b.z-cz); if(d>dmax) dmax=d; }
-    frameR=Math.max(frameR, dmax*1.15);
+    needR=Math.max(needR, dmax*1.15);
   }
-  const tZoom=Math.max(0.05, Math.min(4, 0.40*Math.min(canvas.width,canvas.height)/frameR));
+  // Envelope follower: the frame widens instantly when a body needs more room, but contracts only
+  // ~0.4% per frame. Orbiting bodies swing out and back — chasing that directly made the zoom
+  // pump nervously in and out; the envelope settles on the widest recent extent instead.
+  _astroFrameR = _astroSnap ? needR : Math.max(needR, _astroFrameR*0.996);
+  const tZoom=Math.max(0.05, Math.min(4, 0.40*Math.min(canvas.width,canvas.height)/_astroFrameR));
   if(_astroSnap){ _astroCx=cx; _astroCy=cy; _astroZoom=tZoom; _astroSnap=false; }
   else { _astroCx+=(cx-_astroCx)*0.10; _astroCy+=(cy-_astroCy)*0.10; _astroZoom+=(tZoom-_astroZoom)*0.05; }
 }
@@ -4694,6 +4713,7 @@ _ASTRO_SPIN     = ${_ASTRO_SPIN};
 _ASTRO_SUBSTEPS = ${_ASTRO_SUBSTEPS};
 _ASTRO_SETTLE   = ${_ASTRO_SETTLE};
 _ASTRO_STICK    = ${_ASTRO_STICK};
+_ASTRO_GROW     = ${_ASTRO_GROW};
 _ASTRO_MERGE    = ${_ASTRO_MERGE};
 _applySimMode();
 if(SIM_MODE==='astro') astroSeed(); else startSim();
