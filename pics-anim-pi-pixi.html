@@ -1335,13 +1335,13 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <h2>Population</h2>
 <div class="ctrl-row flock-only">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="1000" value="30">
-<span class="ctrl-val" id="targetVal">30</span>
+<input type="range" id="targetSlider" min="2" max="1000" value="512">
+<span class="ctrl-val" id="targetVal">512</span>
 </div>
 <div class="ctrl-row">
 <label title="How many boids the simulation is seeded with at start (applies on restart / play after pause)">start pop</label>
-<input type="range" id="initPopSlider" min="2" max="1000" value="10">
-<span class="ctrl-val" id="initPopVal">10</span>
+<input type="range" id="initPopSlider" min="2" max="1000" value="252">
+<span class="ctrl-val" id="initPopVal">252</span>
 </div>
 <div class="ctrl-row flock-only">
 <label>pop ceiling</label>
@@ -1444,18 +1444,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row flock-only">
 <label>sensing r</label>
-<input type="range" id="sensingSlider" min="30" max="300" value="130" step="10">
-<span class="ctrl-val" id="sensingVal">130</span>
+<input type="range" id="sensingSlider" min="30" max="300" value="70" step="10">
+<span class="ctrl-val" id="sensingVal">70</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Thermal mixing (Boltzmann rotational diffusion): random jitter on each boid's heading. 0 = near-ballistic, higher = more mixing/roaming.">temp (mix)</label>
-<input type="range" id="boltzRotSlider" min="0" max="150" value="20" step="1">
-<span class="ctrl-val" id="boltzRotVal">0.20</span>
+<input type="range" id="boltzRotSlider" min="0" max="150" value="0" step="1">
+<span class="ctrl-val" id="boltzRotVal">0.00</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Cohesion strength (conservative spring toward the local flock centre). Higher = tighter clusters.">cohere k</label>
-<input type="range" id="cohKSlider" min="0" max="100" value="20" step="1">
-<span class="ctrl-val" id="cohKVal">0.020</span>
+<input type="range" id="cohKSlider" min="0" max="100" value="82" step="1">
+<span class="ctrl-val" id="cohKVal">0.082</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Alignment (Vicsek): each boid steers toward its neighbours' average heading. 0 = static clumps; higher = clusters spontaneously pick a direction and wander. Competes with temp — high temp keeps them meandering/reorienting.">align / roam</label>
@@ -1464,20 +1464,20 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>depth</label>
-<input type="range" id="depthSlider" min="0" max="600" value="0" step="25">
-<span class="ctrl-val" id="depthVal">off</span>
+<input type="range" id="depthSlider" min="0" max="600" value="600" step="25">
+<span class="ctrl-val" id="depthVal">600</span>
 </div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>no overlap</label>
 <button id="noOverlapBtn" title="Toggle body separation" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#555;position:relative;transition:background 0.2s;outline:none;">
+background:#54a0ff;position:relative;transition:background 0.2s;outline:none;">
 <span id="noOverlapKnob" style="
-position:absolute;top:3px;left:3px;
+position:absolute;top:3px;left:25px;
 width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
-<span id="noOverlapLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+<span id="noOverlapLabel" style="font-size:10px;font-weight:700;color:#54a0ff;letter-spacing:0.5px;text-transform:uppercase;">on</span>
 </div>
 </section>
 
@@ -1588,32 +1588,32 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>tint L</label>
-<input type="range" id="spriteLSlider" min="50" max="100" value="85" step="1">
-<span class="ctrl-val" id="spriteLVal">85</span>
+<input type="range" id="spriteLSlider" min="50" max="100" value="50" step="1">
+<span class="ctrl-val" id="spriteLVal">50</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>details</label>
 <button id="detailsBtn" title="Toggle beak, forked tail and trail" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#a29bfe;position:relative;transition:background 0.2s;outline:none;">
+background:#555;position:relative;transition:background 0.2s;outline:none;">
 <span id="detailsKnob" style="
-position:absolute;top:3px;left:25px;
+position:absolute;top:3px;left:3px;
 width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
-<span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+<span id="detailsLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>dim infertile</label>
 <button id="dimBtn" title="Draw infertile boids at 55% opacity (off = everyone fully opaque; fertility still shows via the glow)" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#ff9f43;position:relative;transition:background 0.2s;outline:none;">
+background:#555;position:relative;transition:background 0.2s;outline:none;">
 <span id="dimKnob" style="
-position:absolute;top:3px;left:25px;
+position:absolute;top:3px;left:3px;
 width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
-<span id="dimLabel" style="font-size:10px;font-weight:700;color:#ff9f43;letter-spacing:0.5px;text-transform:uppercase;">on</span>
+<span id="dimLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>upright</label>
@@ -1658,12 +1658,12 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>trail length</label>
-<input type="range" id="trailLengthSlider" min="5" max="150" value="30" step="5">
-<span class="ctrl-val" id="trailLengthVal">30</span>
+<input type="range" id="trailLengthSlider" min="5" max="150" value="20" step="5">
+<span class="ctrl-val" id="trailLengthVal">20</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>background</label>
-<input type="color" id="bgColorInput" value="#081828" title="Canvas background colour">
+<input type="color" id="bgColorInput" value="#000000" title="Canvas background colour">
 </div>
 </section>
 
@@ -1691,8 +1691,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
-<input type="range" id="imgScaleSlider" min="0.1" max="3" value="1" step="0.05">
-<span class="ctrl-val" id="imgScaleVal">1.00×</span>
+<input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.2" step="0.05">
+<span class="ctrl-val" id="imgScaleVal">0.20×</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Pixels from image centre to nose tip">nose px</label>
@@ -1758,7 +1758,7 @@ const _poolPNG_F = [];       // female image data URLs
 let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let INIT_POP = parseInt(document.getElementById('initPopSlider').value); // boids seeded at startSim (grows/shrinks toward TARGET_POP)
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
-let AURA_MODE = 2; // aura render mode: 0 = off, 1 = flat disc, 2 = gradient (3 concentric circles)
+let AURA_MODE = 0; // aura render mode: 0 = off, 1 = flat disc, 2 = gradient (3 concentric circles)
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
@@ -1844,7 +1844,7 @@ let BG_COLOR = document.getElementById('bgColorInput').value;
 document.getElementById('bgColorInput').addEventListener('input', e => { BG_COLOR = e.target.value; });
 
 // ── no-overlap toggle ─────────────────────────────────────────────────────────
-let NO_OVERLAP = false;
+let NO_OVERLAP = true;
 const noOverlapBtn   = document.getElementById('noOverlapBtn');
 const noOverlapKnob  = document.getElementById('noOverlapKnob');
 const noOverlapLabel = document.getElementById('noOverlapLabel');
@@ -1877,7 +1877,7 @@ if(SHOW_COLOR){
 });
 
 // ── details toggle (beak, forked tail, trail) ────────────────────────────────
-let SHOW_DETAILS = true;
+let SHOW_DETAILS = false;
 const detailsBtn   = document.getElementById('detailsBtn');
 const detailsKnob  = document.getElementById('detailsKnob');
 const detailsLabel = document.getElementById('detailsLabel');
@@ -1896,7 +1896,7 @@ if(SHOW_DETAILS){
 // On (default): non-fertile boids draw at 55% opacity — the age/fertility signal.
 // Off: everyone fully opaque (better for photo bodies); fertility still shows
 // via the aura glow.
-let DIM_INFERTILE = true;
+let DIM_INFERTILE = false;
 const dimBtn   = document.getElementById('dimBtn');
 const dimKnob  = document.getElementById('dimKnob');
 const dimLabel = document.getElementById('dimLabel');
@@ -1934,7 +1934,7 @@ if(UPRIGHT_SPRITE){
 //           1 = bond lines only
 //           0 = nothing shown
 // Two derived flags drive the draw code so the rest of the file stays simple.
-let EVENT_FX    = 2;
+let EVENT_FX    = 1;
 let SHOW_BONDS  = true;   // derived — bond lines drawn
 let SHOW_EVENTS = true;   // derived — birth rings + death splashes drawn
 const bondLinesBtn   = document.getElementById('bondLinesBtn');
@@ -2129,7 +2129,7 @@ wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>
 wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
 // ── canvas sizing ─────────────────────────────────────────────────────────────
-let SENSING_RADIUS = 130;
+let SENSING_RADIUS = 70;
 function resize() {
 if(RUN_MODE==='dash') return; // dashboard: canvas stays hidden and unsized
 const ui = document.getElementById('ui');
@@ -2191,7 +2191,7 @@ let preferredFamily    = COLOR_FAMILY_CYCLE[0];
 let familyConvergedTimer = 0;
 const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
 const RADIUS = 20;
-let MAX_TRAIL = 30;
+let MAX_TRAIL = 20;
 const SPEED_MAX = 10 * 0.45;   // slider ceiling × conversion factor = 4.5
 let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
 const TURN_SPEED_BASE = 0.07;   // heading-change cap per steerToward call at max speed
