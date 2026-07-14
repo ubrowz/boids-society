@@ -232,9 +232,12 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
 <section>
   <p class="eyebrow">Physics · Growth &amp; decay</p>
   <h3>Accretion and evaporation</h3>
-  <p class="note">Touching bodies merge, conserving mass and momentum; size grows as <b>∛mass</b> and heavy bodies gain
-  a glow. Growth is hierarchical and runaway — grains sweep up grains, planetesimals sweep up planetesimals, until a
-  few massive survivors orbit each other. The counter-current is <b>evaporation</b>: close encounters slingshot bodies
+  <p class="note">Not every collision sticks. A contact merges — conserving mass and momentum — only when the bodies
+  meet <b>slower than their mutual escape speed</b> (× the <b>stickiness</b> slider); harder hits <b>bounce</b>
+  inelastically. So the hot young disk resists clumping, every bounce sheds energy, and accretion accelerates as the
+  disk cools — the way real disks grow. Size grows as <b>∛mass</b> and heavy bodies gain a glow. Growth is hierarchical
+  and runaway — grains sweep up grains, planetesimals sweep up planetesimals, until a few massive survivors orbit each
+  other. The counter-current is <b>evaporation</b>: close encounters slingshot bodies
   outward while the core tightens (gravitating systems get hotter as they lose energy — the famous negative heat
   capacity of star clusters). Escapers past 12× the half-mass radius are removed; they were never coming back.</p>
   <div class="fx">
@@ -242,8 +245,10 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
     the cube root, so giants rise slowly out of the dust.</figcaption></figure>
   </div>
   <div class="chips">
+    <span class="chip">stick below <b>stickiness × v<sub>esc</sub></b> · harder hits bounce (e 0.4)</span>
     <span class="chip">merge radius tracks <b>image scale</b> — 0.1× default keeps accretion gradual</span>
-    <span class="chip">accretion <b>off</b> = bodies persist — best for studying spin / inertia / gravity</span>
+    <span class="chip">stickiness <b>0</b> = bouncing gravel — nothing ever sticks</span>
+    <span class="chip">accretion <b>off</b> = fully collisionless — bodies pass through</span>
     <span class="chip">700 grains at seed (astro default)</span>
   </div>
 </section>

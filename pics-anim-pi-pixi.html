@@ -1513,6 +1513,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="astroStepSlider" min="1" max="8" value="1" step="1">
 <span class="ctrl-val" id="astroStepVal">1</span>
 </div>
+<div class="ctrl-row">
+<label title="Collisions stick only below this fraction of the mutual escape speed; harder hits bounce inelastically. 1.0 = the physical criterion, lower = slower accretion, 0 = nothing ever sticks (bouncing gravel).">stickiness</label>
+<input type="range" id="astroStickSlider" min="0" max="200" value="100" step="5">
+<span class="ctrl-val" id="astroStickVal">1.00</span>
+</div>
 <div class="ctrl-row" style="gap:8px;">
 <label>accretion</label>
 <button id="astroMergeBtn" class="on" title="Merge bodies that collide (conserving mass & momentum) so they grow — planets/stars by accretion.">accretion: on</button>
@@ -1793,6 +1798,7 @@ let _ASTRO_SOFT     = parseInt(document.getElementById('astroSoftSlider').value)
 let _ASTRO_SPIN     = parseInt(document.getElementById('astroSpinSlider').value) / 100;
 let _ASTRO_SUBSTEPS = parseInt(document.getElementById('astroStepSlider').value);
 let _ASTRO_SETTLE   = parseInt(document.getElementById('astroSettleSlider').value) / 1000;
+let _ASTRO_STICK    = parseInt(document.getElementById('astroStickSlider').value) / 100;
 let _ASTRO_MERGE    = true;
 let pyramidRefreshInterval = 3;
 let lastPyramidUpdate = -Infinity;
@@ -2064,6 +2070,7 @@ wire('astroSoftSlider',    'astroSoftVal',    v=>parseInt(v),      v=>parseInt(v
 wire('astroSpinSlider',    'astroSpinVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_SPIN=v; });
 wire('astroStepSlider',    'astroStepVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SUBSTEPS=v; });
 wire('astroSettleSlider',  'astroSettleVal',  v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3),  v=>{ _ASTRO_SETTLE=v; });
+wire('astroStickSlider',   'astroStickVal',   v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_STICK=v; });
 // Mode switch: [✦ Astro] ⇄ [← Active Matter]. Toggles which control groups show and
 // relabels the header/speed control. Physics branching + tank-forward come next increment.
 function _applySimMode(){
@@ -4267,15 +4274,37 @@ function astroStep(h){
 
 function astroMerge(){
   const n=boids.length; if(n<2) return;
+  // Velocity-gated sticking (real accretion): a collision merges only when the relative speed is
+  // below _ASTRO_STICK × the mutual escape speed √(2G·m/r) — gentle hits are gravitationally
+  // bound and stick; hard hits BOUNCE inelastically (e=0.4) instead. Consequences: the hot early
+  // disk resists clumping, each bounce dissipates energy so accretion accelerates as the disk
+  // cools (like real disks), and massive bodies capture more readily (gravitational focusing).
+  const G=_ASTRO_G*0.03, s2=_ASTRO_STICK*_ASTRO_STICK;
   const dead=new Uint8Array(n); let any=false;
   for(let i=0;i<n;i++){ if(dead[i])continue; const bi=boids[i];
     for(let j=i+1;j<n;j++){ if(dead[j])continue; const bj=boids[j];
       const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z, mr=_astroRadiusPx(bi)+_astroRadiusPx(bj);
-      if(dx*dx+dy*dy+dz*dz < mr*mr){ // inelastic merge — conserve mass & momentum (3D contact test)
-        const m=bi.m+bj.m;
+      const d2=dx*dx+dy*dy+dz*dz;
+      if(d2 >= mr*mr) continue;
+      const m=bi.m+bj.m;
+      const dvx=bj.vx-bi.vx, dvy=bj.vy-bi.vy, dvz=bj.vz-bi.vz;
+      if(dvx*dvx+dvy*dvy+dvz*dvz <= (2*G*m/mr)*s2){
+        // stick: inelastic merge — conserve mass & momentum
         bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m; bi.z=(bi.z*bi.m+bj.z*bj.m)/m;
         bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m; bi.vz=(bi.vz*bi.m+bj.vz*bj.m)/m;
         bi.m=m; dead[j]=1; any=true;
+      } else {
+        // bounce: separate along the line of centres (mass-weighted), then reflect the closing
+        // radial velocity with restitution 0.4 — dissipative, and prevents visual tunneling
+        const d=Math.sqrt(d2)||1e-6, nx=dx/d, ny=dy/d, nz=dz/d, ov=mr-d;
+        bi.x-=nx*ov*(bj.m/m); bi.y-=ny*ov*(bj.m/m); bi.z-=nz*ov*(bj.m/m);
+        bj.x+=nx*ov*(bi.m/m); bj.y+=ny*ov*(bi.m/m); bj.z+=nz*ov*(bi.m/m);
+        const vn=dvx*nx+dvy*ny+dvz*nz;
+        if(vn<0){ // approaching
+          const P=-(1+0.4)*vn/(1/bi.m+1/bj.m);
+          bi.vx-=P*nx/bi.m; bi.vy-=P*ny/bi.m; bi.vz-=P*nz/bi.m;
+          bj.vx+=P*nx/bj.m; bj.vy+=P*ny/bj.m; bj.vz+=P*nz/bj.m;
+        }
       }
     }
   }
@@ -4664,6 +4693,7 @@ _ASTRO_SOFT     = ${_ASTRO_SOFT};
 _ASTRO_SPIN     = ${_ASTRO_SPIN};
 _ASTRO_SUBSTEPS = ${_ASTRO_SUBSTEPS};
 _ASTRO_SETTLE   = ${_ASTRO_SETTLE};
+_ASTRO_STICK    = ${_ASTRO_STICK};
 _ASTRO_MERGE    = ${_ASTRO_MERGE};
 _applySimMode();
 if(SIM_MODE==='astro') astroSeed(); else startSim();
