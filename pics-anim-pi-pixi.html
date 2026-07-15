@@ -4125,6 +4125,23 @@ if(RUN_MODE!=='dash'){
     }
   };
   for(const ev of ['touchend','click','pointerdown','keydown']) window.addEventListener(ev,_sndUnlock,{passive:true});
+  // In-tank sound button. On iOS the dashboard's forwarded 🔊 toggle can be lost entirely
+  // (background tabs are suspended), leaving SOUND_ON false in the tank — so taps did nothing
+  // and no hint ever showed. This button lives IN the tank document: one genuine tap both
+  // enables sound and satisfies the gesture rule. Created dynamically so the dashboard is untouched.
+  const _tb=document.createElement('button');
+  _tb.id='tankSndBtn'; _tb.textContent='🔈'; _tb.title='Sound on/off';
+  _tb.style.cssText='position:fixed;right:14px;bottom:14px;z-index:99;width:46px;height:46px;'+
+    'border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.35);'+
+    'color:#fff;font-size:20px;cursor:pointer;opacity:0.55;';
+  _tb.addEventListener('click',()=>{
+    SOUND_ON=!SOUND_ON; _tb.textContent=SOUND_ON?'🔊':'🔈';
+    if(SOUND_ON){ _sndInit(); if(_ac&&_ac.state!=='running'){ _ac.resume().catch(()=>{});
+      try{ const b=_ac.createBuffer(1,1,22050), s=_ac.createBufferSource(); s.buffer=b; s.connect(_ac.destination); s.start(0); }catch(e){} } }
+    if(_ac&&_snd) _sndUpdate();
+  });
+  document.body.appendChild(_tb);
+  setInterval(()=>{ _tb.textContent=SOUND_ON?'🔊':'🔈'; },800); // stay in sync with dashboard-forwarded toggles
 }
 
 // ── canvas video recorder ──────────────────────────────────────────────────────
