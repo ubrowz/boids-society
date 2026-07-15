@@ -4112,8 +4112,19 @@ document.getElementById('soundBtn').addEventListener('click',()=>{
   if(_ac&&_snd) _sndUpdate();
 });
 if(RUN_MODE!=='dash'){
-  // audio unlock: the first real gesture in this tab resumes the context
-  window.addEventListener('pointerdown',()=>{ if(SOUND_ON&&_ac&&_ac.state!=='running') _ac.resume().catch(()=>{}); });
+  // Audio unlock, iOS-proof: WebKit honours the unlock gesture reliably on touchend/click
+  // (not always pointerdown), wants the context CREATED inside the gesture when possible,
+  // and requires actually playing something within it (the classic silent-buffer trick).
+  // NOTE: the iPhone ring/silent side switch mutes Web Audio entirely — code can't override it.
+  const _sndUnlock=()=>{
+    if(!SOUND_ON) return;
+    if(!_ac) _sndInit();
+    if(_ac&&_ac.state!=='running'){
+      _ac.resume().catch(()=>{});
+      try{ const b=_ac.createBuffer(1,1,22050), s=_ac.createBufferSource(); s.buffer=b; s.connect(_ac.destination); s.start(0); }catch(e){}
+    }
+  };
+  for(const ev of ['touchend','click','pointerdown','keydown']) window.addEventListener(ev,_sndUnlock,{passive:true});
 }
 
 // ── canvas video recorder ──────────────────────────────────────────────────────
