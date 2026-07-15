@@ -1335,13 +1335,13 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <h2>Population</h2>
 <div class="ctrl-row flock-only">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="1000" value="512">
-<span class="ctrl-val" id="targetVal">512</span>
+<input type="range" id="targetSlider" min="2" max="1000" value="624">
+<span class="ctrl-val" id="targetVal">624</span>
 </div>
 <div class="ctrl-row">
 <label title="How many boids the simulation is seeded with at start (applies on restart / play after pause)">start pop</label>
-<input type="range" id="initPopSlider" min="2" max="1000" value="252">
-<span class="ctrl-val" id="initPopVal">252</span>
+<input type="range" id="initPopSlider" min="2" max="1000" value="445">
+<span class="ctrl-val" id="initPopVal">445</span>
 </div>
 <div class="ctrl-row flock-only">
 <label>pop ceiling</label>
@@ -1401,13 +1401,13 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label title="A couple farther apart than this (px) divorces — grew apart">split dist</label>
-<input type="range" id="divorceDistSlider" min="120" max="600" value="315" step="5">
-<span class="ctrl-val" id="divorceDistVal">315 px</span>
+<input type="range" id="divorceDistSlider" min="120" max="600" value="535" step="5">
+<span class="ctrl-val" id="divorceDistVal">535 px</span>
 </div>
 <div class="ctrl-row">
 <label title="How much harder far-apart partners turn back toward each other (0 = off)">reel-in</label>
-<input type="range" id="bondRampSlider" min="0" max="8" value="4" step="0.5">
-<span class="ctrl-val" id="bondRampVal">4.0×</span>
+<input type="range" id="bondRampSlider" min="0" max="8" value="4.5" step="0.5">
+<span class="ctrl-val" id="bondRampVal">4.5×</span>
 </div>
 </section>
 
@@ -1439,13 +1439,13 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <h2>Motion &amp; space</h2>
 <div class="ctrl-row">
 <label id="speedLabel">speed</label>
-<input type="range" id="speedSlider" min="1" max="10" value="7" step="1">
-<span class="ctrl-val" id="speedVal">7</span>
+<input type="range" id="speedSlider" min="1" max="10" value="9" step="1">
+<span class="ctrl-val" id="speedVal">9</span>
 </div>
 <div class="ctrl-row flock-only">
 <label>sensing r</label>
-<input type="range" id="sensingSlider" min="30" max="300" value="70" step="10">
-<span class="ctrl-val" id="sensingVal">70</span>
+<input type="range" id="sensingSlider" min="30" max="300" value="40" step="10">
+<span class="ctrl-val" id="sensingVal">40</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Thermal mixing (Boltzmann rotational diffusion): random jitter on each boid's heading. 0 = near-ballistic, higher = more mixing/roaming.">temp (mix)</label>
@@ -1454,13 +1454,13 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Cohesion strength (conservative spring toward the local flock centre). Higher = tighter clusters.">cohere k</label>
-<input type="range" id="cohKSlider" min="0" max="100" value="82" step="1">
-<span class="ctrl-val" id="cohKVal">0.082</span>
+<input type="range" id="cohKSlider" min="0" max="100" value="84" step="1">
+<span class="ctrl-val" id="cohKVal">0.084</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Alignment (Vicsek): each boid steers toward its neighbours' average heading. 0 = static clumps; higher = clusters spontaneously pick a direction and wander. Competes with temp — high temp keeps them meandering/reorienting.">align / roam</label>
-<input type="range" id="alignSlider" min="0" max="100" value="0" step="1">
-<span class="ctrl-val" id="alignVal">0.00</span>
+<input type="range" id="alignSlider" min="0" max="100" value="5" step="1">
+<span class="ctrl-val" id="alignVal">0.05</span>
 </div>
 <div class="ctrl-row">
 <label>depth</label>
@@ -1543,8 +1543,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>fatality %</label>
-<input type="range" id="fatalitySlider" min="0" max="80" value="10" step="5">
-<span class="ctrl-val" id="fatalityVal">10%</span>
+<input type="range" id="fatalitySlider" min="0" max="80" value="75" step="5">
+<span class="ctrl-val" id="fatalityVal">75%</span>
 <span id="fatalityEffVal" style="min-width:36px;font-size:9px;color:#ff6b6b;letter-spacing:0.5px;"></span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
@@ -1600,13 +1600,13 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label>details</label>
 <button id="detailsBtn" title="Toggle beak, forked tail and trail" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#555;position:relative;transition:background 0.2s;outline:none;">
+background:#a29bfe;position:relative;transition:background 0.2s;outline:none;">
 <span id="detailsKnob" style="
-position:absolute;top:3px;left:3px;
+position:absolute;top:3px;left:25px;
 width:16px;height:16px;border-radius:50%;
 background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
-<span id="detailsLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+<span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
 </div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>dim infertile</label>
@@ -1663,8 +1663,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>trail length</label>
-<input type="range" id="trailLengthSlider" min="5" max="150" value="20" step="5">
-<span class="ctrl-val" id="trailLengthVal">20</span>
+<input type="range" id="trailLengthSlider" min="5" max="150" value="60" step="5">
+<span class="ctrl-val" id="trailLengthVal">60</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>background</label>
@@ -1696,8 +1696,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
-<input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.2" step="0.05">
-<span class="ctrl-val" id="imgScaleVal">0.20×</span>
+<input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
+<span class="ctrl-val" id="imgScaleVal">0.40×</span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Pixels from image centre to nose tip">nose px</label>
@@ -1883,7 +1883,7 @@ if(SHOW_COLOR){
 });
 
 // ── details toggle (beak, forked tail, trail) ────────────────────────────────
-let SHOW_DETAILS = false;
+let SHOW_DETAILS = true;
 const detailsBtn   = document.getElementById('detailsBtn');
 const detailsKnob  = document.getElementById('detailsKnob');
 const detailsLabel = document.getElementById('detailsLabel');
@@ -2136,7 +2136,7 @@ wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>
 wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
 // ── canvas sizing ─────────────────────────────────────────────────────────────
-let SENSING_RADIUS = 70;
+let SENSING_RADIUS = 40;
 function resize() {
 if(RUN_MODE==='dash') return; // dashboard: canvas stays hidden and unsized
 const ui = document.getElementById('ui');
@@ -2198,7 +2198,7 @@ let preferredFamily    = COLOR_FAMILY_CYCLE[0];
 let familyConvergedTimer = 0;
 const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
 const RADIUS = 20;
-let MAX_TRAIL = 20;
+let MAX_TRAIL = 60;
 const SPEED_MAX = 10 * 0.45;   // slider ceiling × conversion factor = 4.5
 let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
 const TURN_SPEED_BASE = 0.07;   // heading-change cap per steerToward call at max speed
