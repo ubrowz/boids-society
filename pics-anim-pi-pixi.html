@@ -1171,11 +1171,13 @@ canvas#c { display:none; }
   display:block; transition:border-radius 0.18s ease, width 0.18s ease, height 0.18s ease; }
 #recBtn.recording{ border-color:rgba(255,85,85,0.85); background:rgba(255,85,85,0.18); }
 #recBtn.recording .rec-icon{ width:13px; height:13px; border-radius:3px; } /* dot → square while recording */
-#saveBtn,#loadBtn{
+#saveBtn,#loadBtn,#soundBtn{
   height:42px; padding:0 14px; border-radius:8px; cursor:pointer;
   font:600 12px system-ui,sans-serif; letter-spacing:0.03em;
   color:var(--muted); background:var(--panel); border:1px solid var(--line2); }
-#saveBtn:hover,#loadBtn:hover{ color:var(--ink); border-color:var(--accent); }
+#saveBtn:hover,#loadBtn:hover,#soundBtn:hover{ color:var(--ink); border-color:var(--accent); }
+#soundBtn{ font-size:16px; padding:0 11px; }
+#soundBtn.on{ border-color:var(--accent); background:rgba(0,210,211,0.08); }
 
 /* ── panel columns (masonry-style: panels pack without holes) ───────────── */
 #dbGrid{ columns:258px; column-gap:14px; }
@@ -1275,6 +1277,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
     <button id="recBtn" title="Record the aquarium to a video file (downloads a new clip each time you stop)"><span class="rec-icon"></span></button>
+    <button id="soundBtn" title="Sonification: a drone follows population and crowding, a warm layer follows the bonded fraction; births, deaths and new bonds chime. Audio plays in the aquarium tab — tap the tank once to unlock sound.">🔇</button>
     <button id="saveBtn" title="Save all current sliders &amp; toggles to a settings file (a new file each time)">Save</button>
     <button id="loadBtn" title="Load sliders &amp; toggles from a settings file">Load</button>
     <input type="file" id="loadFileInput" accept="application/json,.json" style="display:none">
@@ -1673,6 +1676,25 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </section>
 
 <section class="panel">
+<h2>Sound</h2>
+<div class="ctrl-row">
+<label title="Level of the ambient bed (population body, crowding brightness, bond warmth).">drone</label>
+<input type="range" id="sndDroneSlider" min="0" max="100" value="55" step="5">
+<span class="ctrl-val" id="sndDroneVal">55%</span>
+</div>
+<div class="ctrl-row">
+<label title="Level of the birth chimes and bond dyads.">chimes</label>
+<input type="range" id="sndChimeSlider" min="0" max="100" value="55" step="5">
+<span class="ctrl-val" id="sndChimeVal">55%</span>
+</div>
+<div class="ctrl-row">
+<label title="Level of the death thuds.">thuds</label>
+<input type="range" id="sndThudSlider" min="0" max="100" value="55" step="5">
+<span class="ctrl-val" id="sndThudVal">55%</span>
+</div>
+</section>
+
+<section class="panel">
 <h2>Body image</h2>
 <div class="ctrl-row">
 <label>shape (both)</label>
@@ -2064,6 +2086,9 @@ wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v;
 wire('boltzRotSlider', 'boltzRotVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _BOLTZ_ROT=v; });
 wire('cohKSlider', 'cohKVal', v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3), v=>{ _COH_K=v; });
 wire('alignSlider', 'alignVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _ALIGN_K=v; });
+wire('sndDroneSlider','sndDroneVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DRONE=v; });
+wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHIME=v; });
+wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
 // Astro controls
 wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v),                    v=>{
   // Adiabatic G change: orbital speed scales as √G, so rescaling velocities with G keeps the
@@ -2844,6 +2869,7 @@ boid.alive=false;
 spawnDeathSplash(boid.x,boid.y,boid.hue,boid.sat,zScaleOf(boid));
 if(boid.diseased){ rHistory.push(boid.infectCount); if(rHistory.length>30) rHistory.shift(); }
 deathEvents.push(simClock);
+_sndEvent('death');
 if(boid.partnerId!==null){
 const partner=boidMap.get(boid.partnerId);
 if(partner&&partner.alive){
@@ -2898,6 +2924,7 @@ boid.breedTimer=PREG_INTERVAL*intervalScale*(0.8+Math.random()*0.8);
 setPairChildren(boid.id,partner.id,born+1);
 spawnFlashPairs.set(pairKey(boid.id,partner.id),2.0);
 birthEvents.push(simClock);
+_sndEvent('birth');
 const mx=(boid.x+partner.x)/2+(Math.random()-0.5)*20;
 const my=(boid.y+partner.y)/2+(Math.random()-0.5)*20;
 const childColor=inheritColor(boid,partner);
@@ -2967,6 +2994,7 @@ const coolFrames=Math.max(5,Math.round(COOLDOWN_FRAMES/Math.sqrt(BOND_THRESHOLD)
 setHits(a.id,b.id,h); setCool(a.id,b.id,coolFrames);
 if(h>=BOND_THRESHOLD){
 a.partnerId=b.id; b.partnerId=a.id;
+_sndEvent('bond');
 a.breedTimer=PREG_INTERVAL*(0.5+Math.random());
 b.breedTimer=PREG_INTERVAL*(0.5+Math.random());
 // per-pair family target: drawn from Normal(FAMILY_SIZE, 0.8), min 0
@@ -3276,6 +3304,7 @@ if(edible){
 // eat it
 b.alive=false;
 spawnDeathSplash(b.x,b.y,b.hue,b.sat,zScaleOf(b));
+_sndEvent('death');
 pred.lastEaten=simClock;
 pred.lockedBoidId=null; // meal complete — lock released
 break;
@@ -3955,6 +3984,103 @@ infectBoid(target);
 statusEl.textContent='';
 });
 
+// ── sound engine (Phase 1: sonification) ──────────────────────────────────────
+// Everything is synthesized with Web Audio — no samples, no network, the file stays
+// self-contained. A drone's body follows the population, its filter brightness follows
+// crowding pressure, and a warm fifth follows the bonded fraction; births, deaths and
+// new bonds fire small chimes. All pitches sit on a minor-pentatonic scale, so the
+// society can't play a wrong note. Audio lives in the TANK (where the sim runs);
+// browsers require a gesture in that tab, so the overlay shows "tap for sound" until
+// the first click. The dashboard 🔊 button is forwarded like any other toggle.
+let SOUND_ON=false, _ac=null, _snd=null, _sndTick=0, _sndVoices=0;
+let _SND_DRONE=parseInt(document.getElementById('sndDroneSlider').value)/100;
+let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
+let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
+const _SND_SCALE=[0,3,5,7,10]; // minor pentatonic degrees
+function _midiHz(m){ return 440*Math.pow(2,(m-69)/12); }
+function _sndInit(){
+  if(_ac) return;
+  const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+  _ac=new AC();
+  const comp=_ac.createDynamicsCompressor(); comp.connect(_ac.destination); // tames peaks so the bus can run hot
+  const master=_ac.createGain(); master.gain.value=0; master.connect(comp);
+  // synthesized reverb: exponentially decaying noise impulse (no sample files)
+  const len=Math.floor(_ac.sampleRate*2.2), ir=_ac.createBuffer(2,len,_ac.sampleRate);
+  for(let c=0;c<2;c++){ const d=ir.getChannelData(c); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); }
+  const conv=_ac.createConvolver(); conv.buffer=ir;
+  const wet=_ac.createGain(); wet.gain.value=0.35; conv.connect(wet); wet.connect(master);
+  const dry=_ac.createGain(); dry.gain.value=0.85; dry.connect(master);
+  const bus=_ac.createGain(); bus.connect(dry); bus.connect(conv);
+  // drone: sub sine + two detuned saws through a lowpass; bond layer = a soft fifth above
+  const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=300; lp.Q.value=0.7;
+  const droneGain=_ac.createGain(); droneGain.gain.value=0;
+  lp.connect(droneGain); droneGain.connect(bus);
+  const mk=(type,freq,det,g)=>{ const o=_ac.createOscillator(); o.type=type; o.frequency.value=freq; o.detune.value=det;
+    const og=_ac.createGain(); og.gain.value=g; o.connect(og); og.connect(lp); o.start(); return og; };
+  const root=_midiHz(50); // D3 — an octave lower buried the drone below what laptop/phone speakers reproduce
+  mk('sine',root/2,0,0.6); mk('sawtooth',root,-6,0.24); mk('sawtooth',root,+6,0.24);
+  const bondG=mk('sawtooth',root*1.5,+3,0.0);
+  _snd={master,bus,lp,droneGain,bondG};
+}
+function _sndPluck(midi,vel,dur,type){
+  if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
+  const t=_ac.currentTime, o=_ac.createOscillator(), g=_ac.createGain();
+  o.type=type; o.frequency.value=_midiHz(midi);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vel,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(_snd.bus);
+  o.onended=()=>{ _sndVoices--; };
+  o.start(t); o.stop(t+dur+0.05);
+}
+function _sndThud(vel){ // percussion-style thud: a fast downward pitch sweep reads as a "boom"
+  // even on small speakers (a fixed low sine has no harmonics and simply vanishes on them)
+  if(_sndVoices>=24) return; _sndVoices++;
+  const t=_ac.currentTime, o=_ac.createOscillator(), g=_ac.createGain();
+  o.type='sine'; // sine = round bass-drum body; triangle harmonics read as a snare
+  o.frequency.setValueAtTime(150,t);
+  o.frequency.exponentialRampToValueAtTime(45,t+0.12); // faster, lower sweep = kick, not tom
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vel,t+0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.45);
+  o.connect(g); g.connect(_snd.bus);
+  o.onended=()=>{ _sndVoices--; };
+  o.start(t); o.stop(t+0.55);
+}
+function _sndEvent(kind){
+  if(!SOUND_ON||!_ac||_ac.state!=='running'||!_snd) return;
+  const deg=_SND_SCALE[Math.floor(Math.random()*_SND_SCALE.length)];
+  if(kind==='birth'){ if(_SND_CHIME>0) _sndPluck(74+deg, 0.20*_SND_CHIME, 1.4, 'triangle'); } // high chime
+  else if(kind==='death'){ if(_SND_THUD>0) _sndThud(1.3*_SND_THUD); } // swept-pitch thud
+  else if(kind==='bond'){ if(_SND_CHIME>0){ _sndPluck(62+deg, 0.18*_SND_CHIME, 2.0, 'sine'); _sndPluck(69+deg, 0.14*_SND_CHIME, 2.0, 'sine'); } } // dyad
+}
+function _sndHint(){ return (SOUND_ON&&_ac&&_ac.state!=='running') ? ' · 🔈 tap for sound' : ''; }
+function _sndUpdate(){
+  if(!_ac||!_snd) return;
+  const t=_ac.currentTime;
+  _snd.master.gain.setTargetAtTime(SOUND_ON?1.2:0, t, 0.3);
+  if(!SOUND_ON||_ac.state!=='running') return;
+  let living=0,bonded=0;
+  for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++; } }
+  const pop=Math.min(1,living/600);
+  _snd.droneGain.gain.setTargetAtTime((0.08+0.38*pop)*_SND_DRONE*2, t, 0.5); // population → drone body (×2: slider 50% = reference level)
+  const press=(typeof smoothPressure==='number')?Math.max(0,Math.min(1,smoothPressure)):0.5;
+  _snd.lp.frequency.setTargetAtTime(380+2600*press*press, t, 0.6);         // crowding → brightness
+  _snd.bondG.gain.setTargetAtTime(0.22*(living?bonded/living:0)*_SND_DRONE*2, t, 0.8); // bonded fraction → warm fifth
+}
+function _sndSetBtn(){
+  const b=document.getElementById('soundBtn'); if(!b) return;
+  b.textContent=SOUND_ON?'🔊':'🔇';
+  b.classList.toggle('on',SOUND_ON);
+}
+document.getElementById('soundBtn').addEventListener('click',()=>{
+  SOUND_ON=!SOUND_ON; _sndSetBtn();
+  if(RUN_MODE!=='dash'&&SOUND_ON){ _sndInit(); if(_ac&&_ac.state!=='running') _ac.resume().catch(()=>{}); }
+  if(_ac&&_snd) _sndUpdate();
+});
+if(RUN_MODE!=='dash'){
+  // audio unlock: the first real gesture in this tab resumes the context
+  window.addEventListener('pointerdown',()=>{ if(SOUND_ON&&_ac&&_ac.state!=='running') _ac.resume().catch(()=>{}); });
+}
+
 // ── canvas video recorder ──────────────────────────────────────────────────────
 // Captures the actual WebGL canvas (not the screen) to a .webm/.mp4 via MediaRecorder.
 // The click is forwarded dashboard→tank by the control bridge, so the capture always
@@ -4404,7 +4530,7 @@ function astroTrails(){ // orbital paths — what makes spin / inertia / gravity
 }
 
 function astroFrame(dt){
-  if(_fpsEl) _fpsEl.innerHTML = '☄ ASTRO · '+boids.length+' bodies';
+  if(_fpsEl) _fpsEl.innerHTML = '☄ ASTRO · '+boids.length+' bodies'+_sndHint();
   const h=1.0;
   for(let s=0;s<_ASTRO_SUBSTEPS;s++){
     // adaptive substepping: keep the fastest body's motion under ~half the softening length per
@@ -4454,12 +4580,13 @@ if(lastTime!==null && ts-lastTime < FRAME_MIN_MS) return;
 const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
 lastTime=ts;
 simClock+=dt;
+if(++_sndTick>=6){ _sndTick=0; _sndUpdate(); } // sonification mappings at ~5 Hz (both modes)
 if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch (rafId already queued)
 // Overlay: live boid count + preferred colour family
 if(_fpsEl){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
-  _fpsEl.innerHTML=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>';
+  _fpsEl.innerHTML=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+_sndHint();
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
 
@@ -4716,6 +4843,11 @@ _ASTRO_STICK    = ${_ASTRO_STICK};
 _ASTRO_GROW     = ${_ASTRO_GROW};
 _ASTRO_MERGE    = ${_ASTRO_MERGE};
 _applySimMode();
+SOUND_ON        = ${SOUND_ON};
+_SND_DRONE      = ${_SND_DRONE};
+_SND_CHIME      = ${_SND_CHIME};
+_SND_THUD       = ${_SND_THUD};
+if(SOUND_ON){ _sndSetBtn(); _sndInit(); } // audio starts on the first tap (browser gesture rule)
 if(SIM_MODE==='astro') astroSeed(); else startSim();
 })();
 <\/script>`;
@@ -4773,7 +4905,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn','recBtn','astroMergeBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn','recBtn','astroMergeBtn','soundBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
