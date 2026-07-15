@@ -1663,8 +1663,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>trail length</label>
-<input type="range" id="trailLengthSlider" min="5" max="150" value="60" step="5">
-<span class="ctrl-val" id="trailLengthVal">60</span>
+<input type="range" id="trailLengthSlider" min="5" max="150" value="20" step="5">
+<span class="ctrl-val" id="trailLengthVal">20</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
 <label>background</label>
@@ -2198,7 +2198,7 @@ let preferredFamily    = COLOR_FAMILY_CYCLE[0];
 let familyConvergedTimer = 0;
 const FAMILY_CONVERGE_HOLD = 5.0; // seconds at ≥90% convergence before advancing
 const RADIUS = 20;
-let MAX_TRAIL = 60;
+let MAX_TRAIL = 20;
 const SPEED_MAX = 10 * 0.45;   // slider ceiling × conversion factor = 4.5
 let SPEED = parseInt(document.getElementById('speedSlider').value) * 0.45;
 const TURN_SPEED_BASE = 0.07;   // heading-change cap per steerToward call at max speed
