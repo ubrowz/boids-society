@@ -2874,6 +2874,7 @@ if(boid.partnerId!==null){
 const partner=boidMap.get(boid.partnerId);
 if(partner&&partner.alive){
 partner.partnerId=null;
+_sndEvent('unbond');
 partner.breedTimer=PREG_INTERVAL*(0.5+Math.random());
 for(const o of boids) clearPair(partner.id,o.id);
 }
@@ -3025,6 +3026,7 @@ clearPairChildren(boid.id, partner.id);
 clearPair(boid.id, partner.id);
 boid.partnerId = null;
 partner.partnerId = null;
+_sndEvent('unbond');
 boid.pairFamilyTarget = 0;
 partner.pairFamilyTarget = 0;
 boid.breedTimer = PREG_INTERVAL*(0.5+Math.random());
@@ -4045,12 +4047,45 @@ function _sndThud(vel){ // percussion-style thud: a fast downward pitch sweep re
   o.onended=()=>{ _sndVoices--; };
   o.start(t); o.stop(t+0.55);
 }
+const _ksCache=new Map();
+function _ksBuffer(midi){
+  // Karplus-Strong plucked string, rendered OFFLINE into a buffer. A live Web Audio feedback
+  // loop is clamped to >=128 samples of delay (~3 ms), which caps playable pitch at ~340 Hz —
+  // higher notes came out as detuned metallic clanging. Computing the string in plain JS has
+  // no such limit: exact pitch, computed once per note, cached.
+  let b=_ksCache.get(midi); if(b) return b;
+  const sr=_ac.sampleRate, freq=_midiHz(midi);
+  const N=Math.max(2,Math.round(sr/freq));            // string length in samples
+  const len=Math.floor(sr*2.0), data=new Float32Array(len), line=new Float32Array(N);
+  for(let i=0;i<N;i++) line[i]=Math.random()*2-1;     // the pluck: one period of noise
+  let idx=0;
+  for(let i=0;i<len;i++){
+    const cur=line[idx], nxt=line[(idx+1)%N];
+    data[i]=cur;
+    line[idx]=0.996*0.5*(cur+nxt);                    // averaging = damping lowpass; 0.996 = string loss
+    idx=(idx+1)%N;
+  }
+  b=_ac.createBuffer(1,len,sr); b.copyToChannel(data,0);
+  _ksCache.set(midi,b); return b;
+}
+function _sndPluckKS(midi, vel, dur, off){
+  if(_sndVoices>=24) return; _sndVoices++;
+  const t=_ac.currentTime+(off||0);
+  const src=_ac.createBufferSource(); src.buffer=_ksBuffer(midi);
+  const g=_ac.createGain();
+  g.gain.setValueAtTime(vel,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.connect(g); g.connect(_snd.bus);
+  src.onended=()=>{ _sndVoices--; };
+  src.start(t); src.stop(t+dur+0.05);
+}
 function _sndEvent(kind){
   if(!SOUND_ON||!_ac||_ac.state!=='running'||!_snd) return;
   const deg=_SND_SCALE[Math.floor(Math.random()*_SND_SCALE.length)];
-  if(kind==='birth'){ if(_SND_CHIME>0) _sndPluck(74+deg, 0.20*_SND_CHIME, 1.4, 'triangle'); } // high chime
+  if(kind==='birth'){ if(_SND_CHIME>0) _sndPluckKS(74+deg, 0.22*_SND_CHIME, 1.6); } // plucked harp note
   else if(kind==='death'){ if(_SND_THUD>0) _sndThud(1.3*_SND_THUD); } // swept-pitch thud
-  else if(kind==='bond'){ if(_SND_CHIME>0){ _sndPluck(62+deg, 0.18*_SND_CHIME, 2.0, 'sine'); _sndPluck(69+deg, 0.14*_SND_CHIME, 2.0, 'sine'); } } // dyad
+  else if(kind==='bond'){ if(_SND_CHIME>0){ _sndPluckKS(62+deg, 0.20*_SND_CHIME, 2.2); _sndPluckKS(69+deg, 0.16*_SND_CHIME, 2.2, 0.07); } } // strummed dyad (2nd string 70 ms late)
+  else if(kind==='unbond'){ if(_SND_CHIME>0){ _sndPluckKS(69+deg, 0.16*_SND_CHIME, 2.0); _sndPluckKS(62+deg, 0.13*_SND_CHIME, 2.0, 0.09); } } // the same dyad strummed DOWNWARD — a bond undone
 }
 function _sndHint(){ return (SOUND_ON&&_ac&&_ac.state!=='running') ? ' · 🔈 tap for sound' : ''; }
 function _sndUpdate(){
