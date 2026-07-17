@@ -213,10 +213,10 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   but never creep into a corner — while a thermal <b>temperature</b> jitters every heading so a cluster's centre
   wanders. The result: clusters that <b>breathe and roam</b>, loosening as they crowd and drifting as a whole.</p>
   <p class="note">A dense, tightly-packed cluster is a different story: the spring only pulls inward and the thermal
-  kicks cancel across many boids, so it can sit almost still. The optional <b>alignment</b> nudge (the
-  <b>align / roam</b> control — the classic third flocking rule, off by default) fixes that by making neighbours
-  match headings, so a whole cluster locks onto a shared direction and <b>wanders as one</b>. Turned up against
-  the temperature, it's a genuine order/disorder switch: static clump below, marching flock above.</p>
+  kicks cancel across many boids, so it can sit almost still. The <b>alignment</b> nudge (the
+  <b>align / roam</b> control — the classic third flocking rule, on by default at a gentle 0.05) fixes that by making
+  neighbours match headings, so a whole cluster locks onto a shared direction and <b>wanders as one</b>. Turned up
+  against the temperature, it's a genuine order/disorder switch: static clump below, marching flock above.</p>
   <div class="panel scrollx"><svg id="dgFeed" class="dg" viewBox="0 0 960 360" role="img" aria-label="Negative feedback loop between population and pressure with three return arms: nearness, lifespan and breeding rate"></svg></div>
   <div class="chips">
     <span class="chip">arm 1 · nearness <b>4.0 → 0.05</b> — fewer meetings, fewer bonds</span>

@@ -1462,8 +1462,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row flock-only">
 <label title="Alignment (Vicsek): each boid steers toward its neighbours' average heading. 0 = static clumps; higher = clusters spontaneously pick a direction and wander. Competes with temp — high temp keeps them meandering/reorienting.">align / roam</label>
-<input type="range" id="alignSlider" min="0" max="100" value="5" step="1">
-<span class="ctrl-val" id="alignVal">0.05</span>
+<input type="range" id="alignSlider" min="0" max="100" value="57" step="1">
+<span class="ctrl-val" id="alignVal">0.050</span>
 </div>
 <div class="ctrl-row">
 <label>depth</label>
@@ -1647,6 +1647,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
 </div>
+<div class="ctrl-row flock-only">
+<label title="Brightness of the bonded/fertile aura glow. 100% = the original look; above 100% boosts it, 0 hides it without changing the aura mode.">aura opacity</label>
+<input type="range" id="auraOpacitySlider" min="0" max="300" value="100" step="5">
+<span class="ctrl-val" id="auraOpacityVal">100%</span>
+</div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>event fx</label>
 <button id="bondLinesBtn" title="Cycle event fx: all (bond lines + birth rings + death splashes) → bond lines only → none" style="
@@ -1812,7 +1817,10 @@ let _COH_K = parseInt(document.getElementById('cohKSlider').value) / 1000;
 // Alignment (Vicsek collective motion): each boid steers toward its neighbours' average heading. This
 // makes headings correlated, so a dense cluster's average velocity is no longer ~0 and the whole cluster
 // self-propels/wanders instead of sitting still. 0 = off (today's static clumps). Live via "align / roam".
-let _ALIGN_K = parseInt(document.getElementById('alignSlider').value) / 100;
+// The slider is log-scaled: k's visible effect saturates above ~0.05, so a linear 0..1 track wasted
+// 95% of its travel. Position 0 = exactly 0 (off); positions 1..100 sweep 0.001..1.0 logarithmically.
+function _alignKFromSlider(v){ v=parseInt(v); return v<=0 ? 0 : 0.001*Math.pow(1000,(v-1)/99); }
+let _ALIGN_K = _alignKFromSlider(document.getElementById('alignSlider').value);
 // ── Astro (gravitational N-body) mode ────────────────────────────────────────
 // SIM_MODE switches the whole simulation between 'flock' (active-matter boids) and
 // 'astro' (gravitational N-body). The astro params below are read by the astro
@@ -2085,7 +2093,7 @@ WANDER_STR=WANDER_STR_BASE*(SPEED/SPEED_MAX);
 wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v; });
 wire('boltzRotSlider', 'boltzRotVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _BOLTZ_ROT=v; });
 wire('cohKSlider', 'cohKVal', v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3), v=>{ _COH_K=v; });
-wire('alignSlider', 'alignVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _ALIGN_K=v; });
+wire('alignSlider', 'alignVal', v=>_alignKFromSlider(v), v=>_alignKFromSlider(v).toFixed(3), v=>{ _ALIGN_K=v; });
 wire('sndDroneSlider','sndDroneVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DRONE=v; });
 wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHIME=v; });
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
@@ -2157,6 +2165,7 @@ wire('predatorSlider',     'predatorVal',      v=>parseInt(v),   v=>v,       v=>
 wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>{ FULL_DURATION=v; });
 wire('predatorDietSlider', 'predatorDietVal',  v=>parseInt(v),   v=>['','any','favored','other'][v], v=>{ PREDATOR_DIET=v; });
 wire('trailOpacitySlider', 'trailOpacityVal',  v=>parseInt(v),   v=>v+'%',  v=>{ TRAIL_OPACITY=v/100; });
+wire('auraOpacitySlider',  'auraOpacityVal',   v=>parseInt(v),   v=>v+'%',  v=>{ AURA_OPACITY=v/100; });
 wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
 wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
@@ -2276,6 +2285,7 @@ const STARVATION_TIME   = 45; // seconds hungry with no prey before dying
 let predators = [];
 let deathSplashes = [];
 let TRAIL_OPACITY    = parseInt(document.getElementById('trailOpacitySlider').value) / 100;
+let AURA_OPACITY     = parseInt(document.getElementById('auraOpacitySlider').value) / 100;   // multiplier on the aura glow alphas; 1.0 = original look
 const DISEASE_COOLDOWN = 1.5;    // seconds before same pair can register another hit
 
 let smoothPressure = 0.5;
@@ -3584,17 +3594,18 @@ const r = (boid.isSingle ? RADIUS*0.7 : RADIUS) * zs;
 const baseAlpha = alpha * ((fertile||!DIM_INFERTILE) ? 1.0 : 0.55) * Math.min(1, 0.45+0.55*zs); // dim beyond the midplane only
 
 // aura glow — mode 0 = off, 1 = flat disc, 2 = gradient (three concentric circles)
-if(SHOW_DETAILS && AURA_MODE>0 && (isBonded||fertile)){
+if(SHOW_DETAILS && AURA_MODE>0 && AURA_OPACITY>0 && (isBonded||fertile)){
   const glowR=RADIUS*2.0*zs;
   // aura follows the boid's own hue (and greys out with the colour toggle, via _drawHex);
   // bonded boids just glow a touch brighter (L60) so they still read as paired, in-palette.
   const glowCol = _drawHex(boid, isBonded ? 60 : 50);
+  const aA = baseAlpha*AURA_OPACITY; // "aura opacity" slider: scales all glow alphas (clamped below)
   if(AURA_MODE===2){ // gradient — soft radial falloff
-    g.beginFill(glowCol, baseAlpha*0.06); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
-    g.beginFill(glowCol, baseAlpha*0.20); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
-    g.beginFill(glowCol, baseAlpha*0.40); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.06)); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.20)); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.40)); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
   } else { // flat — a single even disc
-    g.beginFill(glowCol, baseAlpha*0.18); g.drawCircle(boid.x,boid.y,glowR*0.6); g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.18)); g.drawCircle(boid.x,boid.y,glowR*0.6); g.endFill();
   }
 }
 
@@ -4802,6 +4813,7 @@ const bootScript = `<script>
 (function(){
 MAX_TRAIL         = ${MAX_TRAIL};
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
+AURA_OPACITY      = ${AURA_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
 AURA_MODE         = ${AURA_MODE};
 _applyAura(); // sync the aura button visual to the exported mode
