@@ -1653,6 +1653,38 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="auraOpacityVal">100%</span>
 </div>
 <div class="ctrl-row flock-only" style="gap:8px;">
+<label title="Cell differentiation (embryo fate model): undecided grey cells commit to one of three fate colours (red/green/blue), driven by a vertical morphogen gradient + neighbour coupling. Run with low motion (align/temp down) so territories hold.">differentiate</label>
+<button id="diffBtn" title="Toggle cell differentiation" style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="diffKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="diffLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Neighbour rule for differentiation. +1 = community effect (neighbours reinforce the same fate → coherent organ territories). −1 = lateral inhibition (a committing cell pushes neighbours to a different fate → salt-and-pepper). 0 = neighbours ignored, fate set by the gradient + noise alone.">fate coupling</label>
+<input type="range" id="diffCouplingSlider" min="-100" max="100" value="100" step="5">
+<span class="ctrl-val" id="diffCouplingVal">+1.00</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Morphogen gradient strength — how strongly a cell's vertical position dictates its fate (French-flag positional information). 0 = position ignored (fate from neighbours + noise only); 1 = position dominates (clean top/middle/bottom bands).">morphogen</label>
+<input type="range" id="diffGradientSlider" min="0" max="100" value="60" step="5">
+<span class="ctrl-val" id="diffGradientVal">0.60</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Cell motility while differentiating — how much cells actually move. 0 = pinned like packed tissue (territories hold still, best for watching the pattern form); 1 = cells swim freely (patterns smear). Only active while differentiate is on.">motility</label>
+<input type="range" id="diffMotilitySlider" min="0" max="100" value="12" step="2">
+<span class="ctrl-val" id="diffMotilityVal">0.12</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Commitment rate — how fast a cell decides. Low = cells sit undecided (grey) and drift under the gradient/neighbours/noise for a long time before locking; high = they snap to a fate almost instantly. Committed neighbours still accelerate nearby cells on top of this.">commit rate</label>
+<input type="range" id="diffRateSlider" min="2" max="100" value="25" step="1">
+<span class="ctrl-val" id="diffRateVal">0.25</span>
+</div>
+<div class="ctrl-row flock-only" style="gap:8px;">
 <label>event fx</label>
 <button id="bondLinesBtn" title="Cycle event fx: all (bond lines + birth rings + death splashes) → bond lines only → none" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1791,6 +1823,11 @@ let TARGET_POP = parseInt(document.getElementById('targetSlider').value);
 let INIT_POP = parseInt(document.getElementById('initPopSlider').value); // boids seeded at startSim (grows/shrinks toward TARGET_POP)
 let POP_CEILING   = parseInt(document.getElementById('popCeilSlider').value);   // 0 = off
 let AURA_MODE = 0; // aura render mode: 0 = off, 1 = flat disc, 2 = gradient (3 concentric circles)
+let DIFF_MODE = false; // cell differentiation overlay (flock mode) — see updateDifferentiation
+let DIFF_COUPLING = parseInt(document.getElementById('diffCouplingSlider').value)/100; // −1 lateral inhibition .. +1 community effect
+let DIFF_GRADIENT = parseInt(document.getElementById('diffGradientSlider').value)/100;  // 0..1 morphogen-gradient strength
+let DIFF_MOTILITY = parseInt(document.getElementById('diffMotilitySlider').value)/100;   // 0..1 how much cells translate (0 = pinned tissue)
+let DIFF_RATE     = parseInt(document.getElementById('diffRateSlider').value)/100;        // base commitment climb per second (decision speed)
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
@@ -1873,6 +1910,29 @@ _applyAura(); // init UI to the current mode
 auraGradBtn.addEventListener('click',()=>{
   AURA_MODE = (AURA_MODE + 1) % 3; // cycle off → flat → gradient → off
   _applyAura();
+});
+
+// ── cell differentiation toggle ───────────────────────────────────────────────
+const diffBtn=document.getElementById('diffBtn');
+const diffKnob=document.getElementById('diffKnob');
+const diffLabel=document.getElementById('diffLabel');
+function _applyDiff(){
+  if(DIFF_MODE){ diffBtn.style.background='#a29bfe'; diffKnob.style.left='25px'; diffLabel.textContent='on'; diffLabel.style.color='#a29bfe'; }
+  else { diffBtn.style.background='#555'; diffKnob.style.left='3px'; diffLabel.textContent='off'; diffLabel.style.color='#555'; }
+}
+// Turning it on snapshots each cell's genetic saturation and resets it to grey/undecided;
+// turning it off restores the genome's saturation. Hue (the fate coordinate) is left as-is.
+function _diffReset(on){
+  for(const b of boids){
+    if(on){ if(b._genSat===undefined) b._genSat=b.sat; b.commitment=0; b.sat=0.15; }
+    else { if(b._genSat!==undefined){ b.sat=b._genSat; b._genSat=undefined; } }
+  }
+}
+_applyDiff();
+diffBtn.addEventListener('click',()=>{
+  DIFF_MODE=!DIFF_MODE;
+  _diffReset(DIFF_MODE);
+  _applyDiff();
 });
 
 // ── background colour ─────────────────────────────────────────────────────────
@@ -2166,6 +2226,10 @@ wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>
 wire('predatorDietSlider', 'predatorDietVal',  v=>parseInt(v),   v=>['','any','favored','other'][v], v=>{ PREDATOR_DIET=v; });
 wire('trailOpacitySlider', 'trailOpacityVal',  v=>parseInt(v),   v=>v+'%',  v=>{ TRAIL_OPACITY=v/100; });
 wire('auraOpacitySlider',  'auraOpacityVal',   v=>parseInt(v),   v=>v+'%',  v=>{ AURA_OPACITY=v/100; });
+wire('diffCouplingSlider', 'diffCouplingVal',  v=>parseInt(v)/100, v=>(v/100>=0?'+':'')+(parseInt(v)/100).toFixed(2), v=>{ DIFF_COUPLING=v; });
+wire('diffGradientSlider', 'diffGradientVal',  v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_GRADIENT=v; });
+wire('diffMotilitySlider', 'diffMotilityVal',  v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_MOTILITY=v; });
+wire('diffRateSlider',     'diffRateVal',      v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_RATE=v; });
 wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
 wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
@@ -2535,7 +2599,7 @@ vx:Math.cos(angle)*SPEED, vy:Math.sin(angle)*SPEED, _sa:angle, _drawAngle:angle,
 // children are born at their parents' depth; everyone else at a random depth
 z:(parentA!==undefined&&parentB!==undefined)?(parentA.z+parentB.z)/2:Math.random()*DEPTH, vz:0,
 _visR:RADIUS, // on-screen rendered half-extent (px); set each frame in drawBoid, used by depth layering
-hue:chosenHue, sat:chosenSat, wanderAngle:Math.random()*Math.PI*2,
+hue:chosenHue, sat: DIFF_MODE ? 0.15 : chosenSat, commitment:0, _genSat: DIFF_MODE ? chosenSat : undefined, wanderAngle:Math.random()*Math.PI*2,
 age:0, dying:false, fadeTimer:0, birthTimer:BIRTH_DURATION, alive:true,
 partnerId:null, breedTimer:PREG_INTERVAL*(0.5+Math.random()), _turnBoost:1,
 isChild:!!isChild, localPressure:0, globalPressure:0, popPressure:0,
@@ -2735,6 +2799,49 @@ steerToward(boid,partner.x,partner.y,BOND_STRENGTH);
 // too close — steer away to maintain natural separation
 steerToward(boid,boid.x-dx,boid.y-dy,BOND_STRENGTH*0.8);
 }
+}
+
+// ── cell differentiation (embryo fate specification) ──────────────────────────
+// A toy model of early-embryo fate decisions layered on the colour genome. Each cell's
+// HUE is its fate coordinate; three fates sit at the RGB thirds (a heart / liver / brain
+// metaphor). Undecided cells read grey (low sat) and drift under three influences: a
+// vertical MORPHOGEN gradient (positional information — the French-flag "trigger"),
+// NEIGHBOUR coupling (community effect at +coupling → coherent territories; lateral
+// inhibition at −coupling → salt-and-pepper), and thermal NOISE that anneals away as the
+// cell commits. COMMITMENT ramps every frame — faster where neighbours have already
+// committed (community reinforcement) — and on reaching 1 the hue snaps to the nearest
+// fate and locks (canalisation). Saturation is repurposed as the commitment readout:
+// grey → vivid. Newborns inherit their parents' committed hue via inheritColor, so
+// descendants start life biased toward a fate but must still commit themselves.
+const _FATE_HUES = [0, 120, 240]; // heart (red) · liver (green) · brain (blue)
+function _hueDelta(target, cur){ return ((target-cur)%360+540)%360-180; } // signed −180..180
+function _nearestFate(h){ let best=_FATE_HUES[0], bd=181; for(const f of _FATE_HUES){ const d=Math.abs(_hueDelta(f,h)); if(d<bd){ bd=d; best=f; } } return best; }
+function _gradientFate(y){ const p=Math.max(0,Math.min(0.999, y/canvas.height)); return _FATE_HUES[Math.floor(p*_FATE_HUES.length)]; }
+function updateDifferentiation(boid,dt){
+if(boid.commitment>=1){ boid.sat=1; return; } // canalised — locked to its fate
+// neighbour fate = circular mean of hue, weighted by each neighbour's commitment so
+// already-decided cells dominate (induction); also track average commitment for pacing.
+let sx=0, sy=0, wsum=0, csum=0, cn=0;
+const r2=SENSING_RADIUS*SENSING_RADIUS;
+for(const o of _sgNeighbors(boid.x, boid.y, SENSING_RADIUS)){
+  if(o===boid || !o.alive || o.dying) continue;
+  const dx=o.x-boid.x, dy=o.y-boid.y;
+  if(dx*dx+dy*dy > r2) continue;
+  const w=0.15+o.commitment, a=o.hue*Math.PI/180;
+  sx+=w*Math.cos(a); sy+=w*Math.sin(a); wsum+=w;
+  csum+=o.commitment; cn++;
+}
+const avgCommit = cn>0 ? csum/cn : 0;
+// hue update: gradient pull + neighbour coupling + annealing noise
+let dh = DIFF_GRADIENT*0.03*_hueDelta(_gradientFate(boid.y), boid.hue);
+if(wsum>0){ const nMean=Math.atan2(sy,sx)*180/Math.PI; dh += DIFF_COUPLING*0.05*_hueDelta(nMean, boid.hue); }
+dh += (Math.random()-0.5)*8*(1-boid.commitment);
+boid.hue=(boid.hue+dh+360)%360;
+// commitment ramps; committed neighbours accelerate it (community reinforcement)
+const before=boid.commitment;
+boid.commitment=Math.min(1, boid.commitment + DIFF_RATE*dt*(0.5+avgCommit));
+if(before<1 && boid.commitment>=1) boid.hue=_nearestFate(boid.hue); // snap on lock
+boid.sat=0.12+0.88*boid.commitment; // grey (undecided) → vivid (committed)
 }
 
 function avoidWalls(boid){
@@ -4208,7 +4315,7 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 return { app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE } };
+  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE } };
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
@@ -4238,6 +4345,7 @@ if(t.HUNT_MODE!==undefined)         clickTo(t.HUNT_MODE!==HUNT_MODE,'huntModeBtn
 if(t.ASTRO_MERGE!==undefined)       clickTo(!!_ASTRO_MERGE         !== !!t.ASTRO_MERGE,   'astroMergeBtn');
 if(t.EVENT_FX!==undefined){ let n=((t.EVENT_FX-EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); }
 if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
+if(t.DIFF_MODE!==undefined)         clickTo(!!DIFF_MODE        !== !!t.DIFF_MODE,         'diffBtn');
 }
 document.getElementById('saveBtn').addEventListener('click',()=>{
 const blob=new Blob([JSON.stringify(_gatherSettings(),null,2)],{type:'application/json'});
@@ -4684,7 +4792,12 @@ updateLifespan(boid,dt);
 if(!boid.alive) continue;
 updateBreeding(boid,dt);
 if(!boid.dying){
+// differentiation motility: remember the pre-move position so all translation this
+// frame (velocity, cohesion, separation, wander, walls) can be damped toward it —
+// real tissue is near-stationary, but this is a constant-speed engine, so pin the cells.
+const _mx0=boid.x, _my0=boid.y;
 avoidWalls(boid); wander(boid); updateZ(boid); nearnessBehavior(boid); bondAttraction(boid);
+if(DIFF_MODE) updateDifferentiation(boid,dt);
 if(NO_OVERLAP || DEPTH>0) separateBoid(boid); // 3D → non-interpenetration is intrinsic; 2D → only when "no overlap" is on
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
 // only actually rotate toward it by at most TURN_SPEED×6 per frame, preventing
@@ -4702,6 +4815,9 @@ if(_BOLTZ_ROT>0) boid._sa += gaussianRandom(0,_BOLTZ_ROT); // Boltzmann thermal 
 boid.vx=Math.cos(boid._sa)*SPEED; boid.vy=Math.sin(boid._sa)*SPEED;
 boid.x+=boid.vx; boid.y+=boid.vy;
 clampToBounds(boid);
+if(DIFF_MODE && DIFF_MOTILITY<1){ // damp net translation toward the frame's start (0 = pinned tissue)
+  boid.x=_mx0+(boid.x-_mx0)*DIFF_MOTILITY; boid.y=_my0+(boid.y-_my0)*DIFF_MOTILITY;
+}
 boid.trail.push({x:boid.x,y:boid.y});
 if(boid.trail.length>MAX_TRAIL) boid.trail.shift();
 } else if(boid.trail.length>0){
@@ -4817,6 +4933,12 @@ AURA_OPACITY      = ${AURA_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
 AURA_MODE         = ${AURA_MODE};
 _applyAura(); // sync the aura button visual to the exported mode
+DIFF_MODE         = ${DIFF_MODE};
+DIFF_COUPLING     = ${DIFF_COUPLING};
+DIFF_GRADIENT     = ${DIFF_GRADIENT};
+DIFF_MOTILITY     = ${DIFF_MOTILITY};
+DIFF_RATE         = ${DIFF_RATE};
+_applyDiff(); // sync the differentiation button visual to the exported mode
 NO_OVERLAP        = ${NO_OVERLAP};
 // Sync the no-overlap button visual to match the exported NO_OVERLAP state
 if(NO_OVERLAP){
@@ -4980,7 +5102,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','immigrationBtn','huntModeBtn','infectBtn','recBtn','astroMergeBtn','soundBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','recBtn','astroMergeBtn','soundBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
