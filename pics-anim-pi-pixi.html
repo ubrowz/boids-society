@@ -2474,6 +2474,19 @@ else { _sharedTex=_defaultTex; _predTex=_defaultTex; }
 _rebuildPool(_boidPoolM, _poolPNG_M);
 _rebuildPool(_boidPoolF, _poolPNG_F);
 }
+// Image assignment: prefer the least-used image in the sex's pool so a small set of
+// uploaded images spreads evenly instead of clumping by chance. Counts only living
+// boids of that sex, so as boids die and are replaced the distribution self-heals;
+// a random tie-break keeps it varied when many images share the lowest count (the
+// large-population case). Called once per boid at birth (first draw) — see drawBoid.
+function _pickLeastUsedImg(sex, poolLen){
+if(poolLen<=1) return 0;
+const counts=new Array(poolLen).fill(0);
+for(const b of boids){ if(b.alive && b.sex===sex && b.imgIdx>=0 && b.imgIdx<poolLen) counts[b.imgIdx]++; }
+let min=Infinity; for(const c of counts) if(c<min) min=c;
+const cands=[]; for(let i=0;i<poolLen;i++) if(counts[i]===min) cands.push(i);
+return cands[Math.floor(Math.random()*cands.length)];
+}
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
 function blendHueSat(a,b){
@@ -3748,7 +3761,7 @@ const _pool = boid.sex==='M' ? _boidPoolM : _boidPoolF;
 let _bt;
 if(_pool.length){
   if(boid.imgIdx===undefined || boid.imgIdx<0 || boid.imgIdx>=_pool.length)
-    boid.imgIdx = Math.floor(Math.random()*_pool.length);
+    boid.imgIdx = _pickLeastUsedImg(boid.sex, _pool.length);
   _bt = _pool[boid.imgIdx].tex;
 } else {
   _bt = _sharedTex || _defaultTex;
