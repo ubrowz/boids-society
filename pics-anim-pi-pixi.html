@@ -1684,6 +1684,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="diffRateSlider" min="2" max="100" value="25" step="1">
 <span class="ctrl-val" id="diffRateVal">0.25</span>
 </div>
+<div class="ctrl-row flock-only">
+<label title="Migrate-then-settle — how much committing freezes a cell in place. 1 = undecided cells drift (at the motility rate) but a cell stops moving as it commits, settling into the tissue like a differentiated cell. 0 = commitment doesn't affect movement (uniform motility, committed and undecided cells move alike).">settle</label>
+<input type="range" id="diffSettleSlider" min="0" max="100" value="100" step="5">
+<span class="ctrl-val" id="diffSettleVal">1.00</span>
+</div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>event fx</label>
 <button id="bondLinesBtn" title="Cycle event fx: all (bond lines + birth rings + death splashes) → bond lines only → none" style="
@@ -1828,6 +1833,7 @@ let DIFF_COUPLING = parseInt(document.getElementById('diffCouplingSlider').value
 let DIFF_GRADIENT = parseInt(document.getElementById('diffGradientSlider').value)/100;  // 0..1 morphogen-gradient strength
 let DIFF_MOTILITY = parseInt(document.getElementById('diffMotilitySlider').value)/100;   // 0..1 how much cells translate (0 = pinned tissue)
 let DIFF_RATE     = parseInt(document.getElementById('diffRateSlider').value)/100;        // base commitment climb per second (decision speed)
+let DIFF_SETTLE   = parseInt(document.getElementById('diffSettleSlider').value)/100;      // 0..1 how much committing freezes a cell (migrate-then-settle)
 let EMIG_RETURN    = parseInt(document.getElementById('emigReturnSlider').value) / 10;
 let BOND_THRESHOLD = parseInt(document.getElementById('bondSlider').value);
 let BASE_LIFESPAN = parseInt(document.getElementById('lifeSlider').value);
@@ -2230,6 +2236,7 @@ wire('diffCouplingSlider', 'diffCouplingVal',  v=>parseInt(v)/100, v=>(v/100>=0?
 wire('diffGradientSlider', 'diffGradientVal',  v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_GRADIENT=v; });
 wire('diffMotilitySlider', 'diffMotilityVal',  v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_MOTILITY=v; });
 wire('diffRateSlider',     'diffRateVal',      v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_RATE=v; });
+wire('diffSettleSlider',   'diffSettleVal',    v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_SETTLE=v; });
 wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
 wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
@@ -4815,8 +4822,9 @@ if(_BOLTZ_ROT>0) boid._sa += gaussianRandom(0,_BOLTZ_ROT); // Boltzmann thermal 
 boid.vx=Math.cos(boid._sa)*SPEED; boid.vy=Math.sin(boid._sa)*SPEED;
 boid.x+=boid.vx; boid.y+=boid.vy;
 clampToBounds(boid);
-if(DIFF_MODE && DIFF_MOTILITY<1){ // damp net translation toward the frame's start (0 = pinned tissue)
-  boid.x=_mx0+(boid.x-_mx0)*DIFF_MOTILITY; boid.y=_my0+(boid.y-_my0)*DIFF_MOTILITY;
+if(DIFF_MODE){ // damp net translation toward the frame's start; committing freezes a cell (migrate-then-settle)
+  const _mot=DIFF_MOTILITY*(1-DIFF_SETTLE*boid.commitment); // undecided → motility; committed → ~0
+  if(_mot<1){ boid.x=_mx0+(boid.x-_mx0)*_mot; boid.y=_my0+(boid.y-_my0)*_mot; }
 }
 boid.trail.push({x:boid.x,y:boid.y});
 if(boid.trail.length>MAX_TRAIL) boid.trail.shift();
@@ -4938,6 +4946,7 @@ DIFF_COUPLING     = ${DIFF_COUPLING};
 DIFF_GRADIENT     = ${DIFF_GRADIENT};
 DIFF_MOTILITY     = ${DIFF_MOTILITY};
 DIFF_RATE         = ${DIFF_RATE};
+DIFF_SETTLE       = ${DIFF_SETTLE};
 _applyDiff(); // sync the differentiation button visual to the exported mode
 NO_OVERLAP        = ${NO_OVERLAP};
 // Sync the no-overlap button visual to match the exported NO_OVERLAP state

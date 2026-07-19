@@ -272,10 +272,13 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   colour, so a newborn starts life <b>biased</b> toward the family lineage — but it is born grey and must still
   commit for itself, the way an embryo's daughter cells inherit a head start yet make their own call.</p>
   <p class="note">One caveat the physics forces on us: a boid always swims at full speed, so a flock never holds
-  still — and a pattern you can't hold still, you can't see. The <b>motility</b> control pins the cells like packed
-  tissue while they differentiate; turn it to zero and the territories set like stained glass. This is a metaphor,
-  not developmental biology — no genes regulating genes here — but the shapes it makes (positional bands,
-  inhibition patterns, irreversible commitment) are the real ones.</p>
+  still — and a pattern you can't hold still, you can't see. Two controls tame it. <b>Motility</b> damps how far
+  the cells drift; turn it down and they pack like tissue, the territories setting like stained glass. <b>Settle</b>
+  ties that damping to the decision itself — undecided cells migrate, then freeze the moment they commit, so a
+  lineage crystallises in place while its still-grey neighbours wander on, the way cells in an embryo roam until
+  they know what they are and then stay put. This is a metaphor, not developmental biology — no genes regulating
+  genes here — but the shapes it makes (positional bands, inhibition patterns, irreversible commitment) are the
+  real ones.</p>
   <div class="chips">
     <span class="chip">three fates — <b>heart · liver · brain</b> (red / green / blue)</span>
     <span class="chip">undecided = <b>grey</b>; committed = vivid and <b>locked</b> (canalised)</span>
@@ -283,6 +286,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
     <span class="chip"><b>fate coupling</b> +1 community (territories) ↔ −1 lateral inhibition (salt&#8209;and&#8209;pepper)</span>
     <span class="chip"><b>commit rate</b> — how long a cell hesitates before it locks</span>
     <span class="chip"><b>motility</b> 0 = pinned tissue · 1 = free-swimming (pattern smears)</span>
+    <span class="chip"><b>settle</b> — undecided cells migrate, committed cells freeze in place</span>
     <span class="chip">children inherit the fate hue but are <b>born grey</b> — a biased head start</span>
   </div>
 </section>
