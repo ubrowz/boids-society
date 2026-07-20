@@ -1734,6 +1734,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="sndThudSlider" min="0" max="100" value="55" step="5">
 <span class="ctrl-val" id="sndThudVal">55%</span>
 </div>
+<div class="ctrl-row">
+<label title="Level of the colour chord — six pad voices (one per hue family) whose volumes follow the population's colour mix.">colour</label>
+<input type="range" id="sndColorSlider" min="0" max="100" value="55" step="5">
+<span class="ctrl-val" id="sndColorVal">55%</span>
+</div>
 </section>
 
 <section class="panel">
@@ -2163,6 +2168,7 @@ wire('alignSlider', 'alignVal', v=>_alignKFromSlider(v), v=>_alignKFromSlider(v)
 wire('sndDroneSlider','sndDroneVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DRONE=v; });
 wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHIME=v; });
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
+wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 // Astro controls
 wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v),                    v=>{
   // Adiabatic G change: orbital speed scales as √G, so rescaling velocities with G keeps the
@@ -3074,15 +3080,26 @@ toSpawn.push(child);
 }
 
 // ── genetic distance ──────────────────────────────────────────────────────────
+// Diversity is the mean pairwise genetic distance. Full pairwise is O(N²) — ~220k
+// distance calls at N=665, run ~6×/s in updateStatus, the biggest CPU cost on a Pi.
+// Since it's a mean, a random sample of pairs tracks the true value closely (SE ≈
+// 0.006 at 1500 samples), so exact-scan only for small populations and sample above.
+const _DIV_SAMPLE = 1500;
 function genomeDiversity(){
 const alive=boids.filter(b=>b.alive&&!b.dying);
-if(alive.length<2) return 0;
+const n=alive.length;
+if(n<2) return 0;
 let sum=0,count=0;
-for(let i=0;i<alive.length;i++)
-for(let j=i+1;j<alive.length;j++){
-sum+=geneticDistance(alive[i],alive[j]); count++;
+if(n*(n-1)/2 <= _DIV_SAMPLE){ // small pop — exact pairwise is cheap
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){ sum+=geneticDistance(alive[i],alive[j]); count++; }
+} else {                       // large pop — sample random pairs (unbiased mean estimate)
+  for(let k=0;k<_DIV_SAMPLE;k++){
+    const i=(Math.random()*n)|0, j=(Math.random()*n)|0;
+    if(i===j) continue;        // skip degenerate self-pair (~1/n) so it doesn't bias low
+    sum+=geneticDistance(alive[i],alive[j]); count++;
+  }
 }
-return sum/count;
+return count?sum/count:0;
 }
 
 function geneticDistance(a,b){
@@ -4136,7 +4153,21 @@ let SOUND_ON=false, _ac=null, _snd=null, _sndTick=0, _sndVoices=0;
 let _SND_DRONE=parseInt(document.getElementById('sndDroneSlider').value)/100;
 let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
+let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 const _SND_SCALE=[0,3,5,7,10]; // minor pentatonic degrees
+const _FAM_IDX={red:0,yellow:1,green:2,cyan:3,blue:4,magenta:5}; // hue family → colour-chord voice
+// Colour-chord voices: one distinct instrument per hue family, spread across ~2 octaves of
+// D-minor pentatonic (red low/round → magenta high/bright) so a colour shift is heard as a
+// change of instrument AND register, not just which note in a chord is loudest. `cut` is the
+// per-voice lowpass; `lvl` evens perceived loudness (saws/squares carry more energy).
+const _PAD_VOICES=[
+  {midi:53, wave:'sine',     cut:1200, lvl:1.0 },  // red     — F3, round and dark
+  {midi:57, wave:'triangle', cut:1600, lvl:0.95},  // yellow  — A3, soft and hollow
+  {midi:62, wave:'square',   cut:1500, lvl:0.5 },  // green   — D4, reedy and woody
+  {midi:67, wave:'sawtooth', cut:2200, lvl:0.55},  // cyan    — G4, bright and brassy
+  {midi:72, wave:'triangle', cut:3200, lvl:0.72},  // blue    — C5, glassy
+  {midi:77, wave:'sawtooth', cut:3800, lvl:0.4 },  // magenta — F5, piercing top
+];
 function _midiHz(m){ return 440*Math.pow(2,(m-69)/12); }
 function _sndInit(){
   if(_ac) return;
@@ -4160,7 +4191,22 @@ function _sndInit(){
   const root=_midiHz(50); // D3 — an octave lower buried the drone below what laptop/phone speakers reproduce
   mk('sine',root/2,0,0.6); mk('sawtooth',root,-6,0.24); mk('sawtooth',root,+6,0.24);
   const bondG=mk('sawtooth',root*1.5,+3,0.0);
-  _snd={master,bus,lp,droneGain,bondG};
+  // ── colour chord: one instrument per hue family (see _PAD_VOICES) ──
+  // Pitches stay on D-minor pentatonic so every combination is consonant by construction,
+  // but each voice has its own waveform, lowpass and register, so a colour shift changes the
+  // instrument you hear, not just the balance of one chord. Each voice's volume is driven each
+  // frame by how many boids wear that colour (see _sndUpdate). Routed straight to the bus
+  // (bypassing the crowding-modulated drone filter) so the chord is independent of the drone.
+  const colorGains=[];
+  for(let i=0;i<6;i++){
+    const v=_PAD_VOICES[i];
+    const o=_ac.createOscillator(); o.type=v.wave; o.frequency.value=_midiHz(v.midi); o.detune.value=(i%2?5:-5);
+    const f=_ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=v.cut; f.Q.value=0.7;
+    const g=_ac.createGain(); g.gain.value=0;
+    o.connect(f); f.connect(g); g.connect(bus); o.start();
+    colorGains.push(g);
+  }
+  _snd={master,bus,lp,droneGain,bondG,colorGains};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4232,12 +4278,21 @@ function _sndUpdate(){
   _snd.master.gain.setTargetAtTime(SOUND_ON?1.2:0, t, 0.3);
   if(!SOUND_ON||_ac.state!=='running') return;
   let living=0,bonded=0;
-  for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++; } }
+  const fam=_snd.colorGains ? [0,0,0,0,0,0] : null; // per-family colour tally (only "coloured" boids)
+  for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++;
+    if(fam && b.sat>=0.15){ const f=_FAM_IDX[hueToFamily(b.hue)]; fam[f]++; } } } // grey/undecided cells don't vote
   const pop=Math.min(1,living/600);
   _snd.droneGain.gain.setTargetAtTime((0.08+0.38*pop)*_SND_DRONE*2, t, 0.5); // population → drone body (×2: slider 50% = reference level)
   const press=(typeof smoothPressure==='number')?Math.max(0,Math.min(1,smoothPressure)):0.5;
   _snd.lp.frequency.setTargetAtTime(380+2600*press*press, t, 0.6);         // crowding → brightness
   _snd.bondG.gain.setTargetAtTime(0.22*(living?bonded/living:0)*_SND_DRONE*2, t, 0.8); // bonded fraction → warm fifth
+  if(fam){ // colour chord: each voice's volume = sqrt of that family's share (minority colours stay audible)
+    const totalC=fam[0]+fam[1]+fam[2]+fam[3]+fam[4]+fam[5];
+    for(let i=0;i<6;i++){
+      const frac = totalC>0 ? fam[i]/totalC : 0;
+      _snd.colorGains[i].gain.setTargetAtTime(0.13*_PAD_VOICES[i].lvl*Math.sqrt(frac)*_SND_COLOR*2, t, 0.7); // per-voice level trim; slow ramp → swells, not jitter
+    }
+  }
 }
 function _sndSetBtn(){
   const b=document.getElementById('soundBtn'); if(!b) return;
@@ -5066,6 +5121,7 @@ SOUND_ON        = ${SOUND_ON};
 _SND_DRONE      = ${_SND_DRONE};
 _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
+_SND_COLOR      = ${_SND_COLOR};
 if(SOUND_ON){ _sndSetBtn(); _sndInit(); } // audio starts on the first tap (browser gesture rule)
 if(SIM_MODE==='astro') astroSeed(); else startSim();
 })();
