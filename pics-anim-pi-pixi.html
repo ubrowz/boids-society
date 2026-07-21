@@ -1775,6 +1775,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
     <div class="vwrap"><input type="range" class="vfader" id="sndSighSlider" min="0" max="100" value="55" step="5"></div>
     <label title="Level of the bond-breaking sighs — the descending tone when a pair splits (divorce / drift / widowhood).">sighs</label>
   </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndPredVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndPredSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the predator menace — a low Jaws-style two-note ostinato that plays while any predator is in the tank and speeds up as the threat grows.">menace</label>
+  </div>
 </div>
 <div style="max-width:360px;margin-top:12px;">
   <div class="ctrl-row">
@@ -2219,6 +2224,7 @@ wire('sndDroneSlider','sndDroneVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DRO
 wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHIME=v; });
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
 wire('sndSighSlider','sndSighVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIGH=v; });
+wire('sndPredSlider','sndPredVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_PRED=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
@@ -3514,7 +3520,7 @@ if(edible){
 // eat it
 b.alive=false;
 spawnDeathSplash(b.x,b.y,b.hue,b.sat,zScaleOf(b));
-_sndEvent('death');
+_sndEvent('kill'); // predator catch = thud + snare crack (natural/disease deaths stay 'death' = thud only)
 pred.lastEaten=simClock;
 pred.lockedBoidId=null; // meal complete — lock released
 break;
@@ -4208,6 +4214,7 @@ let _SND_DRONE=parseInt(document.getElementById('sndDroneSlider').value)/100;
 let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
 let _SND_SIGH =parseInt(document.getElementById('sndSighSlider').value)/100;
+let _SND_PRED =parseInt(document.getElementById('sndPredSlider').value)/100;
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
 let _SND_DISEASE=parseInt(document.getElementById('sndDiseaseSlider').value)/100;
@@ -4355,6 +4362,36 @@ function _sndThud(vel){ // percussion-style thud: a fast downward pitch sweep re
   const ng=_ac.createGain(); ng.gain.value=vel*0.5;
   ns.connect(nf); nf.connect(ng); ng.connect(_snd.bus); ns.start(t);
 }
+// snare crack for the predator kill: a bright highpassed-noise rattle + a short
+// tonal shell body with a fast downward chirp. Layered over the death thud, it
+// reads as a strike — the moment of the catch, not just the body dropping.
+function _sndSnare(vel){
+  if(!_snd || _sndVoices>=24) return; _sndVoices++;
+  const t=_ac.currentTime;
+  // rattle: white noise through a highpass into a bandpass, short decay
+  const nb=_ac.createBuffer(1,Math.floor(_ac.sampleRate*0.22),_ac.sampleRate), nd=nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*Math.pow(1-i/nd.length,1.6);
+  const ns=_ac.createBufferSource(); ns.buffer=nb;
+  const hp=_ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1400; hp.Q.value=0.6;
+  const bp=_ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3200; bp.Q.value=0.5;
+  const ng=_ac.createGain();
+  ng.gain.setValueAtTime(vel,t);
+  ng.gain.exponentialRampToValueAtTime(0.0001,t+0.17);      // rattle tail
+  ns.connect(hp); hp.connect(bp); bp.connect(ng); ng.connect(_snd.bus);
+  ns.start(t); ns.stop(t+0.22);
+  ns.onended=()=>{ _sndVoices--; };
+  // tonal shell: two triangles with a quick downward chirp = the drum's body
+  const sg=_ac.createGain();
+  sg.gain.setValueAtTime(vel*0.55,t);
+  sg.gain.exponentialRampToValueAtTime(0.0001,t+0.11);
+  sg.connect(_snd.bus);
+  for(const hz of [190,278]){
+    const o=_ac.createOscillator(); o.type='triangle';
+    o.frequency.setValueAtTime(hz,t);
+    o.frequency.exponentialRampToValueAtTime(hz*0.7,t+0.09);
+    o.connect(sg); o.start(t); o.stop(t+0.13);
+  }
+}
 // soft marimba: a warm sine fundamental + a quiet, fast-decaying partial two octaves up
 // (the marimba's woody 4:1 overtone). Rounder and lower than a plucked string, so frequent
 // births sit under the mix instead of dominating it.
@@ -4403,6 +4440,51 @@ function _sndSigh(midi, vel, dur){
   o.onended=()=>{ _sndVoices--; };
   o.start(t); o.stop(t+dur+0.05);
 }
+// ── Predator menace: the Jaws two-note ostinato ────────────────────────────
+// A low minor-second (E2→F2) pulse — E is the 2nd, F the ♭3rd of D minor, so it
+// sits in our key AND is the exact Jaws half-step. Plays whenever a predator is
+// in the tank and TIGHTENS (accelerates) as the threat grows, which is the
+// suspense. Two detuned saws through a dark lowpass = a low-string section that
+// carries on laptop speakers even though the fundamental is sub-90 Hz.
+function _sndPredNote(midi, vel, startT, dur){
+  if(!_snd || _sndVoices>=24) return; _sndVoices++;
+  const f=_midiHz(midi);
+  const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=820; lp.Q.value=2.2; // brighter + resonant so the ostinato cuts through the drone/pads instead of masking under them
+  const g=_ac.createGain();
+  g.gain.setValueAtTime(0.0001,startT);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002,vel),startT+0.015); // hard bowed attack
+  g.gain.exponentialRampToValueAtTime(0.0001,startT+dur);                  // decay across the beat
+  lp.connect(g); g.connect(_snd.bus);
+  let first=true;
+  for(const det of [-7,7]){                                               // two detuned saws → section thickness
+    const o=_ac.createOscillator(); o.type='sawtooth';
+    o.frequency.value=f; o.detune.value=det;
+    o.connect(lp); o.start(startT); o.stop(startT+dur+0.05);
+    if(first){ o.onended=()=>{ _sndVoices--; }; first=false; }
+  }
+}
+let _predNextT=0, _predStep=0;
+function _sndPredSchedule(){
+  if(!SOUND_ON || !_ac || !_snd || _ac.state!=='running' || _SND_PRED<=0){ _predNextT=0; return; }
+  let nPred=0, nHungry=0;
+  for(const p of predators){
+    if(!p.alive) continue;
+    nPred++;
+    if((simClock-p.lastEaten)>FULL_DURATION) nHungry++;                    // actively on the hunt
+  }
+  if(nPred===0){ _predNextT=0; return; }                                  // no predator → silence (the "all clear")
+  const now=_ac.currentTime;
+  if(_predNextT===0){ _predNextT=now+0.04; _predStep=0; }                  // (re)start the ostinato from the low note
+  // mounting suspense: more predators, and more of them hungry, tighten the pulse
+  const interval=Math.max(0.17, 0.70 - 0.09*(nPred-1) - 0.20*Math.min(3,nHungry));
+  const dur=Math.min(interval*0.92, 0.55);
+  const vel=0.34*_SND_PRED*(0.82+0.18*Math.min(1,nHungry));
+  while(_predNextT < now+0.12){                                           // 120 ms look-ahead → beat lands on the audio clock, not the frame clock
+    const midi=(_predStep&1)?41:40;                                       // E2 → F2 → E2 … the Jaws minor second
+    _sndPredNote(midi, vel, _predNextT, dur);
+    _predStep++; _predNextT+=interval;
+  }
+}
 const _ksCache=new Map();
 function _ksBuffer(midi){
   // Karplus-Strong plucked string, rendered OFFLINE into a buffer. A live Web Audio feedback
@@ -4440,6 +4522,7 @@ function _sndEvent(kind){
   const deg=_SND_SCALE[Math.floor(Math.random()*_SND_SCALE.length)];
   if(kind==='birth'){ if(_SND_CHIME>0) _sndMarimba(62+deg, 0.4*_SND_CHIME, 0.5); } // warm marimba, an octave below the old high chime — sits under the mix even at high birth rates
   else if(kind==='death'){ if(_SND_THUD>0) _sndThud(1.3*_SND_THUD); } // swept-pitch thud
+  else if(kind==='kill'){ if(_SND_THUD>0) _sndThud(1.3*_SND_THUD); if(_SND_PRED>0) _sndSnare(0.72*_SND_PRED); } // predator catch: thud (body) + snare crack (the strike), on the "menace" fader
   else if(kind==='bond'){ if(_SND_CHIME>0) _sndSwell(55+deg, 0.16*_SND_CHIME, 0.55); }   // warm fifth swell — two become one
   else if(kind==='unbond'){ if(_SND_SIGH>0) _sndSigh(62+deg, 0.14*_SND_SIGH, 0.7); }        // descending sigh — a bond undone (own "sighs" fader)
 }
@@ -4985,6 +5068,7 @@ const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
 lastTime=ts;
 simClock+=dt;
 if(++_sndTick>=6){ _sndTick=0; _sndUpdate(); } // sonification mappings at ~5 Hz (both modes)
+_sndPredSchedule(); // predator ostinato needs per-frame look-ahead scheduling for a steady beat
 if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch (rafId already queued)
 // Overlay: live boid count + preferred colour family
 if(_fpsEl){
@@ -5269,6 +5353,7 @@ _SND_DRONE      = ${_SND_DRONE};
 _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
 _SND_SIGH       = ${_SND_SIGH};
+_SND_PRED       = ${_SND_PRED};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
