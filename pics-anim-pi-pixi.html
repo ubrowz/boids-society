@@ -1171,13 +1171,16 @@ canvas#c { display:none; }
   display:block; transition:border-radius 0.18s ease, width 0.18s ease, height 0.18s ease; }
 #recBtn.recording{ border-color:rgba(255,85,85,0.85); background:rgba(255,85,85,0.18); }
 #recBtn.recording .rec-icon{ width:13px; height:13px; border-radius:3px; } /* dot → square while recording */
-#saveBtn,#loadBtn,#soundBtn{
-  height:42px; padding:0 14px; border-radius:8px; cursor:pointer;
-  font:600 12px system-ui,sans-serif; letter-spacing:0.03em;
-  color:var(--muted); background:var(--panel); border:1px solid var(--line2); }
-#saveBtn:hover,#loadBtn:hover,#soundBtn:hover{ color:var(--ink); border-color:var(--accent); }
-#soundBtn{ font-size:16px; padding:0 11px; }
-#soundBtn.on{ border-color:var(--accent); background:rgba(0,210,211,0.08); }
+/* unified header icon buttons — one theme for sound / settings / composition */
+.hbtn{ width:42px; height:42px; border-radius:50%; padding:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:16px; line-height:1;
+  color:var(--muted); background:var(--panel); border:1px solid var(--line2);
+  transition:background 0.2s,border-color 0.2s,color 0.2s; }
+.hbtn:hover{ color:var(--ink); border-color:var(--accent); }
+.hbtn.comp{ color:#a29bfe; border-color:rgba(162,155,254,0.5); }               /* composition group — violet */
+.hbtn.comp:hover{ color:#c4bdff; border-color:#a29bfe; background:rgba(162,155,254,0.12); }
+#soundBtn.on{ border-color:var(--accent); color:var(--accent); background:rgba(0,210,211,0.08); }
+.hsep{ width:1px; height:26px; background:var(--line2); border-radius:1px; }   /* group divider */
 
 /* ── panel columns (masonry-style: panels pack without holes) ───────────── */
 #dbGrid{ columns:258px; column-gap:14px; }
@@ -1276,12 +1279,20 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <button id="astroModeBtn" title="Switch between Active Matter (flocking) and Astro (gravitational N-body)">✦ Astro</button>
     <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
-    <button id="recBtn" title="Record the aquarium to a video file (downloads a new clip each time you stop)"><span class="rec-icon"></span></button>
-    <button id="soundBtn" title="Sonification: a drone follows population and crowding, a warm layer follows the bonded fraction; births, deaths and new bonds chime. Audio plays in the aquarium tab — tap the tank once to unlock sound.">🔇</button>
-    <button id="saveBtn" title="Save all current sliders &amp; toggles to a settings file (a new file each time)">Save</button>
-    <button id="loadBtn" title="Load sliders &amp; toggles from a settings file">Load</button>
+    <span class="hsep"></span>
+    <button id="soundBtn" class="hbtn" title="Play sound — sonification of the tank (drone, colour chord, climax shimmer, event chimes). Tap the tank once to unlock audio.">🔇</button>
+    <button id="saveBtn" class="hbtn" title="Save dashboard settings — all sliders &amp; toggles to a file">💾</button>
+    <button id="loadBtn" class="hbtn" title="Load dashboard settings from a file">📂</button>
     <input type="file" id="loadFileInput" accept="application/json,.json" style="display:none">
-    <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi)">⬇</button>
+    <span class="hsep"></span>
+    <button id="recBtn" title="Record composition — capture slider &amp; toggle moves over time as a replayable piece. Click to start, click again to stop."><span class="rec-icon"></span></button>
+    <button id="compPlayBtn" class="hbtn comp" title="Play composition — replay the recorded timeline in the aquarium">▶</button>
+    <button id="compLoadBtn" class="hbtn comp" title="Load composition — open a composition file">⬆</button>
+    <button id="compSaveBtn" class="hbtn comp" title="Save composition — download the recorded composition">⬇</button>
+    <input type="file" id="compLoadInput" accept="application/json,.json" style="display:none">
+    <span class="hsep"></span>
+    <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi)">📦</button>
+    <span id="compStatus" style="font-size:11px;color:#888;align-self:center;margin-left:2px;"></span>
   </div>
 </header>
 
@@ -4371,50 +4382,8 @@ if(RUN_MODE!=='dash'){
   setInterval(()=>{ _tb.textContent=SOUND_ON?'🔊':'🔈'; },800); // stay in sync with dashboard-forwarded toggles
 }
 
-// ── canvas video recorder ──────────────────────────────────────────────────────
-// Captures the actual WebGL canvas (not the screen) to a .webm/.mp4 via MediaRecorder.
-// The click is forwarded dashboard→tank by the control bridge, so the capture always
-// happens where the canvas lives; each Stop downloads a fresh timestamped file.
-let _mediaRec=null, _recChunks=[], _recStream=null, _dashRecOn=false;
-function _setRecBtn(on){
-const btn=document.getElementById('recBtn'); if(!btn) return;
-btn.classList.toggle('recording', on); // CSS morphs the inner red dot ↔ red square
-btn.title = on ? 'Stop recording & save the clip' : 'Record the aquarium to a video file (downloads a new clip each time you stop)';
-}
-document.getElementById('recBtn').addEventListener('click',()=>{
-if(RUN_MODE==='dash'){
-  // No canvas here — the recording runs in the aquarium tab (bridge forwards this click).
-  if(!_tankAlive()) return;              // nothing to record until the aquarium is open
-  _dashRecOn=!_dashRecOn; _setRecBtn(_dashRecOn);
-  return;
-}
-// tank / standalone: do the real capture on this document's canvas
-if(_mediaRec && _mediaRec.state!=='inactive'){ _mediaRec.stop(); return; } // Stop → onstop downloads
-if(!canvas || typeof canvas.captureStream!=='function'){ console.warn('canvas capture not supported'); return; }
-try{
-  _recStream = canvas.captureStream(30); // 30 fps
-  const types=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
-  const mime = types.find(t=>window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
-  _mediaRec = mime ? new MediaRecorder(_recStream,{mimeType:mime,videoBitsPerSecond:12000000})
-                   : new MediaRecorder(_recStream);
-}catch(err){ console.warn('recording unavailable:',err); _recStream=null; return; }
-_recChunks=[];
-_mediaRec.ondataavailable=e=>{ if(e.data && e.data.size) _recChunks.push(e.data); };
-_mediaRec.onstop=()=>{
-  const type=(_mediaRec&&_mediaRec.mimeType)||'video/webm';
-  const ext = type.indexOf('mp4')>=0 ? 'mp4' : 'webm';
-  const blob=new Blob(_recChunks,{type});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='boids-'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)+'.'+ext;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),15000);
-  if(_recStream){ _recStream.getTracks().forEach(t=>t.stop()); _recStream=null; }
-  _mediaRec=null; _setRecBtn(false);
-};
-_mediaRec.start(1000); // collect data every 1s so long clips survive
-_setRecBtn(true);
-});
+// (Canvas video recorder removed — the ⏺ recBtn now records slider/toggle compositions;
+//  see the composition recorder in the dashboard block.)
 
 // ── settings save / load ───────────────────────────────────────────────────────
 // Save every slider/number/colour input plus the toggle states to a JSON file, and
@@ -5216,11 +5185,75 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','recBtn','astroMergeBtn','soundBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','soundBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
   _tankSend({boid:1,t:'ctl',kind:'click',id:b.id});
+});
+
+// ── composition recorder ────────────────────────────────────────────────────
+// Record slider/toggle changes with timestamps into a timeline, then play it back
+// by re-firing the same input/click events along the recorded clock — driving the
+// dashboard (and, via the bridge above, the tank) exactly as a live user would.
+// Note: the sim is still stochastic (no seed), so each playback is the same *score*
+// performed fresh — the slider choreography is exact, the boids/chimes differ.
+let _composition=null;
+let _compRec=false, _compPlaying=false, _compT0=0, _compEvents=[], _compInitial=null;
+let _compPlayIdx=0, _compPlayT0=0, _compRAF=0;
+const _compStatusEl=document.getElementById('compStatus');
+function _compStatus(m){ if(_compStatusEl) _compStatusEl.textContent=m; }
+function _compRecBtnSync(){ const b=document.getElementById('recBtn'); if(b){ b.classList.toggle('recording',_compRec); b.title=_compRec?'Stop recording the composition':'Composition: record all slider & toggle moves over time as a replayable piece. Click to start, click again to stop.'; } }
+function _compStopAll(){ _compRec=false; _compPlaying=false; if(_compRAF){ cancelAnimationFrame(_compRAF); _compRAF=0; } _compRecBtnSync(); }
+function _compRecStart(){
+  _compStopAll();
+  _compInitial=_gatherSettings(); _compEvents=[]; _compT0=performance.now(); _compRec=true;
+  _compRecBtnSync(); _compStatus('● recording…');
+}
+function _compRecStop(){
+  _compRec=false; _compRecBtnSync();
+  _composition={ app:'boid-composition', v:1, initial:_compInitial, events:_compEvents.slice() };
+  const dur=_compEvents.length?_compEvents[_compEvents.length-1].t/1000:0;
+  _compStatus(`recorded ${_compEvents.length} events · ${dur.toFixed(1)}s`);
+}
+function _compPlayStart(){
+  if(!_composition||!_composition.events||!_composition.events.length){ _compStatus('nothing to play — record first'); return; }
+  if(!_tankAlive()){ _compStatus('open the aquarium first'); return; }
+  _compStopAll();
+  // Play IN the tank (the visible window) — its rAF keeps running while the dashboard is
+  // hidden behind it. The tank applies the initial state + timeline to its own controls.
+  _compPlaying=true;
+  _tankSend({boid:1, t:'comp-play', comp:_composition});
+  _compStatus('▶ playing in the tank…');
+}
+function _compSave(){
+  if(!_composition){ _compStatus('nothing to save — record first'); return; }
+  const blob=new Blob([JSON.stringify(_composition)],{type:'application/json'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='boid-composition-'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+// record hooks — piggyback the same events the bridge forwards (guarded so playback doesn't record itself)
+document.addEventListener('input', e=>{
+  const el=e.target;
+  if(_compRec && !_compPlaying && el.id && el.matches('input[type=range],input[type=color],input[type=number]'))
+    _compEvents.push({t:performance.now()-_compT0, k:'i', id:el.id, v:el.value});
+});
+document.addEventListener('click', e=>{
+  const b=e.target.closest('button');
+  if(_compRec && !_compPlaying && b && _FWD_CLICKS.has(b.id))
+    _compEvents.push({t:performance.now()-_compT0, k:'c', id:b.id});
+});
+document.getElementById('recBtn').addEventListener('click',()=>{ if(_compRec) _compRecStop(); else _compRecStart(); });
+document.getElementById('compPlayBtn').addEventListener('click',()=>{ if(_compPlaying){ if(_tankAlive()) _tankSend({boid:1,t:'comp-stop'}); _compStopAll(); _compStatus('■ stopped'); } else _compPlayStart(); });
+document.getElementById('compSaveBtn').addEventListener('click',_compSave);
+const _compLoadInput=document.getElementById('compLoadInput');
+document.getElementById('compLoadBtn').addEventListener('click',()=> _compLoadInput.click());
+_compLoadInput.addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const c=JSON.parse(r.result); if(c&&Array.isArray(c.events)){ _composition=c; _compStatus(`loaded ${c.events.length} events`); } else _compStatus('not a composition file'); }catch(err){ _compStatus('could not load file'); } };
+  r.readAsText(f); e.target.value='';
 });
 
 // receive live status + pyramid mirrors from the tank
@@ -5228,6 +5261,7 @@ const _pyCtx = document.getElementById('popPyramid').getContext('2d');
 window.addEventListener('message', e => {
   const m=e.data;
   if(!m || m.boid!==1 || e.source!==tankWin) return;
+  if(m.t==='comp-done'){ _compPlaying=false; _compStatus('▮ composition finished'); return; }
   if(m.t==='status'){
     const s=m.s;
     for(const id in s.ids){
@@ -5265,6 +5299,31 @@ setInterval(()=>{
 }
 
 if(RUN_MODE==='tank'){
+// ── composition playback (runs HERE, in the tank) ──
+// The dashboard records the timeline but plays it back IN the tank, because the tank is
+// the visible/foreground window: its requestAnimationFrame keeps running, whereas the
+// dashboard's rAF is paused by the browser whenever it's hidden behind the tank (which
+// stalled playback — predator/aura changes only landed when the dashboard was refocused).
+let _tcOn=false, _tcComp=null, _tcIdx=0, _tcT0=0;
+function _tcFire(ev){
+  const el=document.getElementById(ev.id); if(!el) return;
+  if(ev.k==='i'){ el.value=ev.v; el.dispatchEvent(new Event('input',{bubbles:true})); }
+  else if(ev.k==='c'){ el.click(); }
+}
+function _tcTick(){
+  if(!_tcOn) return;
+  const el=performance.now()-_tcT0, evs=_tcComp.events;
+  while(_tcIdx<evs.length && evs[_tcIdx].t<=el){ _tcFire(evs[_tcIdx]); _tcIdx++; }
+  if(_tcIdx>=evs.length){ _tcOn=false; try{ window.opener&&window.opener.postMessage({boid:1,t:'comp-done'},'*'); }catch(e){} return; }
+  requestAnimationFrame(_tcTick);
+}
+function _tcStart(comp){
+  if(!comp||!Array.isArray(comp.events)) return;
+  _tcComp=comp; _tcIdx=0; _tcOn=false;
+  if(comp.initial) _applySettings(comp.initial);   // reset to the recorded starting state
+  _tcOn=true; _tcT0=performance.now();
+  requestAnimationFrame(_tcTick);
+}
 // apply dashboard commands by driving this document's own hidden controls
 window.addEventListener('message', e => {
   const m=e.data;
@@ -5275,6 +5334,10 @@ window.addEventListener('message', e => {
     if(!el) return;
     if(m.kind==='click') el.click();
     else { el.value=m.value; el.dispatchEvent(new Event('input',{bubbles:true})); }
+  } else if(m.t==='comp-play'){
+    _tcStart(m.comp);
+  } else if(m.t==='comp-stop'){
+    _tcOn=false;
   } else if(m.t==='mode'){
     // explicit mode set (idempotent): only act when it actually changes
     if(m.mode!==SIM_MODE){
