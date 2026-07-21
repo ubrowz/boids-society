@@ -1739,6 +1739,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="sndColorSlider" min="0" max="100" value="55" step="5">
 <span class="ctrl-val" id="sndColorVal">55%</span>
 </div>
+<div class="ctrl-row">
+<label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the target and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
+<input type="range" id="sndClimaxSlider" min="0" max="100" value="55" step="5">
+<span class="ctrl-val" id="sndClimaxVal">55%</span>
+</div>
 </section>
 
 <section class="panel">
@@ -2169,6 +2174,7 @@ wire('sndDroneSlider','sndDroneVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DRO
 wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHIME=v; });
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
+wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 // Astro controls
 wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v),                    v=>{
   // Adiabatic G change: orbital speed scales as √G, so rescaling velocities with G keeps the
@@ -4154,14 +4160,18 @@ let _SND_DRONE=parseInt(document.getElementById('sndDroneSlider').value)/100;
 let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
+let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
+let _climaxLvl=0; // dwell-smoothed proximity to target population (0..1) → drives the climax shimmer
+const _CLIMAX_ATTACK=0.03, _CLIMAX_RELEASE=0.10; // dwell: slow to earn the bloom, faster to release
 const _SND_SCALE=[0,3,5,7,10]; // minor pentatonic degrees
 const _FAM_IDX={red:0,yellow:1,green:2,cyan:3,blue:4,magenta:5}; // hue family → colour-chord voice
 // Colour-chord voices: one distinct instrument per hue family, spread across ~2 octaves of
-// D-minor pentatonic (red low/round → magenta high/bright) so a colour shift is heard as a
-// change of instrument AND register, not just which note in a chord is loudest. `cut` is the
-// per-voice lowpass; `lvl` evens perceived loudness (saws/squares carry more energy).
+// D-minor pentatonic so a colour shift is heard as a change of instrument AND register, not
+// just which note in a chord is loudest. `cut` is the per-voice lowpass; `lvl` evens perceived
+// loudness (saws/squares carry more energy). Red is raised to F4 (not the lowest voice) so its
+// sine clears the drone band instead of muddying it — that trades away strict low→high order.
 const _PAD_VOICES=[
-  {midi:53, wave:'sine',     cut:1200, lvl:1.0 },  // red     — F3, round and dark
+  {midi:65, wave:'sine',     cut:1200, lvl:1.0 },  // red     — F4, round (raised an octave off F3 to clear the drone)
   {midi:57, wave:'triangle', cut:1600, lvl:0.95},  // yellow  — A3, soft and hollow
   {midi:62, wave:'square',   cut:1500, lvl:0.5 },  // green   — D4, reedy and woody
   {midi:67, wave:'sawtooth', cut:2200, lvl:0.55},  // cyan    — G4, bright and brassy
@@ -4206,7 +4216,17 @@ function _sndInit(){
     o.connect(f); f.connect(g); g.connect(bus); o.start();
     colorGains.push(g);
   }
-  _snd={master,bus,lp,droneGain,bondG,colorGains};
+  // ── climax shimmer: a bright high D-minor triad (D5 F5 A5) that blooms as the population
+  // dwells near the target. Its lowpass opens AND its gain rises with the dwell level
+  // (see _sndUpdate), so approaching balance builds and holds; over/undershoot lets it recede. ──
+  const climaxLp=_ac.createBiquadFilter(); climaxLp.type='lowpass'; climaxLp.frequency.value=500; climaxLp.Q.value=0.8;
+  const climaxGain=_ac.createGain(); climaxGain.gain.value=0;
+  climaxLp.connect(climaxGain); climaxGain.connect(bus);
+  for(const mnote of [74,77,81]){ // D-minor triad up top
+    const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=(Math.random()*10-5); // detune → shimmer
+    const og=_ac.createGain(); og.gain.value=0.33; o.connect(og); og.connect(climaxLp); o.start();
+  }
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4292,6 +4312,13 @@ function _sndUpdate(){
       const frac = totalC>0 ? fam[i]/totalC : 0;
       _snd.colorGains[i].gain.setTargetAtTime(0.13*_PAD_VOICES[i].lvl*Math.sqrt(frac)*_SND_COLOR*2, t, 0.7); // per-voice level trim; slow ramp → swells, not jitter
     }
+  }
+  if(_snd.climaxGain){ // climax: bloom a bright shimmer when the population settles near target
+    const width=Math.max(25, TARGET_POP*0.18);
+    const prox=Math.exp(-Math.pow((living-TARGET_POP)/width,2)); // 1 at target, → 0 on over/undershoot
+    _climaxLvl += (prox-_climaxLvl)*(prox>_climaxLvl?_CLIMAX_ATTACK:_CLIMAX_RELEASE); // dwell: slow attack (earned), faster release
+    _snd.climaxGain.gain.setTargetAtTime(0.09*_climaxLvl*_SND_CLIMAX*2, t, 0.6);
+    _snd.climaxLp.frequency.setTargetAtTime(500+4500*_climaxLvl, t, 0.6); // brightness opens with the bloom
   }
 }
 function _sndSetBtn(){
@@ -5122,6 +5149,7 @@ _SND_DRONE      = ${_SND_DRONE};
 _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
 _SND_COLOR      = ${_SND_COLOR};
+_SND_CLIMAX     = ${_SND_CLIMAX};
 if(SOUND_ON){ _sndSetBtn(); _sndInit(); } // audio starts on the first tap (browser gesture rule)
 if(SIM_MODE==='astro') astroSeed(); else startSim();
 })();
