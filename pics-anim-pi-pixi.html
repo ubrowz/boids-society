@@ -4236,25 +4236,37 @@ function _sndInit(){
   const wet=_ac.createGain(); wet.gain.value=0.35; conv.connect(wet); wet.connect(master);
   const dry=_ac.createGain(); dry.gain.value=0.85; dry.connect(master);
   const bus=_ac.createGain(); bus.connect(dry); bus.connect(conv);
-  // drone: sub sine + two detuned saws through a lowpass; bond layer = a soft fifth above
+  // drone: a low D power-chord (sub D2 + fifth A2 + D3 body) through a slowly BREATHING lowpass —
+  // the crowding pressure sets the cutoff and a slow LFO drifts it, so the bed feels alive, not static.
   const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=300; lp.Q.value=0.7;
   const droneGain=_ac.createGain(); droneGain.gain.value=0;
   lp.connect(droneGain); droneGain.connect(bus);
-  const mk=(type,freq,det,g)=>{ const o=_ac.createOscillator(); o.type=type; o.frequency.value=freq; o.detune.value=det;
-    const og=_ac.createGain(); og.gain.value=g; o.connect(og); og.connect(lp); o.start(); return og; };
+  const mk=(type,freq,det,g,dest)=>{ const o=_ac.createOscillator(); o.type=type; o.frequency.value=freq; o.detune.value=det;
+    const og=_ac.createGain(); og.gain.value=g; o.connect(og); og.connect(dest||lp); o.start(); return og; };
   const root=_midiHz(50); // D3 — an octave lower buried the drone below what laptop/phone speakers reproduce
-  mk('sine',root/2,0,0.6); mk('sawtooth',root,-6,0.24); mk('sawtooth',root,+6,0.24);
-  const bondG=mk('sawtooth',root*1.5,+3,0.0);
+  mk('sine',root/2,0,0.55);                                   // sub D2
+  mk('sawtooth',root*0.75,-4,0.13);                           // fifth below → A2 (power-chord weight)
+  mk('sawtooth',root,-6,0.22); mk('sawtooth',root,+6,0.22);   // D3 body (two detuned saws)
+  // slow breathing on the drone filter — autonomous life, layered on top of the crowding sweep
+  const droneBreath=_ac.createOscillator(); droneBreath.type='sine'; droneBreath.frequency.value=0.07;
+  const droneBreathD=_ac.createGain(); droneBreathD.gain.value=140; droneBreath.connect(droneBreathD); droneBreathD.connect(lp.frequency); droneBreath.start();
+  // bond warmth: a fifth (A3) + octave (D4), gain follows the bonded fraction (see _sndUpdate)
+  const bondG=_ac.createGain(); bondG.gain.value=0; bondG.connect(lp);
+  mk('sawtooth',root*1.5,+3,0.55,bondG); mk('sine',root*2,0,0.5,bondG);
   // ── colour chord: one instrument per hue family (see _PAD_VOICES) ──
   // Pitches stay on D-minor pentatonic so every combination is consonant by construction,
   // but each voice has its own waveform, lowpass and register, so a colour shift changes the
   // instrument you hear, not just the balance of one chord. Each voice's volume is driven each
   // frame by how many boids wear that colour (see _sndUpdate). Routed straight to the bus
   // (bypassing the crowding-modulated drone filter) so the chord is independent of the drone.
+  // shared slow chorus drift → subtle life so the pad breathes instead of sitting dead still
+  const colVib=_ac.createOscillator(); colVib.type='sine'; colVib.frequency.value=0.18;
+  const colVibD=_ac.createGain(); colVibD.gain.value=7; colVib.connect(colVibD); colVib.start();
   const colorGains=[];
   for(let i=0;i<6;i++){
     const v=_PAD_VOICES[i];
     const o=_ac.createOscillator(); o.type=v.wave; o.frequency.value=_midiHz(v.midi); o.detune.value=(i%2?5:-5);
+    colVibD.connect(o.detune);                              // slow chorus drift on every voice
     const f=_ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=v.cut; f.Q.value=0.7;
     const g=_ac.createGain(); g.gain.value=0;
     o.connect(f); f.connect(g); g.connect(bus); o.start();
@@ -4264,25 +4276,47 @@ function _sndInit(){
   // dwells near the target. Its lowpass opens AND its gain rises with the dwell level
   // (see _sndUpdate), so approaching balance builds and holds; over/undershoot lets it recede. ──
   const climaxLp=_ac.createBiquadFilter(); climaxLp.type='lowpass'; climaxLp.frequency.value=500; climaxLp.Q.value=0.8;
+  const climaxTrem=_ac.createGain(); climaxTrem.gain.value=0.85; // shimmer tremolo carrier
   const climaxGain=_ac.createGain(); climaxGain.gain.value=0;
-  climaxLp.connect(climaxGain); climaxGain.connect(bus);
-  for(const mnote of [74,77,81]){ // D-minor triad up top
-    const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=(Math.random()*10-5); // detune → shimmer
-    const og=_ac.createGain(); og.gain.value=0.33; o.connect(og); og.connect(climaxLp); o.start();
+  climaxLp.connect(climaxTrem); climaxTrem.connect(climaxGain); climaxGain.connect(bus);
+  // a fast, shallow tremolo glistens the top — the "shimmer"
+  const climaxShim=_ac.createOscillator(); climaxShim.type='sine'; climaxShim.frequency.value=7.5;
+  const climaxShimD=_ac.createGain(); climaxShimD.gain.value=0.12; climaxShim.connect(climaxShimD); climaxShimD.connect(climaxTrem.gain); climaxShim.start();
+  // D-minor ADD9 + high octave (D5 F5 A5 D6 E6) — open and radiant, not a bare triad. The high E6/D6
+  // only speak once the filter opens at full bloom, so the sparkle arrives with the climax.
+  for(const mnote of [74,77,81,86,88]){
+    const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=(Math.random()*10-5);
+    const og=_ac.createGain(); og.gain.value=0.2; o.connect(og); og.connect(climaxLp); o.start();
   }
-  // ── disease undertone: a dark, detuned D-minor triad (D4 F4 A4) that swells with the
-  // infected fraction (see _sndUpdate). Same key as the bed, but low, reedy (dark lowpass)
-  // and heavily detuned so it beats/wavers — a sickly undertone that only sounds in an epidemic.
-  const disLp=_ac.createBiquadFilter(); disLp.type='lowpass'; disLp.frequency.value=900; disLp.Q.value=0.8;
-  const disGain=_ac.createGain(); disGain.gain.value=0;
-  disLp.connect(disGain); disGain.connect(bus);
-  for(const mnote of [62,65,69]){ // D-minor triad (D4 F4 A4)
-    for(const det of [-11,11]){ // two detuned saws per note → slow beating (the sickly wobble)
-      const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=det;
-      const og=_ac.createGain(); og.gain.value=0.16; o.connect(og); og.connect(disLp); o.start();
-    }
+  // ── disease: a creeping, pulsing dread that intensifies with the epidemic ──
+  // Rooted on D-minor (matching the bed), but as the infected fraction climbs it SOURS and
+  // AGITATES: a tritone / diminished-fifth (A♭) grinds in against the natural fifth — the
+  // "diabolus in musica" minor-2nd clash, curdling Dm → D dim — while a fever-pulse tremolo
+  // quickens, the filter opens with resonance, and a sub octave adds weight. Driven in _sndUpdate.
+  // Signal: chord + tritone + sub → disLp (severity-swept) → disTrem (fever pulse) → disGain → bus.
+  const disLp=_ac.createBiquadFilter(); disLp.type='lowpass'; disLp.frequency.value=600; disLp.Q.value=0.8;
+  const disTrem=_ac.createGain(); disTrem.gain.value=0.5;   // tremolo carrier — the LFO modulates around this
+  const disGain=_ac.createGain(); disGain.gain.value=0;     // overall level (∝ infected fraction)
+  disLp.connect(disTrem); disTrem.connect(disGain); disGain.connect(bus);
+  // fever pulse: an LFO amplitude-modulates disTrem; its rate + depth rise with severity
+  const disLFO=_ac.createOscillator(); disLFO.type='sine'; disLFO.frequency.value=1.2;
+  const disLFODepth=_ac.createGain(); disLFODepth.gain.value=0.08;
+  disLFO.connect(disLFODepth); disLFODepth.connect(disTrem.gain); disLFO.start();
+  // core D-minor triad (D4 F4 A4), two detuned saws per note → beating roughness
+  for(const mnote of [62,65,69]){ for(const det of [-12,12]){
+    const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=det;
+    const og=_ac.createGain(); og.gain.value=0.13; o.connect(og); og.connect(disLp); o.start();
+  } }
+  // tritone / diminished fifth (A♭4) — grinds in with severity, souring the chord
+  const disTritone=_ac.createGain(); disTritone.gain.value=0; disTritone.connect(disLp);
+  for(const det of [-14,14]){
+    const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(68); o.detune.value=det;
+    const og=_ac.createGain(); og.gain.value=0.5; o.connect(og); og.connect(disTritone); o.start();
   }
-  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain};
+  // sub octave (D3) — dread weight at the height of the epidemic (D2 is inaudible on laptop speakers)
+  const disSub=_ac.createGain(); disSub.gain.value=0; disSub.connect(disLp);
+  { const o=_ac.createOscillator(); o.type='sine'; o.frequency.value=_midiHz(50); o.connect(disSub); o.start(); }
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4306,6 +4340,29 @@ function _sndThud(vel){ // percussion-style thud: a fast downward pitch sweep re
   o.connect(g); g.connect(_snd.bus);
   o.onended=()=>{ _sndVoices--; };
   o.start(t); o.stop(t+0.55);
+  // soft low-passed noise burst at the attack → a percussive "thwump" body under the boom
+  const nb=_ac.createBuffer(1,Math.floor(_ac.sampleRate*0.12),_ac.sampleRate), nd=nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*Math.pow(1-i/nd.length,3);
+  const ns=_ac.createBufferSource(); ns.buffer=nb;
+  const nf=_ac.createBiquadFilter(); nf.type='lowpass'; nf.frequency.value=380; nf.Q.value=0.6;
+  const ng=_ac.createGain(); ng.gain.value=vel*0.5;
+  ns.connect(nf); nf.connect(ng); ng.connect(_snd.bus); ns.start(t);
+}
+// soft marimba: a warm sine fundamental + a quiet, fast-decaying partial two octaves up
+// (the marimba's woody 4:1 overtone). Rounder and lower than a plucked string, so frequent
+// births sit under the mix instead of dominating it.
+function _sndMarimba(midi, vel, dur){
+  if(_sndVoices>=24) return; _sndVoices++;
+  const t=_ac.currentTime, f=_midiHz(midi);
+  const g=_ac.createGain();
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vel,t+0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  g.connect(_snd.bus);
+  const o1=_ac.createOscillator(); o1.type='sine'; o1.frequency.value=f; o1.connect(g);
+  const g2=_ac.createGain(); g2.gain.setValueAtTime(vel*0.35,t); g2.gain.exponentialRampToValueAtTime(0.0001,t+dur*0.35);
+  const o2=_ac.createOscillator(); o2.type='sine'; o2.frequency.value=f*4; o2.connect(g2); g2.connect(_snd.bus); // woody attack
+  o1.onended=()=>{ _sndVoices--; };
+  o1.start(t); o1.stop(t+dur+0.05); o2.start(t); o2.stop(t+dur*0.4+0.05);
 }
 const _ksCache=new Map();
 function _ksBuffer(midi){
@@ -4342,7 +4399,7 @@ function _sndPluckKS(midi, vel, dur, off){
 function _sndEvent(kind){
   if(!SOUND_ON||!_ac||_ac.state!=='running'||!_snd) return;
   const deg=_SND_SCALE[Math.floor(Math.random()*_SND_SCALE.length)];
-  if(kind==='birth'){ if(_SND_CHIME>0) _sndPluckKS(74+deg, 0.22*_SND_CHIME, 1.6); } // plucked harp note
+  if(kind==='birth'){ if(_SND_CHIME>0) _sndMarimba(62+deg, 0.4*_SND_CHIME, 0.5); } // warm marimba, an octave below the old high chime — sits under the mix even at high birth rates
   else if(kind==='death'){ if(_SND_THUD>0) _sndThud(1.3*_SND_THUD); } // swept-pitch thud
   else if(kind==='bond'){ if(_SND_CHIME>0){ _sndPluckKS(62+deg, 0.20*_SND_CHIME, 2.2); _sndPluckKS(69+deg, 0.16*_SND_CHIME, 2.2, 0.07); } } // strummed dyad (2nd string 70 ms late)
   else if(kind==='unbond'){ if(_SND_CHIME>0){ _sndPluckKS(69+deg, 0.16*_SND_CHIME, 2.0); _sndPluckKS(62+deg, 0.13*_SND_CHIME, 2.0, 0.09); } } // the same dyad strummed DOWNWARD — a bond undone
@@ -4376,9 +4433,15 @@ function _sndUpdate(){
     _snd.climaxGain.gain.setTargetAtTime(0.09*_climaxLvl*_SND_CLIMAX*2, t, 0.6);
     _snd.climaxLp.frequency.setTargetAtTime(500+4500*_climaxLvl, t, 0.6); // brightness opens with the bloom
   }
-  if(_snd.disGain){ // disease undertone: swells with the infected fraction (silent when none)
-    const infFrac = living>0 ? infected/living : 0;
-    _snd.disGain.gain.setTargetAtTime(0.14*Math.sqrt(infFrac)*_SND_DISEASE*2, t, 0.6);
+  if(_snd.disGain){ // disease: creeping dread that sours & agitates as the epidemic spreads
+    const inf = living>0 ? infected/living : 0, sev=inf*inf; // severity (steeper for the nastier layers)
+    _snd.disGain.gain.setTargetAtTime(0.16*Math.sqrt(inf)*_SND_DISEASE*2, t, 0.5);   // overall swell
+    _snd.disTritone.gain.setTargetAtTime(0.9*sev, t, 0.7);        // dim-fifth grinds in → Dm sours to D dim
+    _snd.disSub.gain.setTargetAtTime(0.7*sev, t, 0.7);            // sub octave adds dread weight at the height
+    _snd.disLp.frequency.setTargetAtTime(600+2600*inf, t, 0.6);   // filter opens → brighter, edgier
+    _snd.disLp.Q.setTargetAtTime(0.8+7*inf, t, 0.6);              // resonance/edge
+    _snd.disLFO.frequency.setTargetAtTime(1.2+6.5*inf, t, 0.4);   // fever pulse quickens (~1.2 → 7.7 Hz)
+    _snd.disLFODepth.gain.setTargetAtTime(0.08+0.42*inf, t, 0.5); // pulse deepens toward a full throb
   }
 }
 function _sndSetBtn(){
