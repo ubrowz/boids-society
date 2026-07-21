@@ -1760,6 +1760,16 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
 <span class="ctrl-val" id="climaxPopVal">624</span>
 </div>
+<div class="ctrl-row">
+<label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
+<button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
+<span class="ctrl-val" id="climaxAutoVal">~—</span>
+</div>
+<div class="ctrl-row">
+<label title="Level of the disease undertone — a dark, detuned D-minor chord that swells with the fraction of infected boids (silent when there's no epidemic). Consonant with the drone and colour bed.">disease</label>
+<input type="range" id="sndDiseaseSlider" min="0" max="100" value="55" step="5">
+<span class="ctrl-val" id="sndDiseaseVal">55%</span>
+</div>
 </section>
 
 <section class="panel">
@@ -2192,6 +2202,7 @@ wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHI
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
+wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
 wire('climaxPopSlider','climaxPopVal', v=>parseInt(v), v=>v, v=>{ CLIMAX_POP=v; });
 // Astro controls
 wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v),                    v=>{
@@ -4179,6 +4190,7 @@ let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
+let _SND_DISEASE=parseInt(document.getElementById('sndDiseaseSlider').value)/100;
 let CLIMAX_POP=parseInt(document.getElementById('climaxPopSlider').value); // population the climax blooms at (separate from TARGET_POP)
 let _climaxLvl=0; // dwell-smoothed proximity to target population (0..1) → drives the climax shimmer
 const _CLIMAX_ATTACK=0.03, _CLIMAX_RELEASE=0.10; // dwell: slow to earn the bloom, faster to release
@@ -4245,7 +4257,19 @@ function _sndInit(){
     const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=(Math.random()*10-5); // detune → shimmer
     const og=_ac.createGain(); og.gain.value=0.33; o.connect(og); og.connect(climaxLp); o.start();
   }
-  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp};
+  // ── disease undertone: a dark, detuned D-minor triad (D4 F4 A4) that swells with the
+  // infected fraction (see _sndUpdate). Same key as the bed, but low, reedy (dark lowpass)
+  // and heavily detuned so it beats/wavers — a sickly undertone that only sounds in an epidemic.
+  const disLp=_ac.createBiquadFilter(); disLp.type='lowpass'; disLp.frequency.value=900; disLp.Q.value=0.8;
+  const disGain=_ac.createGain(); disGain.gain.value=0;
+  disLp.connect(disGain); disGain.connect(bus);
+  for(const mnote of [62,65,69]){ // D-minor triad (D4 F4 A4)
+    for(const det of [-11,11]){ // two detuned saws per note → slow beating (the sickly wobble)
+      const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=_midiHz(mnote); o.detune.value=det;
+      const og=_ac.createGain(); og.gain.value=0.16; o.connect(og); og.connect(disLp); o.start();
+    }
+  }
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4316,9 +4340,9 @@ function _sndUpdate(){
   const t=_ac.currentTime;
   _snd.master.gain.setTargetAtTime(SOUND_ON?1.2:0, t, 0.3);
   if(!SOUND_ON||_ac.state!=='running') return;
-  let living=0,bonded=0;
+  let living=0,bonded=0,infected=0;
   const fam=_snd.colorGains ? [0,0,0,0,0,0] : null; // per-family colour tally (only "coloured" boids)
-  for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++;
+  for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++; if(b.diseased) infected++;
     if(fam && b.sat>=0.15){ const f=_FAM_IDX[hueToFamily(b.hue)]; fam[f]++; } } } // grey/undecided cells don't vote
   const pop=Math.min(1,living/600);
   _snd.droneGain.gain.setTargetAtTime((0.08+0.38*pop)*_SND_DRONE*2, t, 0.5); // population → drone body (×2: slider 50% = reference level)
@@ -4338,6 +4362,10 @@ function _sndUpdate(){
     _climaxLvl += (prox-_climaxLvl)*(prox>_climaxLvl?_CLIMAX_ATTACK:_CLIMAX_RELEASE); // dwell: slow attack (earned), faster release
     _snd.climaxGain.gain.setTargetAtTime(0.09*_climaxLvl*_SND_CLIMAX*2, t, 0.6);
     _snd.climaxLp.frequency.setTargetAtTime(500+4500*_climaxLvl, t, 0.6); // brightness opens with the bloom
+  }
+  if(_snd.disGain){ // disease undertone: swells with the infected fraction (silent when none)
+    const infFrac = living>0 ? infected/living : 0;
+    _snd.disGain.gain.setTargetAtTime(0.14*Math.sqrt(infFrac)*_SND_DISEASE*2, t, 0.6);
   }
 }
 function _sndSetBtn(){
@@ -5127,6 +5155,7 @@ _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
+_SND_DISEASE    = ${_SND_DISEASE};
 CLIMAX_POP      = ${CLIMAX_POP};
 if(SOUND_ON){ _sndSetBtn(); _sndInit(); } // audio starts on the first tap (browser gesture rule)
 if(SIM_MODE==='astro') astroSeed(); else startSim();
@@ -5258,6 +5287,20 @@ _compLoadInput.addEventListener('change',e=>{
   r.readAsText(f); e.target.value='';
 });
 
+// ── climax-pop auto-set ──────────────────────────────────────────────────────
+// Running average of the live population (fed from the tank's mirrored count in the
+// status handler below). Slow, so it tracks the *settling* level, not each wiggle.
+// The button snaps the climax-pop slider to it — click any time (e.g. after changing
+// target pop and letting it re-settle). During recording, the resulting slider change
+// is captured with its concrete value, so playback replays the calibrated number.
+let _popEMA=0, _popEMAready=false;
+document.getElementById('autoClimaxBtn').addEventListener('click',()=>{
+  if(!_popEMAready || !_tankAlive()){ const av=document.getElementById('climaxAutoVal'); if(av) av.textContent='no pop yet'; return; }
+  const v=Math.max(2,Math.min(1000,Math.round(_popEMA)));
+  const sl=document.getElementById('climaxPopSlider');
+  sl.value=v; sl.dispatchEvent(new Event('input',{bubbles:true})); // updates CLIMAX_POP + display, forwards to tank, recorded if recording
+});
+
 // receive live status + pyramid mirrors from the tank
 const _pyCtx = document.getElementById('popPyramid').getContext('2d');
 window.addEventListener('message', e => {
@@ -5280,6 +5323,11 @@ window.addEventListener('message', e => {
     playBtn.classList.toggle('running', s.running);
     document.getElementById('linkLabel').textContent =
       'aquarium live · '+s.count+' boids · '+Math.floor(s.clock)+' s';
+    // maintain the running population average for the climax-pop auto-set
+    if(typeof s.count==='number'){
+      if(!_popEMAready){ _popEMA=s.count; _popEMAready=true; } else _popEMA += (s.count-_popEMA)*0.006; // τ ≈ 30 s at the ~6 Hz status rate
+      const av=document.getElementById('climaxAutoVal'); if(av) av.textContent='~'+Math.round(_popEMA);
+    }
   } else if(m.t==='pyramid'){
     const img=new Image();
     img.onload=()=>{ _pyCtx.clearRect(0,0,260,200); _pyCtx.drawImage(img,0,0); };
