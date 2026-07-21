@@ -1209,6 +1209,15 @@ input[type=range]::-webkit-slider-thumb{
 input[type=range]::-moz-range-thumb{
   width:14px; height:14px; border-radius:50%; background:var(--accent);
   cursor:pointer; border:2px solid #05222e; box-shadow:0 0 6px rgba(0,210,211,0.5); }
+/* ── full-width sound mixer: vertical faders side by side ── */
+#soundPanel{ column-span:all; }
+.mixer{ display:flex; flex-wrap:wrap; gap:14px 20px; align-items:flex-end; padding:8px 2px 4px; }
+.fader{ display:flex; flex-direction:column; align-items:center; gap:6px; width:50px; }
+.fader label{ min-width:0; text-align:center; font-size:9.5px; line-height:1.2; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.04em; user-select:none; }
+.fader .ctrl-val{ min-width:0; text-align:center; }
+.vwrap{ height:118px; width:26px; display:flex; align-items:center; justify-content:center; } /* reserves the vertical space for the rotated slider */
+.vfader{ width:118px; transform:rotate(-90deg); }                                            /* a horizontal slider rotated → vertical, up = max, keeps the custom thumb */
 input[type=number]{
   width:58px; background:var(--inset); color:var(--good);
   border:1px solid var(--line2); border-radius:4px;
@@ -1728,47 +1737,51 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </section>
 
-<section class="panel">
-<h2>Sound</h2>
-<div class="ctrl-row">
-<label title="Level of the ambient bed (population body, crowding brightness, bond warmth).">drone</label>
-<input type="range" id="sndDroneSlider" min="0" max="100" value="55" step="5">
-<span class="ctrl-val" id="sndDroneVal">55%</span>
+<section class="panel" id="soundPanel">
+<h2>Sound — mixer</h2>
+<div class="mixer">
+  <div class="fader">
+    <span class="ctrl-val" id="sndDroneVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndDroneSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the ambient bed (population body, crowding brightness, bond warmth).">drone</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndColorVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndColorSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the colour chord — six pad voices (one per hue family) whose volumes follow the population's colour mix.">colour</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndClimaxVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndClimaxSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the 'climax pop' value and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndDiseaseVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndDiseaseSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the disease undertone — a dark, detuned D-minor chord that swells with the fraction of infected boids (silent when there's no epidemic). Consonant with the drone and colour bed.">disease</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndChimeVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndChimeSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the birth chimes and bond dyads.">chimes</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndThudVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndThudSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the death thuds.">thuds</label>
+  </div>
 </div>
-<div class="ctrl-row">
-<label title="Level of the birth chimes and bond dyads.">chimes</label>
-<input type="range" id="sndChimeSlider" min="0" max="100" value="55" step="5">
-<span class="ctrl-val" id="sndChimeVal">55%</span>
-</div>
-<div class="ctrl-row">
-<label title="Level of the death thuds.">thuds</label>
-<input type="range" id="sndThudSlider" min="0" max="100" value="55" step="5">
-<span class="ctrl-val" id="sndThudVal">55%</span>
-</div>
-<div class="ctrl-row">
-<label title="Level of the colour chord — six pad voices (one per hue family) whose volumes follow the population's colour mix.">colour</label>
-<input type="range" id="sndColorSlider" min="0" max="100" value="55" step="5">
-<span class="ctrl-val" id="sndColorVal">55%</span>
-</div>
-<div class="ctrl-row">
-<label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the 'climax pop' value and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
-<input type="range" id="sndClimaxSlider" min="0" max="100" value="55" step="5">
-<span class="ctrl-val" id="sndClimaxVal">55%</span>
-</div>
-<div class="ctrl-row">
-<label title="The population count the climax shimmer blooms at — set this to wherever your population actually settles (which may not be the target). Separate from 'target pop'.">climax pop</label>
-<input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
-<span class="ctrl-val" id="climaxPopVal">624</span>
-</div>
-<div class="ctrl-row">
-<label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
-<button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
-<span class="ctrl-val" id="climaxAutoVal">~—</span>
-</div>
-<div class="ctrl-row">
-<label title="Level of the disease undertone — a dark, detuned D-minor chord that swells with the fraction of infected boids (silent when there's no epidemic). Consonant with the drone and colour bed.">disease</label>
-<input type="range" id="sndDiseaseSlider" min="0" max="100" value="55" step="5">
-<span class="ctrl-val" id="sndDiseaseVal">55%</span>
+<div style="max-width:360px;margin-top:12px;">
+  <div class="ctrl-row">
+    <label title="The population count the climax shimmer blooms at — set this to wherever your population actually settles (which may not be the target). Separate from 'target pop'.">climax pop</label>
+    <input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
+    <span class="ctrl-val" id="climaxPopVal">624</span>
+  </div>
+  <div class="ctrl-row">
+    <label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
+    <button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
+    <span class="ctrl-val" id="climaxAutoVal">~—</span>
+  </div>
 </div>
 </section>
 
