@@ -1740,9 +1740,14 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="sndColorVal">55%</span>
 </div>
 <div class="ctrl-row">
-<label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the target and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
+<label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the 'climax pop' value and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
 <input type="range" id="sndClimaxSlider" min="0" max="100" value="55" step="5">
 <span class="ctrl-val" id="sndClimaxVal">55%</span>
+</div>
+<div class="ctrl-row">
+<label title="The population count the climax shimmer blooms at — set this to wherever your population actually settles (which may not be the target). Separate from 'target pop'.">climax pop</label>
+<input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
+<span class="ctrl-val" id="climaxPopVal">624</span>
 </div>
 </section>
 
@@ -2175,6 +2180,7 @@ wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHI
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
+wire('climaxPopSlider','climaxPopVal', v=>parseInt(v), v=>v, v=>{ CLIMAX_POP=v; });
 // Astro controls
 wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v),                    v=>{
   // Adiabatic G change: orbital speed scales as √G, so rescaling velocities with G keeps the
@@ -4161,6 +4167,7 @@ let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
+let CLIMAX_POP=parseInt(document.getElementById('climaxPopSlider').value); // population the climax blooms at (separate from TARGET_POP)
 let _climaxLvl=0; // dwell-smoothed proximity to target population (0..1) → drives the climax shimmer
 const _CLIMAX_ATTACK=0.03, _CLIMAX_RELEASE=0.10; // dwell: slow to earn the bloom, faster to release
 const _SND_SCALE=[0,3,5,7,10]; // minor pentatonic degrees
@@ -4314,8 +4321,8 @@ function _sndUpdate(){
     }
   }
   if(_snd.climaxGain){ // climax: bloom a bright shimmer when the population settles near target
-    const width=Math.max(25, TARGET_POP*0.18);
-    const prox=Math.exp(-Math.pow((living-TARGET_POP)/width,2)); // 1 at target, → 0 on over/undershoot
+    const width=Math.max(25, CLIMAX_POP*0.18);
+    const prox=Math.exp(-Math.pow((living-CLIMAX_POP)/width,2)); // 1 at the chosen climax pop, → 0 on over/undershoot
     _climaxLvl += (prox-_climaxLvl)*(prox>_climaxLvl?_CLIMAX_ATTACK:_CLIMAX_RELEASE); // dwell: slow attack (earned), faster release
     _snd.climaxGain.gain.setTargetAtTime(0.09*_climaxLvl*_SND_CLIMAX*2, t, 0.6);
     _snd.climaxLp.frequency.setTargetAtTime(500+4500*_climaxLvl, t, 0.6); // brightness opens with the bloom
@@ -5150,6 +5157,7 @@ _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
+CLIMAX_POP      = ${CLIMAX_POP};
 if(SOUND_ON){ _sndSetBtn(); _sndInit(); } // audio starts on the first tap (browser gesture rule)
 if(SIM_MODE==='astro') astroSeed(); else startSim();
 })();
