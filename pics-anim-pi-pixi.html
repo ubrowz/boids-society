@@ -1245,6 +1245,16 @@ input[type=color]{ width:44px; height:24px; border:1px solid var(--line2); paddi
 .preset-load{ height:18px; border-radius:0 0 6px 6px; border:1px solid var(--line2);
   background:var(--inset); color:#54a0ff; cursor:pointer; font-size:10px; line-height:1; outline:none; }
 .preset-load:hover{ background:rgba(84,160,255,0.18); }
+/* ── AI conductor bar ── */
+#conductorPanel{ column-span:all; }
+.cond-row{ display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:6px 2px 2px; }
+#conductorBtn{ font:700 12px ui-monospace,Menlo,Consolas,monospace; padding:8px 16px; border-radius:6px;
+  background:var(--inset); color:#c9a6ff; border:1px solid rgba(170,120,255,0.45); cursor:pointer; letter-spacing:0.04em; outline:none; }
+#conductorBtn.on{ background:rgba(170,120,255,0.20); border-color:rgba(170,120,255,0.85); box-shadow:0 0 10px rgba(170,120,255,0.4); }
+.cond-sel{ background:var(--inset); color:var(--ink); border:1px solid var(--line2); border-radius:5px;
+  font:600 11px ui-monospace,Menlo,Consolas,monospace; padding:5px 8px; outline:none; cursor:pointer; }
+.cond-lab{ font:600 9.5px ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+#conductorStatus{ font:600 11px ui-monospace,Menlo,Consolas,monospace; color:#c9a6ff; }
 
 /* ── status panel internals ─────────────────────────────────────────────── */
 #statusGrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(212px,1fr)); gap:12px 24px; align-items:start; }
@@ -1429,11 +1439,16 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <div class="vwrap"><input type="range" class="vfader" id="sndAuraSlider" min="0" max="100" value="55" step="5"></div>
     <label title="Level of the aura halo — an airy high shimmer (root + fifth) that glows in when the bonded/fertile aura is on (brighter for gradient than flat), silent when the aura is off.">aura</label>
   </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndSpreadVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndSpreadSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the flock-spread voice — three tones that sit in unison when the flock is tightly clumped and open into a chord as it disperses. Tracks how spread-out the boids are, so moving coherence K, sensing R or alignment opens/closes the sound.">spread</label>
+  </div>
 </div>
 <div style="max-width:360px;margin-top:12px;">
   <div class="ctrl-row">
     <label title="The population count the climax shimmer blooms at — set this to wherever your population actually settles (which may not be the target). Separate from 'target pop'.">climax pop</label>
-    <input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
+    <input type="range" id="climaxPopSlider" min="2" max="2000" value="624">
     <span class="ctrl-val" id="climaxPopVal">624</span>
   </div>
   <div class="ctrl-row">
@@ -1451,11 +1466,32 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <input type="file" id="presetFileInput" accept="application/json,.json" style="display:none">
 </section>
 
+<section class="panel" id="conductorPanel">
+<h2>AI conductor <span style="font:500 11px/1 'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:0;text-transform:none;">— it plays the sliders for you</span></h2>
+<div class="mini-note" style="margin:-2px 0 4px;">A self-contained performer that eases the controls over time so the society composes itself — no internet, works offline. It drives the sliders through the same events the recorder captures, so you can ● record its performance and 📦 export it. Built for the flock world; it touches the simulation sliders and the mixer faders, never the top-row buttons.</div>
+<div class="cond-row">
+  <button id="conductorBtn">🤖 conductor: off</button>
+  <span class="cond-lab">style</span>
+  <select id="conductorStyle" class="cond-sel">
+    <option value="drama">Drama — reactive, goal-seeking</option>
+    <option value="zen">Zen — calm wander</option>
+    <option value="moods">Moods — cycle named scenes</option>
+  </select>
+  <span class="cond-lab">pace</span>
+  <select id="conductorPace" class="cond-sel">
+    <option value="languid">Languid</option>
+    <option value="measured" selected>Measured</option>
+    <option value="restless">Restless</option>
+  </select>
+  <span id="conductorStatus">■ idle</span>
+</div>
+</section>
+
 <section class="panel">
 <h2>Population</h2>
 <div class="ctrl-row flock-only">
 <label>target pop</label>
-<input type="range" id="targetSlider" min="2" max="1000" value="624">
+<input type="range" id="targetSlider" min="2" max="1500" value="624">
 <span class="ctrl-val" id="targetVal">624</span>
 </div>
 <div class="ctrl-row">
@@ -2267,6 +2303,7 @@ wire('sndSighSlider','sndSighVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIG
 wire('sndPredSlider','sndPredVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_PRED=v; });
 wire('sndSizeSlider','sndSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIZE=v; });
 wire('sndAuraSlider','sndAuraVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_AURA=v; });
+wire('sndSpreadSlider','sndSpreadVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SPREAD=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
@@ -4260,6 +4297,8 @@ let _SND_SIGH =parseInt(document.getElementById('sndSighSlider').value)/100;
 let _SND_PRED =parseInt(document.getElementById('sndPredSlider').value)/100;
 let _SND_SIZE =parseInt(document.getElementById('sndSizeSlider').value)/100;
 let _SND_AURA =parseInt(document.getElementById('sndAuraSlider').value)/100;
+let _SND_SPREAD =parseInt(document.getElementById('sndSpreadSlider').value)/100;
+let _flockSpread=0; // smoothed flock-dispersion metric (0 clumped … 1 spread across the tank)
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
 let _SND_DISEASE=parseInt(document.getElementById('sndDiseaseSlider').value)/100;
@@ -4403,7 +4442,15 @@ function _sndInit(){
     auraChorD.connect(o.detune);
     const og=_ac.createGain(); og.gain.value=0.5; o.connect(og); og.connect(auraLp); o.start();
   } }
-  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain};
+  // ── flock spread: three soft voices on D whose INTERVAL opens with the flock's dispersion ──
+  // Tightly clumped → unison (pure); dispersed → they fan out through the D-pentatonic into an open
+  // chord. Frequencies driven in _sndUpdate from a centroid-variance metric folded into the tally loop.
+  const spreadLp=_ac.createBiquadFilter(); spreadLp.type='lowpass'; spreadLp.frequency.value=1600; spreadLp.Q.value=0.6;
+  const spreadGain=_ac.createGain(); spreadGain.gain.value=0;
+  spreadLp.connect(spreadGain); spreadGain.connect(bus);
+  const mkS=(det)=>{ const o=_ac.createOscillator(); o.type='triangle'; o.frequency.value=_midiHz(62); o.detune.value=det; o.connect(spreadLp); o.start(); return o; };
+  const spreadA=mkS(-4), spreadB=mkS(0), spreadC=mkS(4); // start in unison D4 (tiny detune = gentle chorus even when clumped)
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain,spreadA,spreadB,spreadC,spreadLp,spreadGain};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4606,8 +4653,10 @@ function _sndUpdate(){
   _snd.master.gain.setTargetAtTime(SOUND_ON?1.2*_SND_MASTER:0, t, 0.3); // 1.2 = reference; master fader scales the whole mix
   if(!SOUND_ON||_ac.state!=='running') return;
   let living=0,bonded=0,infected=0;
+  let sumX=0,sumY=0,sumX2=0,sumY2=0; // for the flock-spread metric (centroid variance) — folded in free, no extra pass
   const fam=_snd.colorGains ? [0,0,0,0,0,0] : null; // per-family colour tally (only "coloured" boids)
   for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++; if(b.diseased) infected++;
+    sumX+=b.x; sumY+=b.y; sumX2+=b.x*b.x; sumY2+=b.y*b.y;
     if(fam && b.sat>=0.15){ const f=_FAM_IDX[hueToFamily(b.hue)]; fam[f]++; } } } // grey/undecided cells don't vote
   const pop=Math.min(1,living/600);
   _snd.droneGain.gain.setTargetAtTime((0.08+0.38*pop)*_SND_DRONE*2, t, 0.5); // population → drone body (×2: slider 50% = reference level)
@@ -4651,6 +4700,21 @@ function _sndUpdate(){
     const am=(typeof AURA_MODE==='number')?AURA_MODE:0;
     const lvl = am===2 ? 0.075 : (am===1 ? 0.05 : 0);
     _snd.auraGain.gain.setTargetAtTime(lvl*_SND_AURA*2, t, 0.9);        // slow attack → glows in/out with the visual aura
+  }
+  if(_snd.spreadA){ // flock spread: dispersion (coherence K / sensing R / alignment) heard as an OPENING interval
+    if(living>1){
+      const mx=sumX/living, my=sumY/living;
+      const varSum=Math.max(0,(sumX2+sumY2)/living-(mx*mx+my*my)); // Var(x)+Var(y), from the folded sums — no pairwise cost
+      const diag=Math.hypot(canvas.width,canvas.height)||1400;
+      const raw=Math.min(1, Math.sqrt(varSum)/(0.28*diag));         // RMS distance from centroid, normalised to the tank
+      _flockSpread += (raw-_flockSpread)*0.1;                       // smooth the frame-to-frame jitter → the slow trend
+      const s=_flockSpread;
+      _snd.spreadA.frequency.setTargetAtTime(_midiHz(62),      t, 0.5); // root D4 anchor
+      _snd.spreadB.frequency.setTargetAtTime(_midiHz(62+7*s),  t, 0.5); // clumped: unison → dispersed: opens toward the fifth (A4)
+      _snd.spreadC.frequency.setTargetAtTime(_midiHz(62+12*s), t, 0.5); // …and toward the octave (D5) — sweeping the pentatonic
+      _snd.spreadLp.frequency.setTargetAtTime(1200+1600*s, t, 0.6);     // brightens as it opens
+      _snd.spreadGain.gain.setTargetAtTime(0.05*_SND_SPREAD*2, t, 0.5);
+    } else _snd.spreadGain.gain.setTargetAtTime(0, t, 0.5);         // no flock → silent
   }
 }
 function _sndSetBtn(){
@@ -5444,6 +5508,7 @@ _SND_MASTER     = ${_SND_MASTER};
 _SND_PRED       = ${_SND_PRED};
 _SND_SIZE       = ${_SND_SIZE};
 _SND_AURA       = ${_SND_AURA};
+_SND_SPREAD     = ${_SND_SPREAD};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
@@ -5541,6 +5606,7 @@ function _compRecStop(){
 function _compPlayStart(){
   if(!_composition||!_composition.events||!_composition.events.length){ _compStatus('nothing to play — record first'); return; }
   if(!_tankAlive()){ _compStatus('open the aquarium first'); return; }
+  _condStop(); // the conductor and a playing composition would fight over the sliders
   _compStopAll();
   // Play IN the tank (the visible window) — its rAF keeps running while the dashboard is
   // hidden behind it. The tank applies the initial state + timeline to its own controls.
@@ -5630,10 +5696,10 @@ _presetBuild(); _presetRestore();
 // The button snaps the climax-pop slider to it — click any time (e.g. after changing
 // target pop and letting it re-settle). During recording, the resulting slider change
 // is captured with its concrete value, so playback replays the calibrated number.
-let _popEMA=0, _popEMAready=false;
+let _popEMA=0, _popEMAready=false, _condPop=0;
 document.getElementById('autoClimaxBtn').addEventListener('click',()=>{
   if(!_popEMAready || !_tankAlive()){ const av=document.getElementById('climaxAutoVal'); if(av) av.textContent='no pop yet'; return; }
-  const v=Math.max(2,Math.min(1000,Math.round(_popEMA)));
+  const v=Math.max(2,Math.min(2000,Math.round(_popEMA)));
   const sl=document.getElementById('climaxPopSlider');
   sl.value=v; sl.dispatchEvent(new Event('input',{bubbles:true})); // updates CLIMAX_POP + display, forwards to tank, recorded if recording
 });
@@ -5663,6 +5729,7 @@ window.addEventListener('message', e => {
     // maintain the running population average for the climax-pop auto-set
     if(typeof s.count==='number'){
       if(!_popEMAready){ _popEMA=s.count; _popEMAready=true; } else _popEMA += (s.count-_popEMA)*0.006; // τ ≈ 30 s at the ~6 Hz status rate
+      _condPop=s.count; // live population for the AI conductor's reactivity
       const av=document.getElementById('climaxAutoVal'); if(av) av.textContent='~'+Math.round(_popEMA);
     }
   } else if(m.t==='pyramid'){
@@ -5671,6 +5738,131 @@ window.addEventListener('message', e => {
     img.src=m.data;
   }
 });
+
+// ── AI conductor: an autonomous performer that plays the sliders ──────────────
+// Self-contained (no network): a generative controller that eases the controls over
+// time so the society — and its soundscape — evolves without a human hand. It drives
+// sliders through the SAME input events the recorder captures, so you can ● record the
+// AI's performance and 📦 export it as a self-playing piece. The "style" is pluggable
+// (a registry): Drama = reactive & goal-seeking, Zen = calm wander, Moods = a fixed cycle
+// of named scenes. PROVISION FOR LATER: an online LLM "director" could be registered as
+// another style whose next() is async and calls an API — the engine treats next() as
+// opaque, so nothing else would change. Scope: the flock sliders + the mixer faders
+// (never the op-row buttons). Built for the flock universe. Targets are expressed as
+// FRACTIONS of each slider's [min,max], so they adapt if a range changes.
+const _CONDUCT_POOL = [
+  'cohKSlider','sensingSlider','alignSlider','boltzRotSlider','speedSlider',
+  'targetSlider','childSlider','lifeSlider','fatalitySlider','divorceSlider','bondSlider',
+  'predatorSlider','predatorDietSlider','diseaseThreshSlider','imgScaleSlider','auraOpacitySlider','climaxPopSlider',
+  'sndMasterSlider','sndSpreadSlider','sndDiseaseSlider','sndPredSlider','sndClimaxSlider','sndThudSlider'
+];
+const _CONDUCT_HOME = { // neutral resting fraction each slider drifts toward when no movement claims it
+  cohKSlider:0.55, sensingSlider:0.50, alignSlider:0.35, boltzRotSlider:0.30, speedSlider:0.50,
+  targetSlider:0.45, childSlider:0.40, lifeSlider:0.60, fatalitySlider:0.22, divorceSlider:0.25, bondSlider:0.40,
+  predatorSlider:0.0, predatorDietSlider:0.45, diseaseThreshSlider:0.55, imgScaleSlider:0.12, auraOpacitySlider:0.42, climaxPopSlider:0.40,
+  sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.55, sndPredSlider:0.55, sndClimaxSlider:0.55, sndThudSlider:0.55
+};
+// shared movement palette (Drama picks reactively, Moods cycles). NB diseaseThreshSlider is
+// "hits to catch disease" → LOW = contagious; an epidemic still needs a seed, so the disruption
+// is a slider-driven die-off (fatality up, lifespan down), not a promised plague.
+const _CONDUCT_MOVES = {
+  awaken:   { label:'awakening',            hold:[22,34], t:{ cohKSlider:0.60, sensingSlider:0.55, boltzRotSlider:0.20, childSlider:0.32, lifeSlider:0.65, fatalitySlider:0.18, targetSlider:0.50, predatorSlider:0.0, diseaseThreshSlider:0.55, auraOpacitySlider:0.50, sndMasterSlider:0.85 } },
+  bloom:    { label:'blooming to a climax', hold:[26,42], t:{ cohKSlider:0.90, sensingSlider:0.72, boltzRotSlider:0.15, alignSlider:0.60, childSlider:0.24, lifeSlider:0.78, fatalitySlider:0.14, targetSlider:0.82, predatorSlider:0.0, diseaseThreshSlider:0.60, imgScaleSlider:0.30, auraOpacitySlider:0.85, climaxPopSlider:0.32, sndClimaxSlider:0.72, sndMasterSlider:0.95 } },
+  diaspora: { label:'the diaspora',         hold:[16,28], t:{ cohKSlider:0.02, sensingSlider:0.20, alignSlider:0.10, boltzRotSlider:0.80, speedSlider:0.70, imgScaleSlider:0.08, sndSpreadSlider:0.85, auraOpacitySlider:0.40, sndMasterSlider:0.88 } },
+  dieoff:   { label:'a die-off',            hold:[18,30], t:{ fatalitySlider:0.62, lifeSlider:0.28, childSlider:0.50, diseaseThreshSlider:0.10, predatorSlider:0.0, sndDiseaseSlider:0.70, sndThudSlider:0.80, sndMasterSlider:0.90 } },
+  predators:{ label:'a predator storm',     hold:[16,28], t:{ predatorSlider:0.72, predatorDietSlider:0.70, sensingSlider:0.50, cohKSlider:0.50, sndPredSlider:0.85, sndMasterSlider:0.92 } },
+  calm:     { label:'a calm',               hold:[24,38], t:{ cohKSlider:0.55, sensingSlider:0.50, boltzRotSlider:0.25, childSlider:0.40, lifeSlider:0.65, fatalitySlider:0.20, predatorSlider:0.0, diseaseThreshSlider:0.55, auraOpacitySlider:0.45, sndSpreadSlider:0.50, sndDiseaseSlider:0.40, sndPredSlider:0.40, sndClimaxSlider:0.50, sndThudSlider:0.55, sndMasterSlider:0.85 } }
+};
+let _condOn=false, _condRAF=0, _condActuate=0, _condHoldUntil=0, _condPaceMul=1, _condLabel='', _condSurvShown=false;
+const _condBaseTgt={}, _condCur={};
+// ── survival layer: the conductor must never let the population vanish, and should keep it in the
+// region of the target. Below ~40% of target it eases the DEMOGRAPHIC sliders toward these "safe"
+// fractions; by ~10% of target the takeover is full. Above that band, fluctuations are left to the
+// artistic movements (so a die-off / predator storm still bites, it just can't run to extinction).
+const _condSafe={ childSlider:0.15, lifeSlider:0.80, fatalitySlider:0.05, predatorSlider:0.0, cohKSlider:0.55, sensingSlider:0.55, boltzRotSlider:0.25, divorceSlider:0.15, targetSlider:0.50 };
+function _condSurvivalUrgency(){
+  if(!_popEMAready) return 0;                                // no live reading yet → let the art run
+  const target=parseFloat(document.getElementById('targetSlider').value)||300;
+  const pop=_condPop||0, safeLow=Math.max(50,target*0.40), crit=Math.max(18,target*0.10);
+  if(pop>=safeLow) return 0; if(pop<=crit) return 1; return (safeLow-pop)/(safeLow-crit);
+}
+const _condPaceMap={ languid:1.6, measured:1.0, restless:0.6 };
+function _condRnd(a,b){ return a+Math.random()*(b-a); }
+function _condHoldFor(mv){ return _condRnd(mv.hold[0],mv.hold[1])*_condPaceMul; }
+function _condFracToVal(id, frac){ const el=document.getElementById(id); if(!el) return 0;
+  const lo=parseFloat(el.min), hi=parseFloat(el.max); return lo+Math.max(0,Math.min(1,frac))*(hi-lo); }
+function _condSet(id, val){ const el=document.getElementById(id); if(!el) return;
+  const lo=parseFloat(el.min), hi=parseFloat(el.max), st=parseFloat(el.step)||1;
+  let v=Math.max(lo, Math.min(hi, val)); v=Math.round(v/st)*st;
+  if(parseFloat(el.value)!==v){ el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); } } // same event the bridge + recorder use
+const _conductorStyles = {
+  drama: { label:'Drama', _last:'', next(){ // reactive: (re)build → climax → a disruption → breathe
+    const pop=_condPop||0, ema=_popEMA||pop||1; let key;
+    if(pop<40) key='awaken';
+    else if(this._last==='awaken') key='bloom';
+    else if(this._last==='bloom') key=['dieoff','predators','diaspora'][Math.floor(Math.random()*3)];
+    else if(this._last==='dieoff'||this._last==='predators'||this._last==='diaspora') key='calm';
+    else if(this._last==='calm') key=(pop<ema*0.7?'awaken':'bloom');
+    else key='awaken';
+    this._last=key; const mv=_CONDUCT_MOVES[key];
+    return { label:mv.label, hold:_condHoldFor(mv), targets:mv.t };
+  }},
+  zen: { label:'Zen', next(){ // gentle wander around a calm baseline, long holds
+    const t={}, pick=['cohKSlider','sensingSlider','boltzRotSlider','childSlider','imgScaleSlider','auraOpacitySlider'];
+    for(const id of pick){ const home=_CONDUCT_HOME[id]!==undefined?_CONDUCT_HOME[id]:0.4; t[id]=Math.max(0,Math.min(1, home+_condRnd(-0.18,0.18))); }
+    t.predatorSlider=0.0; t.diseaseThreshSlider=0.6; t.fatalitySlider=0.15; t.sndMasterSlider=0.82;
+    return { label:'drifting', hold:_condRnd(30,48)*_condPaceMul, targets:t };
+  }},
+  moods: { label:'Moods', _seq:['awaken','bloom','calm','diaspora','calm','dieoff','calm','predators'], _i:0, next(){
+    const key=this._seq[this._i++ % this._seq.length], mv=_CONDUCT_MOVES[key];
+    return { label:mv.label, hold:_condHoldFor(mv), targets:mv.t };
+  }}
+};
+function _condStatus(m){ const el=document.getElementById('conductorStatus'); if(el) el.textContent=m; }
+function _condStyle(){ return _conductorStyles[document.getElementById('conductorStyle').value] || _conductorStyles.drama; }
+function _condDecide(){
+  const st=_condStyle(), g=st.next();
+  for(const id of _CONDUCT_POOL){ const home=_CONDUCT_HOME[id]; _condBaseTgt[id]=_condFracToVal(id, home!==undefined?home:0.4); } // unclaimed sliders ease home
+  for(const id in g.targets) if(_CONDUCT_POOL.indexOf(id)>=0) _condBaseTgt[id]=_condFracToVal(id, g.targets[id]);
+  _condHoldUntil=performance.now()+g.hold*1000;
+  _condLabel='▮ '+st.label+' — '+g.label; _condSurvShown=false; _condStatus(_condLabel);
+}
+function _condTick(ts){
+  if(!_condOn) return;
+  const u=_condSurvivalUrgency();
+  if(u>=1 && ts<_condHoldUntil-3000) _condHoldUntil=0;             // population critical → cut a killer scene short & re-decide (Drama then rebuilds)
+  if(ts>=_condHoldUntil) _condDecide();
+  if((u>0.05)!==_condSurvShown){ _condSurvShown=u>0.05; _condStatus(_condLabel+(_condSurvShown?' · ⚕ sustaining the population':'')); }
+  if(ts-_condActuate>=100){ // actuate at ~10 Hz: sliders still glide, but events/recordings stay sane
+    _condActuate=ts;
+    const f=0.045/_condPaceMul; // per-step ease toward target (≈1.5 s half-life at "measured")
+    for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(!el || _condBaseTgt[id]===undefined) continue;
+      let tg=_condBaseTgt[id]; const safe=_condSafe[id];
+      if(u>0 && safe!==undefined) tg += (_condFracToVal(id,safe)-tg)*u;  // survival eases the demographic sliders toward safe values
+      if(_condCur[id]===undefined) _condCur[id]=parseFloat(el.value);
+      _condCur[id]+=(tg-_condCur[id])*f; _condSet(id, _condCur[id]);
+    }
+  }
+  _condRAF=requestAnimationFrame(_condTick);
+}
+function _condStart(){
+  if(_condOn) return;
+  _condOn=true; _condActuate=0; _condHoldUntil=0;
+  for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(el) _condCur[id]=parseFloat(el.value); } // seed from current
+  _condDecide();
+  _condRAF=requestAnimationFrame(_condTick);
+  const b=document.getElementById('conductorBtn'); if(b){ b.classList.add('on'); b.textContent='🤖 conductor: on'; }
+}
+function _condStop(){
+  if(!_condOn) return;
+  _condOn=false; if(_condRAF){ cancelAnimationFrame(_condRAF); _condRAF=0; }
+  const b=document.getElementById('conductorBtn'); if(b){ b.classList.remove('on'); b.textContent='🤖 conductor: off'; }
+  _condStatus('■ stopped');
+}
+_condPaceMul=_condPaceMap[document.getElementById('conductorPace').value]||1;
+document.getElementById('conductorBtn').addEventListener('click',()=>{ if(_condOn) _condStop(); else _condStart(); });
+document.getElementById('conductorPace').addEventListener('change',e=>{ _condPaceMul=_condPaceMap[e.target.value]||1; });
+document.getElementById('conductorStyle').addEventListener('change',()=>{ if(_condOn){ _condHoldUntil=0; _condStatus('style → '+_condStyle().label); } }); // switch takes effect on the next movement
 
 // link indicator: green while the tank tab is alive
 setInterval(()=>{
