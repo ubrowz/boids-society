@@ -1780,6 +1780,16 @@ background:#fff;transition:left 0.2s;display:block;"></span>
     <div class="vwrap"><input type="range" class="vfader" id="sndPredSlider" min="0" max="100" value="55" step="5"></div>
     <label title="Level of the predator menace — a low Jaws-style two-note ostinato that plays while any predator is in the tank and speeds up as the threat grows.">menace</label>
   </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndSizeVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndSizeSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the size tone — a soft root (D) whose octave tracks the boid-size slider: tiny boids sound a high glassy D, giant boids a deep sub-bass D.">size</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndAuraVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndAuraSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the aura halo — an airy high shimmer (root + fifth) that glows in when the bonded/fertile aura is on (brighter for gradient than flat), silent when the aura is off.">aura</label>
+  </div>
 </div>
 <div style="max-width:360px;margin-top:12px;">
   <div class="ctrl-row">
@@ -2225,6 +2235,8 @@ wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHI
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
 wire('sndSighSlider','sndSighVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIGH=v; });
 wire('sndPredSlider','sndPredVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_PRED=v; });
+wire('sndSizeSlider','sndSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIZE=v; });
+wire('sndAuraSlider','sndAuraVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_AURA=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
@@ -4215,6 +4227,8 @@ let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
 let _SND_SIGH =parseInt(document.getElementById('sndSighSlider').value)/100;
 let _SND_PRED =parseInt(document.getElementById('sndPredSlider').value)/100;
+let _SND_SIZE =parseInt(document.getElementById('sndSizeSlider').value)/100;
+let _SND_AURA =parseInt(document.getElementById('sndAuraSlider').value)/100;
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
 let _SND_DISEASE=parseInt(document.getElementById('sndDiseaseSlider').value)/100;
@@ -4222,6 +4236,9 @@ let CLIMAX_POP=parseInt(document.getElementById('climaxPopSlider').value); // po
 let _climaxLvl=0; // dwell-smoothed proximity to target population (0..1) → drives the climax shimmer
 const _CLIMAX_ATTACK=0.03, _CLIMAX_RELEASE=0.10; // dwell: slow to earn the bloom, faster to release
 const _SND_SCALE=[0,3,5,7,10]; // minor pentatonic degrees
+// D-minor-pentatonic ladder D2..D6 — the size tone snaps to the nearest rung so gliding the
+// boid-size slider steps through in-key pitches (always consonant) instead of a microtonal slide.
+const _SIZE_LADDER=(()=>{ const a=[]; for(let o=38;o<=86;o+=12) for(const d of [0,3,5,7,10]) if(o+d<=86) a.push(o+d); return a; })();
 const _FAM_IDX={red:0,yellow:1,green:2,cyan:3,blue:4,magenta:5}; // hue family → colour-chord voice
 // Colour-chord voices: one distinct instrument per hue family, spread across ~2 octaves of
 // D-minor pentatonic so a colour shift is heard as a change of instrument AND register, not
@@ -4330,7 +4347,32 @@ function _sndInit(){
   // sub octave (D3) — dread weight at the height of the epidemic (D2 is inaudible on laptop speakers)
   const disSub=_ac.createGain(); disSub.gain.value=0; disSub.connect(disLp);
   { const o=_ac.createOscillator(); o.type='sine'; o.frequency.value=_midiHz(50); o.connect(disSub); o.start(); }
-  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth};
+  // ── size: a soft root (D) whose OCTAVE tracks the boid-size slider (IMG_SCALE) ──
+  // Small boids → a high glassy D6; giant boids → a deep sub D2, snapped to a D-pentatonic ladder
+  // so intermediate sizes still land in key. Pitch + warmth driven in _sndUpdate. Gentle vibrato.
+  const sizeLp=_ac.createBiquadFilter(); sizeLp.type='lowpass'; sizeLp.frequency.value=1600; sizeLp.Q.value=0.7;
+  const sizeGain=_ac.createGain(); sizeGain.gain.value=0;
+  sizeLp.connect(sizeGain); sizeGain.connect(bus);
+  const sizeOsc=_ac.createOscillator(); sizeOsc.type='triangle'; sizeOsc.frequency.value=_midiHz(62); sizeOsc.connect(sizeLp); sizeOsc.start();
+  const sizeVib=_ac.createOscillator(); sizeVib.type='sine'; sizeVib.frequency.value=0.25;
+  const sizeVibD=_ac.createGain(); sizeVibD.gain.value=5; sizeVib.connect(sizeVibD); sizeVibD.connect(sizeOsc.detune); sizeVib.start();
+  // ── aura: a high halo shimmer (D5 + A5 = root + fifth) that GLOWS IN when the aura is on ──
+  // Fades up with a slow attack when AURA_MODE>0 (brighter for gradient than flat), silent when off.
+  // Airy and breathing (slow tremolo + chorus drift), sitting above the drone — a presence for the glow.
+  const auraLp=_ac.createBiquadFilter(); auraLp.type='lowpass'; auraLp.frequency.value=2600; auraLp.Q.value=0.6;
+  const auraTrem=_ac.createGain(); auraTrem.gain.value=0.8;   // breathing tremolo carrier
+  const auraGain=_ac.createGain(); auraGain.gain.value=0;     // level ∝ aura on/mode (see _sndUpdate)
+  auraLp.connect(auraTrem); auraTrem.connect(auraGain); auraGain.connect(bus);
+  const auraLFO=_ac.createOscillator(); auraLFO.type='sine'; auraLFO.frequency.value=0.33;
+  const auraLFOD=_ac.createGain(); auraLFOD.gain.value=0.18; auraLFO.connect(auraLFOD); auraLFOD.connect(auraTrem.gain); auraLFO.start();
+  const auraChor=_ac.createOscillator(); auraChor.type='sine'; auraChor.frequency.value=0.21;
+  const auraChorD=_ac.createGain(); auraChorD.gain.value=6; auraChor.connect(auraChorD); auraChor.start();
+  for(const mnote of [74,81]){ for(const det of [-5,5]){   // D5 + A5, two detuned sines each for width
+    const o=_ac.createOscillator(); o.type='sine'; o.frequency.value=_midiHz(mnote); o.detune.value=det;
+    auraChorD.connect(o.detune);
+    const og=_ac.createGain(); og.gain.value=0.5; o.connect(og); og.connect(auraLp); o.start();
+  } }
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4564,6 +4606,20 @@ function _sndUpdate(){
     _snd.disLp.Q.setTargetAtTime(0.8+7*inf, t, 0.6);              // resonance/edge
     _snd.disLFO.frequency.setTargetAtTime(1.2+6.5*inf, t, 0.4);   // fever pulse quickens (~1.2 → 7.7 Hz)
     _snd.disLFODepth.gain.setTargetAtTime(0.08+0.42*inf, t, 0.5); // pulse deepens toward a full throb
+  }
+  if(_snd.sizeOsc){ // size: a root-D tone whose octave tracks IMG_SCALE (small→high glassy, large→deep sub)
+    const sc=Math.max(0.1,Math.min(3,(typeof IMG_SCALE==='number'?IMG_SCALE:0.4)));
+    const sn=(Math.log(sc)-Math.log(0.1))/(Math.log(3)-Math.log(0.1));  // 0..1 across the slider (log-spaced)
+    let mm=86-48*sn, best=_SIZE_LADDER[0];                              // continuous D6..D2, then snap to a D-pentatonic rung
+    for(const r of _SIZE_LADDER) if(Math.abs(r-mm)<Math.abs(best-mm)) best=r;
+    _snd.sizeOsc.frequency.setTargetAtTime(_midiHz(best), t, 0.4);      // glide between rungs, don't jump
+    _snd.sizeLp.frequency.setTargetAtTime(900+2200*(1-sn), t, 0.5);     // warmer/darker as it descends
+    _snd.sizeGain.gain.setTargetAtTime(0.06*_SND_SIZE*2, t, 0.5);
+  }
+  if(_snd.auraGain){ // aura: halo shimmer glows in when the aura is on (brighter for gradient than flat)
+    const am=(typeof AURA_MODE==='number')?AURA_MODE:0;
+    const lvl = am===2 ? 0.075 : (am===1 ? 0.05 : 0);
+    _snd.auraGain.gain.setTargetAtTime(lvl*_SND_AURA*2, t, 0.9);        // slow attack → glows in/out with the visual aura
   }
 }
 function _sndSetBtn(){
@@ -5354,6 +5410,8 @@ _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
 _SND_SIGH       = ${_SND_SIGH};
 _SND_PRED       = ${_SND_PRED};
+_SND_SIZE       = ${_SND_SIZE};
+_SND_AURA       = ${_SND_AURA};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
