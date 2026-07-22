@@ -1228,6 +1228,23 @@ input[type=color]{ width:44px; height:24px; border:1px solid var(--line2); paddi
   background:var(--inset); color:#54a0ff; border:1px solid rgba(84,160,255,0.4);
   border-radius:4px; cursor:pointer; letter-spacing:0.06em; white-space:nowrap; text-transform:uppercase; }
 .mini-note{ font-size:9.5px; color:var(--muted); text-transform:none; letter-spacing:0; }
+/* ── preset scenes: pads that snap the whole dashboard to a saved settings file ── */
+#presetPanel{ column-span:all; }
+.presetBank{ display:flex; flex-wrap:wrap; gap:10px; padding:8px 2px 2px; }
+.preset{ display:flex; flex-direction:column; width:92px; }
+.preset-pad{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; height:46px; padding:4px 6px; border-radius:6px 6px 0 0;
+  background:var(--inset); color:var(--muted); border:1px solid var(--line2); border-bottom:none;
+  cursor:pointer; font:700 13px ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.04em; outline:none; }
+.preset-pad .preset-name{ font:600 9px ui-monospace,Menlo,Consolas,monospace; letter-spacing:0.02em;
+  text-transform:none; opacity:0.75; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.preset-pad.loaded{ color:#ffd479; border-color:rgba(255,180,60,0.55); background:rgba(255,180,60,0.10); }
+.preset-pad.loaded:hover{ background:rgba(255,180,60,0.20); box-shadow:0 0 8px rgba(255,180,60,0.35); }
+.preset-pad:disabled{ cursor:default; opacity:0.5; }
+.preset-pad.flash{ background:rgba(255,220,120,0.55); color:#1a1205; }   /* brief confirm on apply */
+.preset-load{ height:18px; border-radius:0 0 6px 6px; border:1px solid var(--line2);
+  background:var(--inset); color:#54a0ff; cursor:pointer; font-size:10px; line-height:1; outline:none; }
+.preset-load:hover{ background:rgba(84,160,255,0.18); }
 
 /* ── status panel internals ─────────────────────────────────────────────── */
 #statusGrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(212px,1fr)); gap:12px 24px; align-items:start; }
@@ -1352,6 +1369,86 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <div id="noTankHint">open the aquarium to see live data</div>
   </div>
 </div>
+</section>
+
+<section class="panel" id="soundPanel">
+<h2>Sound — mixer</h2>
+<div class="mixer">
+  <div class="fader">
+    <span class="ctrl-val" id="sndMasterVal">100%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndMasterSlider" min="0" max="100" value="100" step="5"></div>
+    <label title="Master volume — scales the whole mix. Turn everything down/up together; the individual faders balance layers within it.">master</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndDroneVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndDroneSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the ambient bed (population body, crowding brightness, bond warmth).">drone</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndColorVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndColorSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the colour chord — six pad voices (one per hue family) whose volumes follow the population's colour mix.">colour</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndClimaxVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndClimaxSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the 'climax pop' value and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndDiseaseVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndDiseaseSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the disease undertone — a dark, detuned D-minor chord that swells with the fraction of infected boids (silent when there's no epidemic). Consonant with the drone and colour bed.">disease</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndChimeVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndChimeSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the birth chimes and bond dyads.">chimes</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndThudVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndThudSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the death thuds.">thuds</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndSighVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndSighSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the bond-breaking sighs — the descending tone when a pair splits (divorce / drift / widowhood).">sighs</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndPredVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndPredSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the predator menace — a low Jaws-style two-note ostinato that plays while any predator is in the tank and speeds up as the threat grows.">menace</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndSizeVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndSizeSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the size tone — a soft root (D) whose octave tracks the boid-size slider: tiny boids sound a high glassy D, giant boids a deep sub-bass D.">size</label>
+  </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndAuraVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndAuraSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the aura halo — an airy high shimmer (root + fifth) that glows in when the bonded/fertile aura is on (brighter for gradient than flat), silent when the aura is off.">aura</label>
+  </div>
+</div>
+<div style="max-width:360px;margin-top:12px;">
+  <div class="ctrl-row">
+    <label title="The population count the climax shimmer blooms at — set this to wherever your population actually settles (which may not be the target). Separate from 'target pop'.">climax pop</label>
+    <input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
+    <span class="ctrl-val" id="climaxPopVal">624</span>
+  </div>
+  <div class="ctrl-row">
+    <label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
+    <button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
+    <span class="ctrl-val" id="climaxAutoVal">~—</span>
+  </div>
+</div>
+</section>
+
+<section class="panel" id="presetPanel">
+<h2>Preset scenes</h2>
+<div class="mini-note" style="margin:-2px 0 4px;">Load a saved settings file (from 💾) into a pad with 📂, then click the pad — even while recording a composition — to snap the whole dashboard, and the tank, to that scene. Right-click a pad to clear it.</div>
+<div class="presetBank" id="presetBank"></div>
+<input type="file" id="presetFileInput" accept="application/json,.json" style="display:none">
 </section>
 
 <section class="panel">
@@ -1734,74 +1831,6 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <div class="ctrl-row" style="gap:8px;">
 <label>background</label>
 <input type="color" id="bgColorInput" value="#000000" title="Canvas background colour">
-</div>
-</section>
-
-<section class="panel" id="soundPanel">
-<h2>Sound — mixer</h2>
-<div class="mixer">
-  <div class="fader">
-    <span class="ctrl-val" id="sndDroneVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndDroneSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the ambient bed (population body, crowding brightness, bond warmth).">drone</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndColorVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndColorSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the colour chord — six pad voices (one per hue family) whose volumes follow the population's colour mix.">colour</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndClimaxVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndClimaxSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the climax shimmer — a bright chord that blooms as the population settles near the 'climax pop' value and holds there, and recedes when it over- or undershoots. Rewards sustained balance, not fleeting crossings.">climax</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndDiseaseVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndDiseaseSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the disease undertone — a dark, detuned D-minor chord that swells with the fraction of infected boids (silent when there's no epidemic). Consonant with the drone and colour bed.">disease</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndChimeVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndChimeSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the birth chimes and bond dyads.">chimes</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndThudVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndThudSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the death thuds.">thuds</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndSighVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndSighSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the bond-breaking sighs — the descending tone when a pair splits (divorce / drift / widowhood).">sighs</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndPredVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndPredSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the predator menace — a low Jaws-style two-note ostinato that plays while any predator is in the tank and speeds up as the threat grows.">menace</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndSizeVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndSizeSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the size tone — a soft root (D) whose octave tracks the boid-size slider: tiny boids sound a high glassy D, giant boids a deep sub-bass D.">size</label>
-  </div>
-  <div class="fader">
-    <span class="ctrl-val" id="sndAuraVal">55%</span>
-    <div class="vwrap"><input type="range" class="vfader" id="sndAuraSlider" min="0" max="100" value="55" step="5"></div>
-    <label title="Level of the aura halo — an airy high shimmer (root + fifth) that glows in when the bonded/fertile aura is on (brighter for gradient than flat), silent when the aura is off.">aura</label>
-  </div>
-</div>
-<div style="max-width:360px;margin-top:12px;">
-  <div class="ctrl-row">
-    <label title="The population count the climax shimmer blooms at — set this to wherever your population actually settles (which may not be the target). Separate from 'target pop'.">climax pop</label>
-    <input type="range" id="climaxPopSlider" min="2" max="1000" value="624">
-    <span class="ctrl-val" id="climaxPopVal">624</span>
-  </div>
-  <div class="ctrl-row">
-    <label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
-    <button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
-    <span class="ctrl-val" id="climaxAutoVal">~—</span>
-  </div>
 </div>
 </section>
 
@@ -2230,6 +2259,7 @@ wire('sensingSlider', 'sensingVal', v=>parseInt(v), v=>v, v=>{ SENSING_RADIUS=v;
 wire('boltzRotSlider', 'boltzRotVal', v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ _BOLTZ_ROT=v; });
 wire('cohKSlider', 'cohKVal', v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3), v=>{ _COH_K=v; });
 wire('alignSlider', 'alignVal', v=>_alignKFromSlider(v), v=>_alignKFromSlider(v).toFixed(3), v=>{ _ALIGN_K=v; });
+wire('sndMasterSlider','sndMasterVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_MASTER=v; if(_snd) _snd.master.gain.setTargetAtTime(SOUND_ON?1.2*_SND_MASTER:0, _ac.currentTime, 0.1); });
 wire('sndDroneSlider','sndDroneVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DRONE=v; });
 wire('sndChimeSlider','sndChimeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CHIME=v; });
 wire('sndThudSlider','sndThudVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_THUD=v; });
@@ -4222,6 +4252,7 @@ statusEl.textContent='';
 // browsers require a gesture in that tab, so the overlay shows "tap for sound" until
 // the first click. The dashboard 🔊 button is forwarded like any other toggle.
 let SOUND_ON=false, _ac=null, _snd=null, _sndTick=0, _sndVoices=0;
+let _SND_MASTER=parseInt(document.getElementById('sndMasterSlider').value)/100;
 let _SND_DRONE=parseInt(document.getElementById('sndDroneSlider').value)/100;
 let _SND_CHIME=parseInt(document.getElementById('sndChimeSlider').value)/100;
 let _SND_THUD =parseInt(document.getElementById('sndThudSlider').value)/100;
@@ -4572,7 +4603,7 @@ function _sndHint(){ return (SOUND_ON&&_ac&&_ac.state!=='running') ? ' · 🔈 t
 function _sndUpdate(){
   if(!_ac||!_snd) return;
   const t=_ac.currentTime;
-  _snd.master.gain.setTargetAtTime(SOUND_ON?1.2:0, t, 0.3);
+  _snd.master.gain.setTargetAtTime(SOUND_ON?1.2*_SND_MASTER:0, t, 0.3); // 1.2 = reference; master fader scales the whole mix
   if(!SOUND_ON||_ac.state!=='running') return;
   let living=0,bonded=0,infected=0;
   const fam=_snd.colorGains ? [0,0,0,0,0,0] : null; // per-family colour tally (only "coloured" boids)
@@ -5409,6 +5440,7 @@ _SND_DRONE      = ${_SND_DRONE};
 _SND_CHIME      = ${_SND_CHIME};
 _SND_THUD       = ${_SND_THUD};
 _SND_SIGH       = ${_SND_SIGH};
+_SND_MASTER     = ${_SND_MASTER};
 _SND_PRED       = ${_SND_PRED};
 _SND_SIZE       = ${_SND_SIZE};
 _SND_AURA       = ${_SND_AURA};
@@ -5545,6 +5577,52 @@ _compLoadInput.addEventListener('change',e=>{
   r.onload=()=>{ try{ const c=JSON.parse(r.result); if(c&&Array.isArray(c.events)){ _composition=c; _compStatus(`loaded ${c.events.length} events · 📦 export loops it`); } else _compStatus('not a composition file'); }catch(err){ _compStatus('could not load file'); } };
   r.readAsText(f); e.target.value='';
 });
+
+// ── preset scenes: pads that snap the whole dashboard (and the tank) to a saved settings file ──
+// A pad holds a settings JSON in the exact format the 💾 save button writes. Clicking a loaded pad
+// calls _applySettings — which fires the same input/click events the recorder captures — so a pad
+// press made WHILE RECORDING is baked into the composition as its individual control changes, and
+// thus survives replay and kiosk export with no dependency on the preset files. Slots persist in
+// localStorage. Dashboard-only. Caveat: a preset that changes SIM_MODE clicks astroModeBtn, which
+// is not in _FWD_CLICKS, so the mode switch itself is not recorded — use presets within one mode.
+const _PRESET_SLOTS=8;
+let _presets=[], _presetTarget=-1;
+const _presetFileInput=document.getElementById('presetFileInput');
+function _presetStore(){ try{ localStorage.setItem('boidPresets', JSON.stringify(_presets)); }catch(e){} }
+function _presetLabel(i){ const pad=document.getElementById('presetPad'+i); if(!pad) return; const p=_presets[i];
+  pad.disabled=!p; pad.classList.toggle('loaded',!!p);
+  pad.querySelector('.preset-name').textContent = p ? p.name : 'empty'; }
+function _presetApply(i){ const p=_presets[i]; if(!p||!p.settings) return;
+  _applySettings(p.settings);
+  const pad=document.getElementById('presetPad'+i); if(pad){ pad.classList.add('flash'); setTimeout(()=>pad.classList.remove('flash'),180); }
+  if(_compRec) _compStatus('● recording… · applied “'+p.name+'”'); }
+function _presetBuild(){
+  const bank=document.getElementById('presetBank'); if(!bank) return; bank.innerHTML='';
+  for(let i=0;i<_PRESET_SLOTS;i++){
+    const cell=document.createElement('div'); cell.className='preset';
+    const pad=document.createElement('button'); pad.className='preset-pad'; pad.id='presetPad'+i; pad.disabled=true;
+    pad.innerHTML=(i+1)+'<small class="preset-name">empty</small>';
+    pad.addEventListener('click',()=>_presetApply(i));
+    pad.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(_presets[i]){ _presets[i]=null; _presetStore(); _presetLabel(i); } });
+    const load=document.createElement('button'); load.className='preset-load'; load.id='presetLoad'+i; load.textContent='📂';
+    load.title='Load a settings JSON into pad '+(i+1);
+    load.addEventListener('click',()=>{ _presetTarget=i; _presetFileInput.click(); });
+    cell.appendChild(pad); cell.appendChild(load); bank.appendChild(cell);
+  }
+}
+function _presetRestore(){ try{ const a=JSON.parse(localStorage.getItem('boidPresets')); if(Array.isArray(a)) _presets=a; }catch(e){ _presets=[]; }
+  _presets.length=_PRESET_SLOTS; for(let i=0;i<_PRESET_SLOTS;i++){ if(_presets[i]===undefined) _presets[i]=null; _presetLabel(i); } }
+_presetFileInput.addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0], i=_presetTarget; e.target.value=''; if(!f||i<0) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const s=JSON.parse(r.result);
+      if(!s||!(s.inputs||s.toggles)){ _compStatus('pad '+(i+1)+': not a settings file'); return; }
+      let nm=f.name.replace(/\.json$/i,'').replace(/^boid-settings-/,''); if(nm.length>12) nm=nm.slice(0,12);
+      _presets[i]={ name:nm||('scene '+(i+1)), settings:s }; _presetStore(); _presetLabel(i);
+    }catch(err){ _compStatus('pad '+(i+1)+': could not load file'); } };
+  r.readAsText(f);
+});
+_presetBuild(); _presetRestore();
 
 // ── climax-pop auto-set ──────────────────────────────────────────────────────
 // Running average of the live population (fed from the tank's mirrored count in the
