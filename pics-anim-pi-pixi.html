@@ -5750,104 +5750,122 @@ window.addEventListener('message', e => {
 // opaque, so nothing else would change. Scope: the flock sliders + the mixer faders
 // (never the op-row buttons). Built for the flock universe. Targets are expressed as
 // FRACTIONS of each slider's [min,max], so they adapt if a range changes.
-const _CONDUCT_POOL = [
-  'cohKSlider','sensingSlider','alignSlider','boltzRotSlider','speedSlider',
-  'targetSlider','childSlider','lifeSlider','fatalitySlider','divorceSlider','bondSlider',
-  'predatorSlider','predatorDietSlider','diseaseThreshSlider','imgScaleSlider','auraOpacitySlider','climaxPopSlider',
-  'sndMasterSlider','sndSpreadSlider','sndDiseaseSlider','sndPredSlider','sndClimaxSlider','sndThudSlider'
-];
-const _CONDUCT_HOME = { // neutral resting fraction each slider drifts toward when no movement claims it
-  cohKSlider:0.55, sensingSlider:0.50, alignSlider:0.35, boltzRotSlider:0.30, speedSlider:0.50,
-  targetSlider:0.45, childSlider:0.40, lifeSlider:0.60, fatalitySlider:0.22, divorceSlider:0.25, bondSlider:0.40,
-  predatorSlider:0.0, predatorDietSlider:0.45, diseaseThreshSlider:0.55, imgScaleSlider:0.12, auraOpacitySlider:0.42, climaxPopSlider:0.40,
-  sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.55, sndPredSlider:0.55, sndClimaxSlider:0.55, sndThudSlider:0.55
+// ── control model: CLOSED-LOOP. A movement sets a target POPULATION (a fraction of the user's own
+// target-pop slider, which the conductor leaves ALONE as the anchor) plus an artistic character
+// (sound emphasis, scatter, predators…). A PI controller then reads the ACTUAL population each tick
+// and drives the DEMOGRAPHIC sliders (breeding interval, bonding speed, lifespan, fatality, breed
+// distance, mate-finding coherence/sensing) with integral action, so the observed population is
+// actually steered onto the setpoint — not guessed at. The old open-loop version set the demographics
+// anti-natal and let the population collapse to a low equilibrium; integral action defeats that
+// steady-state offset. Sliders a movement claims in `art` override the controller for that scene.
+const _condDemoIds = ['childSlider','bondSlider','lifeSlider','fatalitySlider','breedDistSlider','singleSlider','sensingSlider','cohKSlider','divorceSlider','predatorSlider'];
+// [anti-natal fraction, pro-natal fraction] — the controller lerps between them by the growth drive.
+const _condDemo = {
+  childSlider:    [0.90, 0.00],  // pregnancy interval: slow → fastest
+  bondSlider:     [0.70, 0.00],  // hits to bond: reluctant → instant
+  lifeSlider:     [0.25, 1.00],  // lifespan: short → max
+  fatalitySlider: [0.70, 0.00],  // fatality: high → none
+  breedDistSlider:[0.20, 1.00],  // conceive distance: strict → generous
+  singleSlider:   [0.80, 0.00],  // % staying single: many → none (everyone pairs)
+  sensingSlider:  [0.20, 0.85],  // mate-finding radius: myopic → far-seeing
+  cohKSlider:     [0.30, 0.85],  // cohesion: loose → clustered (so they actually meet)
+  divorceSlider:  [0.60, 0.05],  // divorce rate: high → low
+  predatorSlider: [0.35, 0.00]   // predators thin the herd → none (a storm overrides this)
 };
-// shared movement palette (Drama picks reactively, Moods cycles). NB diseaseThreshSlider is
-// "hits to catch disease" → LOW = contagious; an epidemic still needs a seed, so the disruption
-// is a slider-driven die-off (fatality up, lifespan down), not a promised plague.
+const _condArtIds = ['boltzRotSlider','speedSlider','alignSlider','imgScaleSlider','auraOpacitySlider','predatorDietSlider','climaxPopSlider','popCeilSlider','sndMasterSlider','sndSpreadSlider','sndDiseaseSlider','sndPredSlider','sndClimaxSlider','sndThudSlider'];
+const _condArtHome = { // resting fractions for the non-demographic sliders
+  boltzRotSlider:0.25, speedSlider:0.5, alignSlider:0.35, imgScaleSlider:0.12, auraOpacitySlider:0.45,
+  predatorDietSlider:0.5, climaxPopSlider:0.4, popCeilSlider:0.0, // ceiling OFF so it never caps growth
+  sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.5, sndPredSlider:0.5, sndClimaxSlider:0.55, sndThudSlider:0.55
+};
+const _CONDUCT_POOL = _condDemoIds.concat(_condArtIds);
+// Movements: pop = desired population as a FRACTION of the user's target-pop; art = character overrides.
 const _CONDUCT_MOVES = {
-  awaken:   { label:'awakening',            hold:[22,34], t:{ cohKSlider:0.60, sensingSlider:0.55, boltzRotSlider:0.20, childSlider:0.32, lifeSlider:0.65, fatalitySlider:0.18, targetSlider:0.50, predatorSlider:0.0, diseaseThreshSlider:0.55, auraOpacitySlider:0.50, sndMasterSlider:0.85 } },
-  bloom:    { label:'blooming to a climax', hold:[26,42], t:{ cohKSlider:0.90, sensingSlider:0.72, boltzRotSlider:0.15, alignSlider:0.60, childSlider:0.24, lifeSlider:0.78, fatalitySlider:0.14, targetSlider:0.82, predatorSlider:0.0, diseaseThreshSlider:0.60, imgScaleSlider:0.30, auraOpacitySlider:0.85, climaxPopSlider:0.32, sndClimaxSlider:0.72, sndMasterSlider:0.95 } },
-  diaspora: { label:'the diaspora',         hold:[16,28], t:{ cohKSlider:0.02, sensingSlider:0.20, alignSlider:0.10, boltzRotSlider:0.80, speedSlider:0.70, imgScaleSlider:0.08, sndSpreadSlider:0.85, auraOpacitySlider:0.40, sndMasterSlider:0.88 } },
-  dieoff:   { label:'a die-off',            hold:[18,30], t:{ fatalitySlider:0.62, lifeSlider:0.28, childSlider:0.50, diseaseThreshSlider:0.10, predatorSlider:0.0, sndDiseaseSlider:0.70, sndThudSlider:0.80, sndMasterSlider:0.90 } },
-  predators:{ label:'a predator storm',     hold:[16,28], t:{ predatorSlider:0.72, predatorDietSlider:0.70, sensingSlider:0.50, cohKSlider:0.50, sndPredSlider:0.85, sndMasterSlider:0.92 } },
-  calm:     { label:'a calm',               hold:[24,38], t:{ cohKSlider:0.55, sensingSlider:0.50, boltzRotSlider:0.25, childSlider:0.40, lifeSlider:0.65, fatalitySlider:0.20, predatorSlider:0.0, diseaseThreshSlider:0.55, auraOpacitySlider:0.45, sndSpreadSlider:0.50, sndDiseaseSlider:0.40, sndPredSlider:0.40, sndClimaxSlider:0.50, sndThudSlider:0.55, sndMasterSlider:0.85 } }
+  awaken:   { label:'awakening',            pop:0.75, hold:[24,36], art:{ boltzRotSlider:0.20, auraOpacitySlider:0.5, sndMasterSlider:0.85, sndClimaxSlider:0.4, sndSpreadSlider:0.45 } },
+  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.12, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, climaxPopSlider:0.42, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35 } },
+  diaspora: { label:'the diaspora',         pop:0.60, hold:[16,26], art:{ cohKSlider:0.03, sensingSlider:0.25, alignSlider:0.10, boltzRotSlider:0.85, speedSlider:0.72, imgScaleSlider:0.08, sndSpreadSlider:0.95, auraOpacitySlider:0.35, sndMasterSlider:0.9 } },
+  dieoff:   { label:'a die-off',            pop:0.35, hold:[16,26], art:{ fatalitySlider:0.72, lifeSlider:0.28, boltzRotSlider:0.35, sndDiseaseSlider:0.75, sndThudSlider:0.9, sndMasterSlider:0.92 } },
+  predators:{ label:'a predator storm',     pop:0.55, hold:[16,26], art:{ predatorSlider:0.78, predatorDietSlider:0.75, cohKSlider:0.55, boltzRotSlider:0.35, sndPredSlider:0.92, sndMasterSlider:0.94 } },
+  calm:     { label:'a calm',               pop:0.85, hold:[26,40], art:{ boltzRotSlider:0.22, auraOpacitySlider:0.5, sndSpreadSlider:0.5, sndDiseaseSlider:0.4, sndPredSlider:0.4, sndClimaxSlider:0.5, sndThudSlider:0.5, sndMasterSlider:0.85 } }
 };
-let _condOn=false, _condRAF=0, _condActuate=0, _condHoldUntil=0, _condPaceMul=1, _condLabel='', _condSurvShown=false;
-const _condBaseTgt={}, _condCur={};
-// ── survival layer: the conductor must never let the population vanish, and should keep it in the
-// region of the target. Below ~40% of target it eases the DEMOGRAPHIC sliders toward these "safe"
-// fractions; by ~10% of target the takeover is full. Above that band, fluctuations are left to the
-// artistic movements (so a die-off / predator storm still bites, it just can't run to extinction).
-const _condSafe={ childSlider:0.15, lifeSlider:0.80, fatalitySlider:0.05, predatorSlider:0.0, cohKSlider:0.55, sensingSlider:0.55, boltzRotSlider:0.25, divorceSlider:0.15, targetSlider:0.50 };
-function _condSurvivalUrgency(){
-  if(!_popEMAready) return 0;                                // no live reading yet → let the art run
-  const target=parseFloat(document.getElementById('targetSlider').value)||300;
-  const pop=_condPop||0, safeLow=Math.max(50,target*0.40), crit=Math.max(18,target*0.10);
-  if(pop>=safeLow) return 0; if(pop<=crit) return 1; return (safeLow-pop)/(safeLow-crit);
-}
+const _condLethal = { fatalitySlider:1, predatorSlider:1, lifeSlider:1 }; // released to the controller if pop goes critical (safety veto)
+let _condOn=false, _condRAF=0, _condActuate=0, _condHoldUntil=0, _condPaceMul=1, _condLabel='';
+let _condInteg=0, _condPopFrac=0.75, _condArt={};
+const _condCur={};
 const _condPaceMap={ languid:1.6, measured:1.0, restless:0.6 };
 function _condRnd(a,b){ return a+Math.random()*(b-a); }
 function _condHoldFor(mv){ return _condRnd(mv.hold[0],mv.hold[1])*_condPaceMul; }
+function _condTargetPop(){ return parseFloat(document.getElementById('targetSlider').value)||300; } // the user's anchor
 function _condFracToVal(id, frac){ const el=document.getElementById(id); if(!el) return 0;
   const lo=parseFloat(el.min), hi=parseFloat(el.max); return lo+Math.max(0,Math.min(1,frac))*(hi-lo); }
 function _condSet(id, val){ const el=document.getElementById(id); if(!el) return;
   const lo=parseFloat(el.min), hi=parseFloat(el.max), st=parseFloat(el.step)||1;
   let v=Math.max(lo, Math.min(hi, val)); v=Math.round(v/st)*st;
   if(parseFloat(el.value)!==v){ el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); } } // same event the bridge + recorder use
+// growth drive [-1..1] from the population error (PI). Integral defeats the steady-state offset that
+// left the old version stuck far below target. +1 = breed as hard as possible, -1 = thin the herd.
+function _condDrive(){
+  if(!_popEMAready) return 1;                                  // no live reading yet → assume we must grow
+  const desired=_condPopFrac*_condTargetPop(), pop=_condPop||0, ref=Math.max(60,desired);
+  const err=(desired-pop)/ref;
+  _condInteg=Math.max(-1.3,Math.min(1.3,_condInteg+err*0.05));  // integral, with anti-windup clamp
+  return Math.max(-1,Math.min(1, err*1.6 + _condInteg));
+}
 const _conductorStyles = {
-  drama: { label:'Drama', _last:'', next(){ // reactive: (re)build → climax → a disruption → breathe
-    const pop=_condPop||0, ema=_popEMA||pop||1; let key;
-    if(pop<40) key='awaken';
-    else if(this._last==='awaken') key='bloom';
-    else if(this._last==='bloom') key=['dieoff','predators','diaspora'][Math.floor(Math.random()*3)];
+  drama: { label:'Drama', _last:'', next(){ // reactive: it WAITS for the population to actually reach a crowd before disrupting
+    const pf = _popEMAready ? (_condPop||0)/Math.max(1,_condTargetPop()) : 0;
+    let key;
+    if(pf<0.30) key='awaken';                                  // recover from a crash
+    else if(this._last==='awaken') key = pf>0.55 ? 'bloom' : 'awaken';   // climb once off the floor
+    else if(this._last==='bloom') key = pf>0.85 ? ['dieoff','predators','diaspora'][Math.floor(Math.random()*3)] : 'bloom'; // hold the climax until it truly arrives
     else if(this._last==='dieoff'||this._last==='predators'||this._last==='diaspora') key='calm';
-    else if(this._last==='calm') key=(pop<ema*0.7?'awaken':'bloom');
-    else key='awaken';
+    else key = pf<0.6 ? 'awaken' : 'bloom';
     this._last=key; const mv=_CONDUCT_MOVES[key];
-    return { label:mv.label, hold:_condHoldFor(mv), targets:mv.t };
+    return { label:mv.label, pop:mv.pop, hold:_condHoldFor(mv), art:mv.art };
   }},
-  zen: { label:'Zen', next(){ // gentle wander around a calm baseline, long holds
-    const t={}, pick=['cohKSlider','sensingSlider','boltzRotSlider','childSlider','imgScaleSlider','auraOpacitySlider'];
-    for(const id of pick){ const home=_CONDUCT_HOME[id]!==undefined?_CONDUCT_HOME[id]:0.4; t[id]=Math.max(0,Math.min(1, home+_condRnd(-0.18,0.18))); }
-    t.predatorSlider=0.0; t.diseaseThreshSlider=0.6; t.fatalitySlider=0.15; t.sndMasterSlider=0.82;
-    return { label:'drifting', hold:_condRnd(30,48)*_condPaceMul, targets:t };
+  zen: { label:'Zen', next(){ // a calm, coherent plateau with slow drift, no disruptions
+    const art={ boltzRotSlider:_condRnd(0.15,0.30), auraOpacitySlider:_condRnd(0.4,0.6), imgScaleSlider:_condRnd(0.08,0.20),
+      cohKSlider:_condRnd(0.6,0.85), sndMasterSlider:0.82, sndSpreadSlider:0.5, sndClimaxSlider:0.55 };
+    return { label:'drifting', pop:_condRnd(0.7,0.9), hold:_condRnd(34,52)*_condPaceMul, art };
   }},
   moods: { label:'Moods', _seq:['awaken','bloom','calm','diaspora','calm','dieoff','calm','predators'], _i:0, next(){
     const key=this._seq[this._i++ % this._seq.length], mv=_CONDUCT_MOVES[key];
-    return { label:mv.label, hold:_condHoldFor(mv), targets:mv.t };
+    return { label:mv.label, pop:mv.pop, hold:_condHoldFor(mv), art:mv.art };
   }}
 };
 function _condStatus(m){ const el=document.getElementById('conductorStatus'); if(el) el.textContent=m; }
 function _condStyle(){ return _conductorStyles[document.getElementById('conductorStyle').value] || _conductorStyles.drama; }
 function _condDecide(){
   const st=_condStyle(), g=st.next();
-  for(const id of _CONDUCT_POOL){ const home=_CONDUCT_HOME[id]; _condBaseTgt[id]=_condFracToVal(id, home!==undefined?home:0.4); } // unclaimed sliders ease home
-  for(const id in g.targets) if(_CONDUCT_POOL.indexOf(id)>=0) _condBaseTgt[id]=_condFracToVal(id, g.targets[id]);
+  _condPopFrac=g.pop; _condArt={};
+  for(const id in g.art) if(_CONDUCT_POOL.indexOf(id)>=0) _condArt[id]=_condFracToVal(id, g.art[id]);
   _condHoldUntil=performance.now()+g.hold*1000;
-  _condLabel='▮ '+st.label+' — '+g.label; _condSurvShown=false; _condStatus(_condLabel);
+  _condLabel='▮ '+st.label+' — '+g.label; _condStatus(_condLabel);
 }
 function _condTick(ts){
   if(!_condOn) return;
-  const u=_condSurvivalUrgency();
-  if(u>=1 && ts<_condHoldUntil-3000) _condHoldUntil=0;             // population critical → cut a killer scene short & re-decide (Drama then rebuilds)
   if(ts>=_condHoldUntil) _condDecide();
-  if((u>0.05)!==_condSurvShown){ _condSurvShown=u>0.05; _condStatus(_condLabel+(_condSurvShown?' · ⚕ sustaining the population':'')); }
   if(ts-_condActuate>=100){ // actuate at ~10 Hz: sliders still glide, but events/recordings stay sane
     _condActuate=ts;
-    const f=0.045/_condPaceMul; // per-step ease toward target (≈1.5 s half-life at "measured")
-    for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(!el || _condBaseTgt[id]===undefined) continue;
-      let tg=_condBaseTgt[id]; const safe=_condSafe[id];
-      if(u>0 && safe!==undefined) tg += (_condFracToVal(id,safe)-tg)*u;  // survival eases the demographic sliders toward safe values
+    const drive=_condDrive(), gmix=(drive+1)/2;      // 0 = anti-natal … 1 = pro-natal
+    const crit = _popEMAready && (_condPop||0) < Math.max(25, 0.18*_condTargetPop()); // safety veto near extinction
+    const f=0.05/_condPaceMul;                       // ease (~1.35 s half-life at "measured")
+    for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(!el) continue;
+      let tg;
+      if(_condArt[id]!==undefined && !(crit && _condLethal[id])) tg=_condArt[id];               // movement claims it (unless critical + lethal)
+      else if(_condDemo[id]){ const p=_condDemo[id]; tg=_condFracToVal(id, p[0]+(p[1]-p[0])*gmix); } // controller owns demographics
+      else tg=_condFracToVal(id, _condArtHome[id]!==undefined?_condArtHome[id]:0.4);            // else rest at home
       if(_condCur[id]===undefined) _condCur[id]=parseFloat(el.value);
       _condCur[id]+=(tg-_condCur[id])*f; _condSet(id, _condCur[id]);
     }
+    if(_popEMAready){ const desired=Math.round(_condPopFrac*_condTargetPop());
+      _condStatus(_condLabel+' · pop '+(_condPop||0)+'/'+desired+(drive>0.5?' ↑ breeding hard':drive<-0.4?' ↓ thinning':'')); }
   }
   _condRAF=requestAnimationFrame(_condTick);
 }
 function _condStart(){
   if(_condOn) return;
-  _condOn=true; _condActuate=0; _condHoldUntil=0;
+  _condOn=true; _condActuate=0; _condHoldUntil=0; _condInteg=0;
   for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(el) _condCur[id]=parseFloat(el.value); } // seed from current
   _condDecide();
   _condRAF=requestAnimationFrame(_condTick);
