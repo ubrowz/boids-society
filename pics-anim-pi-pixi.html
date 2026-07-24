@@ -1892,6 +1892,20 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <button id="bodyImgFClear" title="Clear the female image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgFName" class="mini-note">0 imgs</span>
 </div>
+<div class="ctrl-row flock-only">
+<label title="Male images that always render upright, regardless of the Upright toggle.">♂ upright</label>
+<input type="file" id="bodyImgMUFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgMUBtn" title="Add one or more PNGs to the male pool that ALWAYS stay upright (ignore the Upright toggle)" class="mini-btn">add ↑</button>
+<button id="bodyImgMUClear" title="Clear the male always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgMUName" class="mini-note">0 imgs</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Female images that always render upright, regardless of the Upright toggle.">♀ upright</label>
+<input type="file" id="bodyImgFUFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgFUBtn" title="Add one or more PNGs to the female pool that ALWAYS stay upright (ignore the Upright toggle)" class="mini-btn">add ↑</button>
+<button id="bodyImgFUClear" title="Clear the female always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgFUName" class="mini-note">0 imgs</span>
+</div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
 <input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
@@ -1956,6 +1970,8 @@ let IMG_SCALE   = parseFloat(document.getElementById('imgScaleSlider').value)||1
 let _customBoidPNG = null;   // data URL of shared body image (predators + fallback), or null
 const _poolPNG_M = [];       // male image data URLs   (baked into exports, bridged to tank)
 const _poolPNG_F = [];       // female image data URLs
+const _poolPNG_MU = [];      // male   "always upright" image data URLs — ignore the Upright toggle
+const _poolPNG_FU = [];      // female "always upright" image data URLs
 
 
 // ── slider state ──────────────────────────────────────────────────────────────
@@ -2218,9 +2234,10 @@ if(HUNT_MODE === 'lock'){
 // Shared image = predators + fallback for a sex with an empty pool (single).
 // Per-sex pools = arrays of data URLs; a boid picks one at birth (see drawBoid).
 function applyBodySharedPNG(dataURL){ _customBoidPNG=dataURL; _recomputeTextures(); }
-function addBodyPoolPNG(sex, dataURL){ (sex==='M'?_poolPNG_M:_poolPNG_F).push(dataURL); _recomputeTextures(); }
-function clearBodyPool(sex){ (sex==='M'?_poolPNG_M:_poolPNG_F).length=0; _recomputeTextures(); }
-function _poolCount(sex){ return (sex==='M'?_poolPNG_M:_poolPNG_F).length; }
+function _poolArr(sex, upright){ return upright ? (sex==='M'?_poolPNG_MU:_poolPNG_FU) : (sex==='M'?_poolPNG_M:_poolPNG_F); }
+function addBodyPoolPNG(sex, dataURL, upright){ _poolArr(sex,upright).push(dataURL); _recomputeTextures(); }
+function clearBodyPool(sex, upright){ _poolArr(sex,upright).length=0; _recomputeTextures(); }
+function _poolCount(sex, upright){ return _poolArr(sex,upright).length; }
 
 // Shared single picker
 document.getElementById('bodyImgBtn').addEventListener('click', () => document.getElementById('bodyImgFile').click());
@@ -2236,16 +2253,16 @@ r.readAsDataURL(file); e.target.value='';
 });
 
 // Per-sex multi-image pools (add + clear)
-function _wirePool(sex, btnId, fileId, clearId, countId){
-const setCount=()=>{ document.getElementById(countId).textContent=_poolCount(sex)+' imgs'; };
+function _wirePool(sex, upright, btnId, fileId, clearId, countId){
+const setCount=()=>{ document.getElementById(countId).textContent=_poolCount(sex,upright)+' imgs'; };
 document.getElementById(btnId).addEventListener('click', () => document.getElementById(fileId).click());
 document.getElementById(fileId).addEventListener('change', e => {
   const files=[...e.target.files]; if(!files.length) return;
   for(const file of files){
     const r=new FileReader();
     r.onload=ev=>{
-      addBodyPoolPNG(sex, ev.target.result);
-      if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:sex,data:ev.target.result});
+      addBodyPoolPNG(sex, ev.target.result, upright);
+      if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:sex,data:ev.target.result,upright});
       setCount();
     };
     r.readAsDataURL(file);
@@ -2253,13 +2270,15 @@ document.getElementById(fileId).addEventListener('change', e => {
   e.target.value=''; // let the same files be picked again later
 });
 document.getElementById(clearId).addEventListener('click', () => {
-  clearBodyPool(sex);
-  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyclear',slot:sex});
+  clearBodyPool(sex, upright);
+  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyclear',slot:sex,upright});
   setCount();
 });
 }
-_wirePool('M','bodyImgMBtn','bodyImgMFile','bodyImgMClear','bodyImgMName');
-_wirePool('F','bodyImgFBtn','bodyImgFFile','bodyImgFClear','bodyImgFName');
+_wirePool('M', false, 'bodyImgMBtn','bodyImgMFile','bodyImgMClear','bodyImgMName');
+_wirePool('F', false, 'bodyImgFBtn','bodyImgFFile','bodyImgFClear','bodyImgFName');
+_wirePool('M', true,  'bodyImgMUBtn','bodyImgMUFile','bodyImgMUClear','bodyImgMUName');
+_wirePool('F', true,  'bodyImgFUBtn','bodyImgFUFile','bodyImgFUClear','bodyImgFUName');
 document.getElementById('noseOffsetInput').addEventListener('input', e => {
 const v = parseFloat(e.target.value);
 if(v > 0) _noseOffset = v;
@@ -2605,9 +2624,9 @@ else {
 }
 // Rebuild a texture pool from its data-URL array. Append order is preserved, so
 // a boid's stored imgIdx keeps pointing at the same image across rebuilds.
-function _rebuildPool(pool, urls){
-pool.length=0;
-for(const u of urls){ const e={tex:_defaultTex, data:u}; _loadTex(u, t=>{ e.tex=t; }); pool.push(e); }
+function _rebuildPool(pool, urls, upright, append){
+if(!append) pool.length=0;
+for(const u of urls){ const e={tex:_defaultTex, data:u, upright:!!upright}; _loadTex(u, t=>{ e.tex=t; }); pool.push(e); }
 }
 // Resolve textures from the current data URLs. Boid sprites are pooled and
 // reused, so drawBoid selects each boid's pool texture per frame; predators use
@@ -2616,8 +2635,8 @@ function _recomputeTextures(){
 if(RUN_MODE==='dash') return; // dashboard keeps data URLs only (for export + bridge)
 if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _sharedTex=t; _predTex=t; });
 else { _sharedTex=_defaultTex; _predTex=_defaultTex; }
-_rebuildPool(_boidPoolM, _poolPNG_M);
-_rebuildPool(_boidPoolF, _poolPNG_F);
+_rebuildPool(_boidPoolM, _poolPNG_M, false, false); _rebuildPool(_boidPoolM, _poolPNG_MU, true, true); // normal images then the always-upright ones, tagged
+_rebuildPool(_boidPoolF, _poolPNG_F, false, false); _rebuildPool(_boidPoolF, _poolPNG_FU, true, true);
 }
 // Image assignment: prefer the least-used image in the sex's pool so a small set of
 // uploaded images spreads evenly instead of clumping by chance. Counts only living
@@ -3914,18 +3933,19 @@ const spr=_getBodySprite(_spriteCount++);
 // per-sex image pool: each boid picks one image at birth (lazily on first draw,
 // same frame it appears) via imgIdx and keeps it for life; empty pool → shared/default
 const _pool = boid.sex==='M' ? _boidPoolM : _boidPoolF;
-let _bt;
+let _bt, _forceUpright=false;
 if(_pool.length){
   if(boid.imgIdx===undefined || boid.imgIdx<0 || boid.imgIdx>=_pool.length)
     boid.imgIdx = _pickLeastUsedImg(boid.sex, _pool.length);
-  _bt = _pool[boid.imgIdx].tex;
+  const _e = _pool[boid.imgIdx];
+  _bt = _e.tex; _forceUpright = _e.upright; // images from the "always upright" uploads ignore the toggle
 } else {
   _bt = _sharedTex || _defaultTex;
 }
 if(spr.texture!==_bt) spr.texture=_bt;
 spr.visible=true;
 spr.x=bx; spr.y=by;
-spr.rotation=UPRIGHT_SPRITE ? 0 : boid._drawAngle;
+spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? 0 : boid._drawAngle;
 spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale*IMG_SCALE); // _bodyScale calibration × user image-scale slider
@@ -4450,7 +4470,24 @@ function _sndInit(){
   spreadLp.connect(spreadGain); spreadGain.connect(bus);
   const mkS=(det)=>{ const o=_ac.createOscillator(); o.type='triangle'; o.frequency.value=_midiHz(62); o.detune.value=det; o.connect(spreadLp); o.start(); return o; };
   const spreadA=mkS(-4), spreadB=mkS(0), spreadC=mkS(4); // start in unison D4 (tiny detune = gentle chorus even when clumped)
-  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain,spreadA,spreadB,spreadC,spreadLp,spreadGain};
+  // ── differentiation hush: while DIFF_MODE is on, the whole society ducks to silence and this serene
+  // pad takes over (cells frozen, committing to a fate). Routed straight to MASTER (+ a reverb send),
+  // so the bus-duck that silences every normal layer never touches it — but the master fader still does.
+  // A D "suspended/add9" open voicing (D–A–D + high E, no third): luminous, neither major nor minor —
+  // fitting for cells suspended mid-decision. Slow chorus + filter drift so it breathes, not a dead drone.
+  const diffLp=_ac.createBiquadFilter(); diffLp.type='lowpass'; diffLp.frequency.value=1500; diffLp.Q.value=0.5;
+  const diffGain=_ac.createGain(); diffGain.gain.value=0; // crossfaded in _sndUpdate on the DIFF toggle
+  diffLp.connect(diffGain); diffGain.connect(master); diffGain.connect(conv); // dry to master + a send to the reverb for air
+  const diffVib=_ac.createOscillator(); diffVib.type='sine'; diffVib.frequency.value=0.13;
+  const diffVibD=_ac.createGain(); diffVibD.gain.value=6; diffVib.connect(diffVibD); diffVib.start();     // gentle chorus drift
+  const diffDrift=_ac.createOscillator(); diffDrift.type='sine'; diffDrift.frequency.value=0.05;
+  const diffDriftD=_ac.createGain(); diffDriftD.gain.value=550; diffDrift.connect(diffDriftD); diffDriftD.connect(diffLp.frequency); diffDrift.start(); // slow filter breathing
+  for(const dn of [[50,0.5,'sine'],[62,0.32,'triangle'],[69,0.30,'triangle'],[74,0.24,'triangle'],[76,0.18,'sine']]){ // D3 D4 A4 D5 + E5 (add9)
+    const o=_ac.createOscillator(); o.type=dn[2]; o.frequency.value=_midiHz(dn[0]); o.detune.value=(Math.random()*8-4);
+    diffVibD.connect(o.detune);
+    const og=_ac.createGain(); og.gain.value=dn[1]; o.connect(og); og.connect(diffLp); o.start();
+  }
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain,spreadA,spreadB,spreadC,spreadLp,spreadGain,diffGain};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -4651,6 +4688,10 @@ function _sndUpdate(){
   if(!_ac||!_snd) return;
   const t=_ac.currentTime;
   _snd.master.gain.setTargetAtTime(SOUND_ON?1.2*_SND_MASTER:0, t, 0.3); // 1.2 = reference; master fader scales the whole mix
+  // differentiation hush: DIFF_MODE ducks EVERY normal layer at the bus and swells the serene pad instead
+  const diffOn = (typeof DIFF_MODE!=='undefined' && DIFF_MODE) ? 1 : 0;
+  _snd.bus.gain.setTargetAtTime(diffOn?0:1, t, 0.6);                        // silence the whole society…
+  if(_snd.diffGain) _snd.diffGain.gain.setTargetAtTime(diffOn?0.6:0, t, 1.2); // …and reveal the differentiation pad (gentle swell)
   if(!SOUND_ON||_ac.state!=='running') return;
   let living=0,bonded=0,infected=0;
   let sumX=0,sumY=0,sumX2=0,sumY2=0; // for the flock-spread metric (centroid variance) — folded in free, no extra pass
@@ -4706,14 +4747,15 @@ function _sndUpdate(){
       const mx=sumX/living, my=sumY/living;
       const varSum=Math.max(0,(sumX2+sumY2)/living-(mx*mx+my*my)); // Var(x)+Var(y), from the folded sums — no pairwise cost
       const diag=Math.hypot(canvas.width,canvas.height)||1400;
-      const raw=Math.min(1, Math.sqrt(varSum)/(0.28*diag));         // RMS distance from centroid, normalised to the tank
-      _flockSpread += (raw-_flockSpread)*0.1;                       // smooth the frame-to-frame jitter → the slow trend
+      let raw=Math.sqrt(varSum)/(0.22*diag);                       // RMS distance from centroid, normalised to the tank (more sensitive)
+      raw=Math.min(1, Math.pow(Math.max(0,raw),0.8));              // gentle curve so mid-range spreads register clearly
+      _flockSpread += (raw-_flockSpread)*0.12;                     // smooth the frame-to-frame jitter → the slow trend
       const s=_flockSpread;
       _snd.spreadA.frequency.setTargetAtTime(_midiHz(62),      t, 0.5); // root D4 anchor
       _snd.spreadB.frequency.setTargetAtTime(_midiHz(62+7*s),  t, 0.5); // clumped: unison → dispersed: opens toward the fifth (A4)
       _snd.spreadC.frequency.setTargetAtTime(_midiHz(62+12*s), t, 0.5); // …and toward the octave (D5) — sweeping the pentatonic
-      _snd.spreadLp.frequency.setTargetAtTime(1200+1600*s, t, 0.6);     // brightens as it opens
-      _snd.spreadGain.gain.setTargetAtTime(0.05*_SND_SPREAD*2, t, 0.5);
+      _snd.spreadLp.frequency.setTargetAtTime(1000+2800*s, t, 0.6);     // opens much brighter as it disperses
+      _snd.spreadGain.gain.setTargetAtTime((0.05+0.11*s)*_SND_SPREAD*2, t, 0.5); // and SWELLS with dispersion — clumped soft (hides under the drone), dispersed prominent
     } else _snd.spreadGain.gain.setTargetAtTime(0, t, 0.5);         // no flock → silent
   }
 }
@@ -5484,6 +5526,8 @@ BOND_TURN_RAMP    = ${BOND_TURN_RAMP};
 ${_customBoidPNG ? `_customBoidPNG = ${JSON.stringify(_customBoidPNG)};` : '// no shared body image'}
 _poolPNG_M.length=0; _poolPNG_M.push(...${JSON.stringify(_poolPNG_M)});
 _poolPNG_F.length=0; _poolPNG_F.push(...${JSON.stringify(_poolPNG_F)});
+_poolPNG_MU.length=0; _poolPNG_MU.push(...${JSON.stringify(_poolPNG_MU)});
+_poolPNG_FU.length=0; _poolPNG_FU.push(...${JSON.stringify(_poolPNG_FU)});
 _recomputeTextures();
 window.addEventListener('resize', resize);
 resize();
@@ -5946,10 +5990,10 @@ window.addEventListener('message', e => {
       if(SIM_MODE==='astro') astroSeed(); else startSim();
     }
   } else if(m.t==='bodyimg'){
-    if(m.slot==='M'||m.slot==='F') addBodyPoolPNG(m.slot, m.data);
+    if(m.slot==='M'||m.slot==='F') addBodyPoolPNG(m.slot, m.data, m.upright);
     else applyBodySharedPNG(m.data);
   } else if(m.t==='bodyclear'){
-    clearBodyPool(m.slot);
+    clearBodyPool(m.slot, m.upright);
   }
 });
 }
