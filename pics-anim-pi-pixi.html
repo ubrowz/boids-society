@@ -5267,7 +5267,7 @@ if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch
 if(_fpsEl){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
-  _fpsEl.innerHTML=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+_sndHint();
+  _fpsEl.innerHTML=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')+_sndHint();
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
 
@@ -5635,14 +5635,16 @@ let _compPlayIdx=0, _compPlayT0=0, _compRAF=0;
 const _compStatusEl=document.getElementById('compStatus');
 function _compStatus(m){ if(_compStatusEl) _compStatusEl.textContent=m; }
 function _compRecBtnSync(){ const b=document.getElementById('recBtn'); if(b){ b.classList.toggle('recording',_compRec); b.title=_compRec?'Stop recording the composition':'Composition: record all slider & toggle moves over time as a replayable piece. Click to start, click again to stop.'; } }
-function _compStopAll(){ _compRec=false; _compPlaying=false; if(_compRAF){ cancelAnimationFrame(_compRAF); _compRAF=0; } _compRecBtnSync(); }
+let _compTimer=0;
+function _compStopAll(){ _compRec=false; _compPlaying=false; if(_compRAF){ cancelAnimationFrame(_compRAF); _compRAF=0; } if(_compTimer){ clearInterval(_compTimer); _compTimer=0; } _compRecBtnSync(); }
 function _compRecStart(){
   _compStopAll();
   _compInitial=_gatherSettings(); _compEvents=[]; _compT0=performance.now(); _compRec=true;
-  _compRecBtnSync(); _compStatus('● recording…');
+  _compRecBtnSync(); _compStatus('● recording… 0.0s');
+  _compTimer=setInterval(()=>{ if(_compRec) _compStatus('● recording… '+_fmtSecs((performance.now()-_compT0)/1000)); }, 150); // live recording counter
 }
 function _compRecStop(){
-  _compRec=false; _compRecBtnSync();
+  _compRec=false; if(_compTimer){ clearInterval(_compTimer); _compTimer=0; } _compRecBtnSync();
   _composition={ app:'boid-composition', v:1, initial:_compInitial, events:_compEvents.slice() };
   const dur=_compEvents.length?_compEvents[_compEvents.length-1].t/1000:0;
   _compStatus(`recorded ${_compEvents.length} events · ${dur.toFixed(1)}s · 📦 export loops it`);
@@ -5753,6 +5755,7 @@ const _pyCtx = document.getElementById('popPyramid').getContext('2d');
 window.addEventListener('message', e => {
   const m=e.data;
   if(!m || m.boid!==1 || e.source!==tankWin) return;
+  if(m.t==='comp-time'){ if(_compPlaying) _compStatus('▶ playing… '+_fmtSecs(m.s)); return; } // playback counter mirrored from the tank (resets each loop)
   if(m.t==='comp-done'){ _compPlaying=false; _compStatus('▮ composition finished'); return; }
   if(m.t==='status'){
     const s=m.s;
@@ -5944,7 +5947,8 @@ setInterval(()=>{
 // the visible/foreground context — the tank window, or a standalone export — so its rAF keeps
 // running. (This is why playback lives here, not on the often-hidden dashboard, whose rAF the
 // browser pauses when it's behind the tank, which used to stall playback.)
-let _tcOn=false, _tcComp=null, _tcIdx=0, _tcT0=0, _tcLoop=false;
+let _tcOn=false, _tcComp=null, _tcIdx=0, _tcT0=0, _tcLoop=false, _tcLastPost=0;
+function _fmtSecs(s){ return s<60 ? s.toFixed(1)+'s' : Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); } // shared by the recording + playback counters
 function _tcFire(ev){
   const el=document.getElementById(ev.id); if(!el) return;
   if(ev.k==='i'){ el.value=ev.v; el.dispatchEvent(new Event('input',{bubbles:true})); }
@@ -5953,6 +5957,7 @@ function _tcFire(ev){
 function _tcTick(){
   if(!_tcOn) return;
   const el=performance.now()-_tcT0, evs=_tcComp.events;
+  if(window.opener && performance.now()-_tcLastPost>200){ _tcLastPost=performance.now(); try{ window.opener.postMessage({boid:1,t:'comp-time',s:el/1000},'*'); }catch(e){} } // mirror the playback clock to the dashboard
   while(_tcIdx<evs.length && evs[_tcIdx].t<=el){ _tcFire(evs[_tcIdx]); _tcIdx++; }
   if(_tcIdx>=evs.length){
     if(_tcLoop){ _tcIdx=0; if(_tcComp.initial) _applySettings(_tcComp.initial); _tcT0=performance.now(); } // loop the piece (kiosk)
