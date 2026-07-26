@@ -1335,7 +1335,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <div id="dbGrid">
 
 <section class="panel flock-only" id="statusPanel">
-<h2>Live status</h2>
+<h2>Live status <button id="statusResetBtn" class="mini-btn" title="Reset the WHOLE dashboard (every slider + toggle) to its starting values and clear the live readouts. The readouts also reset automatically when the aquarium is closed." style="vertical-align:middle;margin-left:8px;">reset all</button></h2>
 <div id="statusGrid">
   <div class="stat-block">
     <div id="popRow"><span id="popSpan" class="val">—</span><span id="popUnit">boids</span></div>
@@ -1966,7 +1966,8 @@ const _lockedBoidIds = new Set(); // boid IDs currently locked by a predator; re
 // ── body image calibration (user-adjustable) ──────────────────────────────────
 let _noseOffset = 32;   // pixels from image centre to nose tip (teardrop-v3: pixel 72, anchor 40 → 32)
 let _bodyScale  = 13;   // body-radius calibration: spr.scale = r/_bodyScale
-let IMG_SCALE   = parseFloat(document.getElementById('imgScaleSlider').value)||1; // user size multiplier on loaded images
+let IMG_SCALE   = parseFloat(document.getElementById('imgScaleSlider').value)||1; // user size multiplier on loaded images (the TARGET, set instantly by the slider)
+let _imgScaleShown = IMG_SCALE; // displayed size, eased toward IMG_SCALE each frame so slider moves glide instead of jumping
 let _customBoidPNG = null;   // data URL of shared body image (predators + fallback), or null
 const _poolPNG_M = [];       // male image data URLs   (baked into exports, bridged to tank)
 const _poolPNG_F = [];       // female image data URLs
@@ -3948,7 +3949,7 @@ spr.x=bx; spr.y=by;
 spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? 0 : boid._drawAngle;
 spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
 spr.alpha=baseAlpha;
-spr.scale.set(r/_bodyScale*IMG_SCALE); // _bodyScale calibration × user image-scale slider
+spr.scale.set(r/_bodyScale*_imgScaleShown); // _bodyScale calibration × user image-scale slider (eased so size changes glide)
 // true on-screen half-extent of THIS boid's image (px) — pool images can differ in
 // pixel size, so the depth layering measures each boid's real footprint, not a constant
 boid._visR = 0.5 * Math.max(spr.texture.width, spr.texture.height) * spr.scale.x;
@@ -3957,7 +3958,7 @@ if(boid._visR > _maxVisR) _maxVisR = boid._visR;
 // decorations (tail, beak, eyes, disease spot) attach to the rendered body, so they
 // track the image-scale slider too — otherwise they detach when the body is resized.
 // At IMG_SCALE=1 rDeco===r, so the default view is unchanged.
-const rDeco = r * IMG_SCALE;
+const rDeco = r * _imgScaleShown;
 
 // ── forked tail fin (drawn in _gfx.tails, below the sprite so it peeks out behind) ──
 // Sprite tail tip is at (35/13)*r ≈ 2.69r behind boid centre.
@@ -5263,6 +5264,7 @@ simClock+=dt;
 if(++_sndTick>=6){ _sndTick=0; _sndUpdate(); } // sonification mappings at ~5 Hz (both modes)
 _sndPredSchedule(); // predator ostinato needs per-frame look-ahead scheduling for a steady beat
 if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch (rafId already queued)
+_imgScaleShown += (IMG_SCALE-_imgScaleShown)*0.16; // ease boid size toward the slider value (~0.3 s glide, one scalar/frame — no Pi cost)
 // Overlay: live boid count + preferred colour family
 if(_fpsEl){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
@@ -5930,14 +5932,34 @@ document.getElementById('conductorPace').addEventListener('change',e=>{ _condPac
 document.getElementById('conductorStyle').addEventListener('change',()=>{ if(_condOn){ _condHoldUntil=0; _condStatus('style → '+_condStyle().label); } }); // switch takes effect on the next movement
 
 // link indicator: green while the tank tab is alive
+// Clear the Live-status readouts back to placeholders (called when the tank dies, so stale
+// numbers don't linger — e.g. after killing the aquarium and loading a new settings file).
+function _resetLiveStatus(){
+  for(const id of _MIRROR_IDS){ const el=document.getElementById(id); if(el){ el.textContent='—'; el.style.color=''; } }
+  const nf=document.getElementById('nearFill'); if(nf) nf.style.width='0%';
+  const lf=document.getElementById('lifeFill'); if(lf) lf.style.width='0%';
+  const iw=document.getElementById('inbreedingWarn'); if(iw) iw.style.display='none';
+  const av=document.getElementById('climaxAutoVal'); if(av) av.textContent='no pop yet';
+  _popEMA=0; _popEMAready=false; _condPop=0; // running averages are stale once the tank is gone
+}
+const _defaultSettings = _gatherSettings(); // starting values, snapshotted at load (before any user change)
+function _resetDashboard(){ // manual "reset all": restore every slider + toggle to default AND clear the readouts
+  if(!confirm('Reset the whole dashboard to its starting values? Your current settings will be lost.')) return;
+  if(typeof _condStop==='function') _condStop(); // stop the AI conductor — it would instantly override the reset
+  _applySettings(_defaultSettings);              // restore all controls (also forwarded to the tank if open)
+  _resetLiveStatus();
+}
+document.getElementById('statusResetBtn').addEventListener('click', _resetDashboard);
+let _tankWasAlive=false;
 setInterval(()=>{
   const dot=document.getElementById('linkDot'), lbl=document.getElementById('linkLabel');
-  if(_tankAlive()){ dot.style.color='#0be881'; }
+  if(_tankAlive()){ dot.style.color='#0be881'; _tankWasAlive=true; }
   else {
     dot.style.color='#4a5b6b';
     lbl.textContent='no aquarium open';
     playBtn.innerHTML='&#9654;'; playBtn.classList.remove('running');
     document.getElementById('noTankHint').style.display='';
+    if(_tankWasAlive){ _resetLiveStatus(); _tankWasAlive=false; } // tank just died → clear stale readouts once
   }
 }, 800);
 }
