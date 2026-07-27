@@ -1477,6 +1477,11 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <input type="range" id="canonOctSlider" min="-24" max="24" value="12" step="12">
     <span class="ctrl-val" id="canonOctVal">+1 oct</span>
   </div>
+  <div class="ctrl-row">
+    <label title="Independent tempo for the lead + canon — a multiplier on top of the speed-slider tie. 1.0× keeps the current feel; higher is faster, lower is slower, at any speed. Lets you set the melody's pace without touching the flock's speed.">lead tempo</label>
+    <input type="range" id="tempoSlider" min="25" max="400" value="100" step="5">
+    <span class="ctrl-val" id="tempoVal">1.0×</span>
+  </div>
 </div>
 </section>
 
@@ -2349,6 +2354,7 @@ wire('sndLeadSlider','sndLeadVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_L
 wire('sndCanonSlider','sndCanonVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CANON=v; });
 wire('leadOctSlider','leadOctVal',     v=>parseInt(v), v=>{ const o=parseInt(v)/12; return (o>0?'+':'')+o+' oct'; }, v=>{ _LEAD_OCT=v; });
 wire('canonOctSlider','canonOctVal',   v=>parseInt(v), v=>{ const o=parseInt(v)/12; return (o>0?'+':'')+o+' oct'; }, v=>{ _LEAD_CANON_OCT=v; });
+wire('tempoSlider','tempoVal',         v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(1)+'×', v=>{ _LEAD_TEMPO=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
@@ -4348,6 +4354,7 @@ let _SND_LEAD =parseInt(document.getElementById('sndLeadSlider').value)/100;
 let _SND_CANON =parseInt(document.getElementById('sndCanonSlider').value)/100; // canon voice level (second lead, one bar behind)
 let _LEAD_OCT =parseInt(document.getElementById('leadOctSlider').value)||0; // lead melody transpose, in semitones (octave steps)
 let _LEAD_CANON_OCT =parseInt(document.getElementById('canonOctSlider').value); // canon transpose ABOVE the lead, in semitones (+12 = classic canon at the octave)
+let _LEAD_TEMPO =parseInt(document.getElementById('tempoSlider').value)/100; // independent tempo multiplier on the lead+canon (1 = neutral), layered over the speed tie
 let _flockSpread=0; // smoothed flock-dispersion metric (0 clumped … 1 spread across the tank)
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
@@ -4698,8 +4705,8 @@ const _LEAD_PATTS = [ // eight eighth-notes per bar; indices into the 4-note bro
 ];
 const _LEAD_BEAT=0.25, _LEAD_SPB=8, _LEAD_BARS=8;          // eighth-note interval (at reference speed); steps/bar; bars
 const _LEAD_SPEED_REF=9*0.45;                              // SPEED at the default speed slider (9) → tempo == _LEAD_BEAT there, so the default feel is unchanged
-function _leadBeat(){                                      // live eighth-note interval — faster society, faster arpeggio
-  return Math.max(0.15, Math.min(0.55, _LEAD_BEAT*Math.pow(_LEAD_SPEED_REF/Math.max(0.3,SPEED), 0.7)));
+function _leadBeat(){                                      // live eighth-note interval — faster society, faster arpeggio, scaled by the manual tempo knob
+  return Math.max(0.09, Math.min(0.90, _LEAD_BEAT*Math.pow(_LEAD_SPEED_REF/Math.max(0.3,SPEED), 0.7)/Math.max(0.25,_LEAD_TEMPO)));
 }
 const _LEAD_PLAY=_LEAD_BARS*_LEAD_SPB, _LEAD_CYCLE=_LEAD_PLAY+16; // 64 sung steps + a 2-bar breath = 80
 let _leadNextT=0, _leadStep=0, _leadPatt=0;
@@ -5672,6 +5679,7 @@ _SND_LEAD       = ${_SND_LEAD};
 _SND_CANON      = ${_SND_CANON};
 _LEAD_OCT       = ${_LEAD_OCT};
 _LEAD_CANON_OCT = ${_LEAD_CANON_OCT};
+_LEAD_TEMPO     = ${_LEAD_TEMPO};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
