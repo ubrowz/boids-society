@@ -1314,6 +1314,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
   <div id="dbActions">
     <button id="astroModeBtn" title="Switch between Active Matter (flocking) and Astro (gravitational N-body)">✦ Astro</button>
     <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
+    <button id="popoutBtn" title="Open the live tank as a tall canvas-only strip filling the screen height">pop-out canvas ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
     <span class="hsep"></span>
     <button id="soundBtn" class="hbtn" title="Play sound — sonification of the tank (drone, colour chord, climax shimmer, event chimes). Tap the tank once to unlock audio.">🔇</button>
@@ -5518,7 +5519,7 @@ if(_statusThrottle >= 5){ _statusThrottle=0; updateStatus(); if(RUN_MODE==='tank
 // Build a fullscreen simulation document from the live DOM.
 // runMode 'standalone' → Pi kiosk export (auto-disease, no bridge)
 // runMode 'tank'       → the "open aquarium" tab (bridged to this dashboard)
-function buildStandaloneHTML(runMode){
+function buildStandaloneHTML(runMode, clean){
 // Sync current slider positions → HTML attributes so outerHTML captures them
 document.querySelectorAll('input[type="range"]').forEach(el => el.setAttribute('value', el.value));
 
@@ -5534,7 +5535,7 @@ const exportCSS = `<script>window.__RUNMODE=${JSON.stringify(runMode)};<\/script
 #ui { display:none !important; }
 body { margin:0 !important; padding:0 !important; overflow:hidden !important; background:#050e18 !important; }
 canvas#c { position:fixed !important; top:0 !important; left:0 !important; display:block !important; }
-#fpsDisplay { display:block !important; }
+#fpsDisplay { display:${clean ? 'none' : 'block'} !important; }
 </style>`;
 html = html.replace('<head>', '<head>\n' + exportCSS);
 
@@ -5708,15 +5709,25 @@ let tankWin = null;
 function _tankAlive(){ return !!(tankWin && !tankWin.closed); }
 function _tankSend(m){ if(_tankAlive()) try{ tankWin.postMessage(m,'*'); }catch(e){} }
 
-function openAquarium(){
+function openAquarium(opts){
+opts = opts || {};
 if(_tankAlive()){ tankWin.focus(); return; }
-const html = buildStandaloneHTML('tank');
+const html = buildStandaloneHTML('tank', opts.clean); // opts.clean → hide the fps overlay (canvas-only strip)
+// opts.strip → open a tall 6:1 popup WINDOW (no tabs/bookmarks) maximised to the screen height,
+// instead of a full-chrome tab. Same live-bridged tank either way (single tankWin slot).
+let features = '';
+if(opts.strip){
+  const h = screen.availHeight;
+  const w = Math.round(h * 32 / 192);                          // aspect 192(h) × 32(w) = 6:1
+  const left = Math.max(0, Math.round((screen.availWidth - w) / 2)); // centered horizontally
+  features = `width=${w},height=${h},left=${left},top=0,menubar=no,toolbar=no,location=no,status=no`;
+}
 // Unique window name per call. A FIXED name ('boidAquarium') could silently target
 // a leftover aquarium tab from an earlier (reloaded) dashboard session whose opener
 // is now stale — the browser then spawns an orphaned blank tab while the sim loads
 // into the wrong window. _tankAlive() still dedups within the current session via the
 // tankWin reference, so this never opens two tanks for one live dashboard.
-tankWin = window.open('about:blank','boidAquarium_'+Date.now());
+tankWin = window.open('about:blank','boidAquarium_'+Date.now(), features);
 if(!tankWin){ alert('The browser blocked the aquarium pop-up — allow pop-ups for this page and try again.'); return; }
 tankWin.document.open();
 tankWin.document.write(html);
@@ -5724,7 +5735,8 @@ tankWin.document.close();
 }
 
 if(RUN_MODE==='dash'){
-document.getElementById('aquariumBtn').addEventListener('click', openAquarium);
+document.getElementById('aquariumBtn').addEventListener('click', ()=>openAquarium());
+document.getElementById('popoutBtn').addEventListener('click', ()=>openAquarium({strip:true, clean:true}));
 
 // forward every slider / colour / number change to the tank
 document.addEventListener('input', e => {
