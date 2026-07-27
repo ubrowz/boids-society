@@ -1449,6 +1449,11 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <div class="vwrap"><input type="range" class="vfader" id="sndLeadSlider" min="0" max="100" value="55" step="5"></div>
     <label title="Level of the generative lead — a Bach-style arpeggio sequence in D minor (a bright harpsichord-ish pluck) that traces a melody over the texture, phrasing and cadencing home; fuller when the society is lively, silent in an empty tank.">lead</label>
   </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndCanonVal">40%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndCanonSlider" min="0" max="100" value="40" step="5"></div>
+    <label title="Level of the canon voice — a second lead that follows the melody one bar behind, an octave up (set by 'canon octave'). It reads the same clock and harmony as the lead, so the two lines lock and answer each other like a Bach two-part invention. Silent when the lead is silent.">canon</label>
+  </div>
 </div>
 <div style="max-width:360px;margin-top:12px;">
   <div class="ctrl-row">
@@ -1460,6 +1465,16 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
     <button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
     <span class="ctrl-val" id="climaxAutoVal">~—</span>
+  </div>
+  <div class="ctrl-row">
+    <label title="Shift the whole generative lead melody up or down in octaves, without changing anything else. Try −1 or −2 if the pluck sits too high.">lead octave</label>
+    <input type="range" id="leadOctSlider" min="-24" max="12" value="0" step="12">
+    <span class="ctrl-val" id="leadOctVal">0</span>
+  </div>
+  <div class="ctrl-row">
+    <label title="How far above the lead the canon voice answers, in octaves. +1 (the classic canon at the octave) is the default; try 0 to double the lead in unison, or −1 to have the canon answer below.">canon octave</label>
+    <input type="range" id="canonOctSlider" min="-24" max="24" value="12" step="12">
+    <span class="ctrl-val" id="canonOctVal">+1 oct</span>
   </div>
 </div>
 </section>
@@ -2330,6 +2345,9 @@ wire('sndSizeSlider','sndSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIZ
 wire('sndAuraSlider','sndAuraVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_AURA=v; });
 wire('sndSpreadSlider','sndSpreadVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SPREAD=v; });
 wire('sndLeadSlider','sndLeadVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_LEAD=v; });
+wire('sndCanonSlider','sndCanonVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CANON=v; });
+wire('leadOctSlider','leadOctVal',     v=>parseInt(v), v=>{ const o=parseInt(v)/12; return (o>0?'+':'')+o+' oct'; }, v=>{ _LEAD_OCT=v; });
+wire('canonOctSlider','canonOctVal',   v=>parseInt(v), v=>{ const o=parseInt(v)/12; return (o>0?'+':'')+o+' oct'; }, v=>{ _LEAD_CANON_OCT=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
@@ -4326,6 +4344,9 @@ let _SND_SIZE =parseInt(document.getElementById('sndSizeSlider').value)/100;
 let _SND_AURA =parseInt(document.getElementById('sndAuraSlider').value)/100;
 let _SND_SPREAD =parseInt(document.getElementById('sndSpreadSlider').value)/100;
 let _SND_LEAD =parseInt(document.getElementById('sndLeadSlider').value)/100;
+let _SND_CANON =parseInt(document.getElementById('sndCanonSlider').value)/100; // canon voice level (second lead, one bar behind)
+let _LEAD_OCT =parseInt(document.getElementById('leadOctSlider').value)||0; // lead melody transpose, in semitones (octave steps)
+let _LEAD_CANON_OCT =parseInt(document.getElementById('canonOctSlider').value); // canon transpose ABOVE the lead, in semitones (+12 = classic canon at the octave)
 let _flockSpread=0; // smoothed flock-dispersion metric (0 clumped … 1 spread across the tank)
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
@@ -4674,9 +4695,20 @@ const _LEAD_PATTS = [ // eight eighth-notes per bar; indices into the 4-note bro
   [0,2,1,3,0,2,1,3], // broken (Alberti-ish)
   [0,1,2,3,3,2,1,0]  // up then down
 ];
-const _LEAD_BEAT=0.25, _LEAD_SPB=8, _LEAD_BARS=8;          // eighth-note interval; steps/bar; bars
+const _LEAD_BEAT=0.25, _LEAD_SPB=8, _LEAD_BARS=8;          // eighth-note interval (at reference speed); steps/bar; bars
+const _LEAD_SPEED_REF=9*0.45;                              // SPEED at the default speed slider (9) → tempo == _LEAD_BEAT there, so the default feel is unchanged
+function _leadBeat(){                                      // live eighth-note interval — faster society, faster arpeggio
+  return Math.max(0.15, Math.min(0.55, _LEAD_BEAT*Math.pow(_LEAD_SPEED_REF/Math.max(0.3,SPEED), 0.7)));
+}
 const _LEAD_PLAY=_LEAD_BARS*_LEAD_SPB, _LEAD_CYCLE=_LEAD_PLAY+16; // 64 sung steps + a 2-bar breath = 80
 let _leadNextT=0, _leadStep=0, _leadPatt=0;
+// Canon: a second voice trails the lead by one bar, an octave up. Each lead note is recorded into
+// a small ring buffer keyed by step; the canon re-plays the note from _LEAD_CANON_LAG steps ago at
+// the current scheduled time — same clock, same harmony, so the two lines lock like a two-part
+// invention. Stores the raw chord tone (no octave) + a base velocity, so canon tracks live octave
+// shifts and voices with its own fader. null = a rest the canon copies exactly.
+const _LEAD_CANON_LAG=_LEAD_SPB;                 // canonic distance = one bar behind
+const _leadHist=new Array(_LEAD_CANON_LAG+8).fill(null); // ring buffer, size > lag
 let _sndLiving=0, _sndBondFrac=0; // sim-energy signals cached in _sndUpdate, read by the lead
 function _sndLeadNote(midi, vel, startT, dur){
   if(!_snd || _sndVoices>=24) return; _sndVoices++;
@@ -4697,12 +4729,13 @@ function _sndLeadNote(midi, vel, startT, dur){
   }
 }
 function _sndLeadSchedule(){
-  if(!SOUND_ON || !_ac || !_snd || _ac.state!=='running' || _SND_LEAD<=0 || (_sndLiving||0)<8){ _leadNextT=0; return; } // silent in an empty/quiet tank
+  if(!SOUND_ON || !_ac || !_snd || _ac.state!=='running' || (_SND_LEAD<=0 && _SND_CANON<=0) || (_sndLiving||0)<8){ _leadNextT=0; _leadHist.fill(null); return; } // silent in an empty/quiet tank
   const now=_ac.currentTime;
-  if(_leadNextT===0){ _leadNextT=now+0.06; _leadStep=0; _leadPatt=0; }
-  const dur=_LEAD_BEAT*0.9, life=0.55+0.45*Math.min(1,(_sndBondFrac||0)+(_sndLiving||0)/900);
+  if(_leadNextT===0){ _leadNextT=now+0.06; _leadStep=0; _leadPatt=0; _leadHist.fill(null); } // clean canon entry on restart
+  const beat=_leadBeat(), dur=beat*0.9, life=0.55+0.45*Math.min(1,(_sndBondFrac||0)+(_sndLiving||0)/900); // tempo tracks the speed slider
   while(_leadNextT < now+0.12){
     const pos=_leadStep % _LEAD_CYCLE;
+    let rec=null;                                                             // this step's lead note {m:chord tone, s:base velocity} — or null for a rest, which the canon copies exactly
     if(pos<_LEAD_PLAY){                                                       // inside the 8 sung bars (else: the breath)
       const bar=(pos/_LEAD_SPB)|0, step=pos%_LEAD_SPB;
       if(pos===0) _leadPatt=(Math.random()*_LEAD_PATTS.length)|0;            // choose the figuration for this cycle
@@ -4710,11 +4743,14 @@ function _sndLeadSchedule(){
       const down=step===0, strong=(step&1)===0;
       const midBreath=(bar===3 && step>=6);                                  // a short breath before the second phrase
       if(!midBreath && (down || Math.random()>=0.12)){                       // occasional articulation rests (never on a downbeat)
-        const vel=(down?0.30:strong?0.22:0.17)*life*_SND_LEAD;
-        _sndLeadNote(midi, vel, _leadNextT, dur);
+        rec={ m:midi, s:(down?0.30:strong?0.22:0.17)*life };
+        if(_SND_LEAD>0) _sndLeadNote(midi+_LEAD_OCT, rec.s*_SND_LEAD, _leadNextT, dur); // octave-shifted by the lead-octave control
       }
     }
-    _leadStep++; _leadNextT+=_LEAD_BEAT;
+    const echo=_leadHist[(_leadStep - _LEAD_CANON_LAG + _leadHist.length*2) % _leadHist.length]; // the lead note from one bar ago
+    if(_SND_CANON>0 && echo) _sndLeadNote(echo.m+_LEAD_OCT+_LEAD_CANON_OCT, echo.s*0.85*_SND_CANON, _leadNextT, dur); // canon: same pluck voice, one bar behind, transposed above the lead
+    _leadHist[_leadStep % _leadHist.length]=rec;
+    _leadStep++; _leadNextT+=beat;
   }
 }
 const _ksCache=new Map();
@@ -5632,6 +5668,9 @@ _SND_SIZE       = ${_SND_SIZE};
 _SND_AURA       = ${_SND_AURA};
 _SND_SPREAD     = ${_SND_SPREAD};
 _SND_LEAD       = ${_SND_LEAD};
+_SND_CANON      = ${_SND_CANON};
+_LEAD_OCT       = ${_LEAD_OCT};
+_LEAD_CANON_OCT = ${_LEAD_CANON_OCT};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
