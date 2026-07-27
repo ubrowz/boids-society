@@ -1444,6 +1444,11 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <div class="vwrap"><input type="range" class="vfader" id="sndSpreadSlider" min="0" max="100" value="55" step="5"></div>
     <label title="Level of the flock-spread voice — three tones that sit in unison when the flock is tightly clumped and open into a chord as it disperses. Tracks how spread-out the boids are, so moving coherence K, sensing R or alignment opens/closes the sound.">spread</label>
   </div>
+  <div class="fader">
+    <span class="ctrl-val" id="sndLeadVal">55%</span>
+    <div class="vwrap"><input type="range" class="vfader" id="sndLeadSlider" min="0" max="100" value="55" step="5"></div>
+    <label title="Level of the generative lead — a Bach-style arpeggio sequence in D minor (a bright harpsichord-ish pluck) that traces a melody over the texture, phrasing and cadencing home; fuller when the society is lively, silent in an empty tank.">lead</label>
+  </div>
 </div>
 <div style="max-width:360px;margin-top:12px;">
   <div class="ctrl-row">
@@ -2324,6 +2329,7 @@ wire('sndPredSlider','sndPredVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_PRE
 wire('sndSizeSlider','sndSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SIZE=v; });
 wire('sndAuraSlider','sndAuraVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_AURA=v; });
 wire('sndSpreadSlider','sndSpreadVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_SPREAD=v; });
+wire('sndLeadSlider','sndLeadVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_LEAD=v; });
 wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COLOR=v; });
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
@@ -4319,6 +4325,7 @@ let _SND_PRED =parseInt(document.getElementById('sndPredSlider').value)/100;
 let _SND_SIZE =parseInt(document.getElementById('sndSizeSlider').value)/100;
 let _SND_AURA =parseInt(document.getElementById('sndAuraSlider').value)/100;
 let _SND_SPREAD =parseInt(document.getElementById('sndSpreadSlider').value)/100;
+let _SND_LEAD =parseInt(document.getElementById('sndLeadSlider').value)/100;
 let _flockSpread=0; // smoothed flock-dispersion metric (0 clumped … 1 spread across the tank)
 let _SND_COLOR=parseInt(document.getElementById('sndColorSlider').value)/100;
 let _SND_CLIMAX=parseInt(document.getElementById('sndClimaxSlider').value)/100;
@@ -4643,6 +4650,73 @@ function _sndPredSchedule(){
     _predStep++; _predNextT+=interval;
   }
 }
+// ── generative lead: a Bach-style arpeggio sequence ────────────────────────
+// A monophonic foreground line, so the ear finally gets a MELODY over the texture.
+// A steady eighth-note pulse arpeggiates broken chords through a DESCENDING-FIFTHS
+// sequence in D natural minor (the quintessential Baroque prelude engine) and cadences
+// home to the tonic — so pulse, phrasing and resolution come from the harmony itself.
+// The top notes of the arpeggios trace the tune; the figuration varies per cycle and the
+// dynamics follow the society's energy, so it's generative, not a fixed loop. Bright
+// detuned-saw pluck with a resonant filter "ping" = a harpsichord-ish cutting timbre that
+// sits above the pads. Look-ahead scheduled on the audio clock like the predator ostinato.
+const _LEAD_PROG = [ // 8 bars, roots descending by fifths, all diatonic to D natural minor → resolves to i
+  [74,77,81,86], // Dm   (i)
+  [74,79,82,86], // Gm   (iv)
+  [72,76,79,84], // C    (VII)
+  [72,77,81,84], // F    (III)
+  [70,74,77,82], // B♭   (VI)
+  [76,79,82,88], // E dim(ii°)
+  [72,76,81,84], // Am   (v)
+  [74,77,81,86]  // Dm   (i) — the cadence
+];
+const _LEAD_PATTS = [ // eight eighth-notes per bar; indices into the 4-note broken chord
+  [0,1,2,3,2,1,2,3], // rolling wave
+  [0,2,1,3,0,2,1,3], // broken (Alberti-ish)
+  [0,1,2,3,3,2,1,0]  // up then down
+];
+const _LEAD_BEAT=0.25, _LEAD_SPB=8, _LEAD_BARS=8;          // eighth-note interval; steps/bar; bars
+const _LEAD_PLAY=_LEAD_BARS*_LEAD_SPB, _LEAD_CYCLE=_LEAD_PLAY+16; // 64 sung steps + a 2-bar breath = 80
+let _leadNextT=0, _leadStep=0, _leadPatt=0;
+let _sndLiving=0, _sndBondFrac=0; // sim-energy signals cached in _sndUpdate, read by the lead
+function _sndLeadNote(midi, vel, startT, dur){
+  if(!_snd || _sndVoices>=24) return; _sndVoices++;
+  const f=_midiHz(midi);
+  const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=6;
+  lp.frequency.setValueAtTime(Math.min(9000,f*6), startT);                    // bright ping on the attack…
+  lp.frequency.exponentialRampToValueAtTime(Math.max(500,f*2), startT+0.14);  // …decaying → a pluck
+  const g=_ac.createGain();
+  g.gain.setValueAtTime(0.0001,startT);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002,vel), startT+0.006);    // fast attack
+  g.gain.exponentialRampToValueAtTime(0.0001, startT+dur);                    // decay across the note
+  lp.connect(g); g.connect(_snd.bus);
+  let first=true;
+  for(const det of [-4,4]){                                                   // two detuned saws → harpsichord-ish bite
+    const o=_ac.createOscillator(); o.type='sawtooth'; o.frequency.value=f; o.detune.value=det;
+    o.connect(lp); o.start(startT); o.stop(startT+dur+0.05);
+    if(first){ o.onended=()=>{ _sndVoices--; }; first=false; }
+  }
+}
+function _sndLeadSchedule(){
+  if(!SOUND_ON || !_ac || !_snd || _ac.state!=='running' || _SND_LEAD<=0 || (_sndLiving||0)<8){ _leadNextT=0; return; } // silent in an empty/quiet tank
+  const now=_ac.currentTime;
+  if(_leadNextT===0){ _leadNextT=now+0.06; _leadStep=0; _leadPatt=0; }
+  const dur=_LEAD_BEAT*0.9, life=0.55+0.45*Math.min(1,(_sndBondFrac||0)+(_sndLiving||0)/900);
+  while(_leadNextT < now+0.12){
+    const pos=_leadStep % _LEAD_CYCLE;
+    if(pos<_LEAD_PLAY){                                                       // inside the 8 sung bars (else: the breath)
+      const bar=(pos/_LEAD_SPB)|0, step=pos%_LEAD_SPB;
+      if(pos===0) _leadPatt=(Math.random()*_LEAD_PATTS.length)|0;            // choose the figuration for this cycle
+      const midi=_LEAD_PROG[bar][_LEAD_PATTS[_leadPatt][step]];
+      const down=step===0, strong=(step&1)===0;
+      const midBreath=(bar===3 && step>=6);                                  // a short breath before the second phrase
+      if(!midBreath && (down || Math.random()>=0.12)){                       // occasional articulation rests (never on a downbeat)
+        const vel=(down?0.30:strong?0.22:0.17)*life*_SND_LEAD;
+        _sndLeadNote(midi, vel, _leadNextT, dur);
+      }
+    }
+    _leadStep++; _leadNextT+=_LEAD_BEAT;
+  }
+}
 const _ksCache=new Map();
 function _ksBuffer(midi){
   // Karplus-Strong plucked string, rendered OFFLINE into a buffer. A live Web Audio feedback
@@ -4700,6 +4774,7 @@ function _sndUpdate(){
   for(const b of boids){ if(b.alive&&!b.dying){ living++; if(b.partnerId!==null) bonded++; if(b.diseased) infected++;
     sumX+=b.x; sumY+=b.y; sumX2+=b.x*b.x; sumY2+=b.y*b.y;
     if(fam && b.sat>=0.15){ const f=_FAM_IDX[hueToFamily(b.hue)]; fam[f]++; } } } // grey/undecided cells don't vote
+  _sndLiving=living; _sndBondFrac = living>0 ? bonded/living : 0; // cached for the generative lead's gate + dynamics
   const pop=Math.min(1,living/600);
   _snd.droneGain.gain.setTargetAtTime((0.08+0.38*pop)*_SND_DRONE*2, t, 0.5); // population → drone body (×2: slider 50% = reference level)
   const press=(typeof smoothPressure==='number')?Math.max(0,Math.min(1,smoothPressure)):0.5;
@@ -5263,6 +5338,7 @@ lastTime=ts;
 simClock+=dt;
 if(++_sndTick>=6){ _sndTick=0; _sndUpdate(); } // sonification mappings at ~5 Hz (both modes)
 _sndPredSchedule(); // predator ostinato needs per-frame look-ahead scheduling for a steady beat
+_sndLeadSchedule(); // generative Bach-arpeggio lead — same per-frame look-ahead scheduling
 if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch (rafId already queued)
 _imgScaleShown += (IMG_SCALE-_imgScaleShown)*0.16; // ease boid size toward the slider value (~0.3 s glide, one scalar/frame — no Pi cost)
 // Overlay: live boid count + preferred colour family
@@ -5555,6 +5631,7 @@ _SND_PRED       = ${_SND_PRED};
 _SND_SIZE       = ${_SND_SIZE};
 _SND_AURA       = ${_SND_AURA};
 _SND_SPREAD     = ${_SND_SPREAD};
+_SND_LEAD       = ${_SND_LEAD};
 _SND_COLOR      = ${_SND_COLOR};
 _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
