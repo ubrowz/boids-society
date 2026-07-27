@@ -760,7 +760,7 @@ eat if distance(tip, boid) &lt; RADIUS</code></pre>
 <p><strong>Signal graph.</strong> Every layer routes to a shared <code>bus</code> → dry gain + a <em>synthesized</em> convolver reverb (an exponentially-decaying noise impulse, no sample file) → <code>master</code> → a <code>DynamicsCompressor</code> → output. The master runs hot (reference 1.2) and the compressor tames peaks. Continuous "state" layers are driven at ~5&nbsp;Hz from the sim loop in a single O(N) pass (<code>_sndUpdate</code>); one-shot "event" sounds fire from the lifecycle hooks; a 24-voice cap keeps a mass die-off from spawning hundreds of oscillators.</p>
 
 <h3>The mixer</h3>
-<p>The <em>Sound&nbsp;— mixer</em> panel is a full-width bank of <strong>12 vertical faders</strong> (sits just under the Live-status bar). <strong>master</strong> leads and scales the whole mix (it multiplies <code>master.gain</code>, pre-compressor, so it attenuates everything without changing the internal balance). The other eleven set per-layer levels; all are live-forwarded to the tank, captured by Save/Load, and baked into exports (as is the on/off state). Defaults: master 100%, the rest 55%.</p>
+<p>The <em>Sound&nbsp;— mixer</em> panel is a full-width bank of <strong>14 vertical faders</strong> (sits just under the Live-status bar). <strong>master</strong> leads and scales the whole mix (it multiplies <code>master.gain</code>, pre-compressor, so it attenuates everything without changing the internal balance). The other thirteen set per-layer levels; all are live-forwarded to the tank, captured by Save/Load, and baked into exports (as is the on/off state). Defaults: master 100%, the rest 55%.</p>
 
 <h3>State layers (the state of the society)</h3>
 <ul>
@@ -781,6 +781,11 @@ eat if distance(tip, boid) &lt; RADIUS</code></pre>
   <li><strong>menace</strong> — a predator layer: the <em>Jaws</em> two-note ostinato (E2→F2, the minor second — E is the 2nd and F the ♭3 of D minor, so it sits in key) that plays whenever a predator is in the tank and <strong>accelerates as the threat grows</strong> (more predators / more of them hungry tighten the pulse). Look-ahead scheduled on the audio clock so the beat stays steady. A <strong>kill</strong> adds a snare crack over the thud, so a caught boid sounds different from one that starved.</li>
 </ul>
 <p>The former Karplus-Strong plucked strings (rendered offline into cached buffers, since a live feedback loop is clamped to ≥128 samples and caps pitch at ~340&nbsp;Hz) are retired from the event vocabulary but remain in the file as dead code.</p>
+
+<h3>The melody — generative lead &amp; canon</h3>
+<p>The soundscape's one true <strong>foreground melody</strong> (every other layer is texture or gesture). A <strong>Bach-style arpeggio</strong>: a steady eighth-note pulse arpeggiates broken chords through an 8-bar <strong>descending-fifths</strong> progression in D natural minor (Dm–Gm–C–F–B♭–E°–Am–Dm, all diatonic, cadencing home to i), then a 2-bar breath. The figuration reshuffles each cycle and the dynamics track bonded fraction + population, so it is <em>generative, not a loop</em>; downbeat accents, a mid-phrase breath and occasional articulation rests shape the phrasing. Timbre = two detuned saws through a resonant lowpass that pings bright on the attack then decays — a harpsichord-ish pluck sitting above the pads. Look-ahead scheduled on the audio clock every frame (like the predator ostinato), silent in an empty/quiet tank. Its own <strong>lead</strong> fader.</p>
+<p><strong>The canon.</strong> A second voice built inside the same scheduler that <strong>answers the lead one bar later, an octave up</strong> — a canon at the octave, the two lines chasing and answering like a two-part invention. Because it reads the <em>same</em> transport, harmony and audio clock (two separate browser tabs could never phase-lock), it stays perfectly in step: each computed lead note is recorded into a small ring buffer and replayed a bar on, transposed — copying even the rests. Its own <strong>canon</strong> fader plus a <strong>canon octave</strong> control (+1 = the classic; 0 doubles the lead in unison, −1 answers below); a canon-only mode works with the lead silenced.</p>
+<p><strong>Tempo.</strong> The pulse <strong>tracks the speed slider</strong> — a livelier society plays a faster arpeggio (the eighth-note interval is inversely proportional to speed, softened and clamped, with the default speed preserving the original tempo) — and a separate <strong>lead tempo</strong> multiplier (0.25×–4×, default&nbsp;1×) sets the pace <em>by hand, independently of the flock's speed</em>. Lead and canon share the beat, so they always retempo in lockstep and the canon stays exactly one bar behind (measured in steps, not seconds).</p>
 
 <h3>Differentiation hush</h3>
 <p>While <a href="#differentiation">cell-differentiation mode</a> is on, the whole society <strong>ducks to silence at the bus</strong> (every normal layer and event routes through <code>bus</code>, so one gain does it) and a serene <strong>D suspended/add9</strong> open pad (D3&nbsp;D4&nbsp;A4&nbsp;D5&nbsp;E5, no third — neither major nor minor, fitting cells suspended mid-decision) swells in, routed straight to <code>master</code> (+ a reverb send) so the duck can't touch it. Both crossfade back when the mode switches off. No slider — automatic on the toggle, still under the master fader.</p>
@@ -815,9 +820,13 @@ A <code>RUN_MODE</code> marker (injected into the <code>&lt;head&gt;</code> of g
   <li><strong>dash</strong> (default) — the dark control-room UI: grouped control panels, live status, pyramid.
   No PixiJS/WebGL context is created; the canvas stays hidden. Suitable for hosting as a public website
   (single self-contained file, works from any static host).</li>
-  <li><strong>tank</strong> — created by the <strong>open aquarium</strong> button: <code>buildStandaloneHTML('tank')</code>
-  serializes the live DOM (all current settings baked in), opens a new tab via <code>window.open</code> +
-  <code>document.write</code>, and auto-starts fullscreen.</li>
+  <li><strong>tank</strong> — the live aquarium, opened two ways (both live-bridged, a single tank at a time):
+  <strong>open aquarium</strong> makes a full-chrome browser tab, while <strong>pop-out canvas</strong> makes a clean,
+  sized popup <em>window</em> — a tall 6:1 strip maximised to the screen height (no tab/bookmarks bar), showing just
+  the canvas (the corner overlay hidden, the 🔈 button kept). Both call <code>buildStandaloneHTML('tank', clean)</code>,
+  which serializes the live DOM (all current settings baked in), open a window via <code>window.open</code> +
+  <code>document.write</code>, and auto-start fullscreen. (True zero-chrome would need the Fullscreen API =
+  whole-monitor, gesture-triggered; a sized popup keeps a thin address strip.)</li>
   <li><strong>standalone</strong> — the classic ⬇ export for the Pi kiosk: identical to tank but with
   auto-disease enabled and no bridge.</li>
 </ul>
