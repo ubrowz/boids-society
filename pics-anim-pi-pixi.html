@@ -1494,7 +1494,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 
 <section class="panel" id="conductorPanel">
 <h2>AI conductor <span style="font:500 11px/1 'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:0;text-transform:none;">— it plays the sliders for you</span></h2>
-<div class="mini-note" style="margin:-2px 0 4px;">A self-contained performer that eases the controls over time so the society composes itself — no internet, works offline. It drives the sliders through the same events the recorder captures, so you can ● record its performance and 📦 export it. Built for the flock world; it touches the simulation sliders and the mixer faders, never the top-row buttons.</div>
+<div class="mini-note" style="margin:-2px 0 4px;">A self-contained performer that eases the controls over time so the society composes itself — no internet, works offline. It drives the sliders through the same events the recorder captures, so you can ● record its performance and 📦 export it. Built for the flock world; it touches the simulation sliders and the whole mixer — including the lead, the canon, their octaves and the tempo, so each movement scores its own melody — but never the top-row buttons. No two readings of a movement are alike, and a long performance builds: scenes open restrained and grow bolder over the first nine minutes.</div>
 <div class="cond-row">
   <button id="conductorBtn">🤖 conductor: off</button>
   <span class="cond-lab">style</span>
@@ -1502,6 +1502,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <option value="drama">Drama — reactive, goal-seeking</option>
     <option value="zen">Zen — calm wander</option>
     <option value="moods">Moods — cycle named scenes</option>
+    <option value="counterpoint">Counterpoint — it composes the melody</option>
   </select>
   <span class="cond-lab">pace</span>
   <select id="conductorPace" class="cond-sel">
@@ -5957,28 +5958,73 @@ const _condDemo = {
   divorceSlider:  [0.60, 0.05],  // divorce rate: high → low
   predatorSlider: [0.35, 0.00]   // predators thin the herd → none (a storm overrides this)
 };
-const _condArtIds = ['boltzRotSlider','speedSlider','alignSlider','imgScaleSlider','auraOpacitySlider','predatorDietSlider','climaxPopSlider','popCeilSlider','sndMasterSlider','sndSpreadSlider','sndDiseaseSlider','sndPredSlider','sndClimaxSlider','sndThudSlider'];
+// The conductor plays the WHOLE mixer, melody included: lead + canon levels, the two octave
+// transposes and the tempo multiplier are ordinary sliders, so a movement can score itself —
+// a low canon answer for a die-off, a canon at the unison (a round) for a procession, both
+// voices high and fast for a two-part invention. Octave sliders are stepped in twelves, so they
+// SNAP (see _condSnap) instead of gliding across a boundary.
+const _condArtIds = ['boltzRotSlider','speedSlider','alignSlider','imgScaleSlider','auraOpacitySlider','predatorDietSlider','climaxPopSlider','popCeilSlider',
+  'sndMasterSlider','sndSpreadSlider','sndDiseaseSlider','sndPredSlider','sndClimaxSlider','sndThudSlider',
+  'sndDroneSlider','sndColorSlider','sndChimeSlider','sndSighSlider','sndSizeSlider','sndAuraSlider',
+  'sndLeadSlider','sndCanonSlider','leadOctSlider','canonOctSlider','tempoSlider'];
 const _condArtHome = { // resting fractions for the non-demographic sliders
   boltzRotSlider:0.25, speedSlider:0.5, alignSlider:0.35, imgScaleSlider:0.12, auraOpacitySlider:0.45,
   predatorDietSlider:0.5, climaxPopSlider:0.4, popCeilSlider:0.0, // ceiling OFF so it never caps growth
-  sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.5, sndPredSlider:0.5, sndClimaxSlider:0.55, sndThudSlider:0.55
+  sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.5, sndPredSlider:0.5, sndClimaxSlider:0.55, sndThudSlider:0.55,
+  sndDroneSlider:0.55, sndColorSlider:0.55, sndChimeSlider:0.5, sndSighSlider:0.5, sndSizeSlider:0.5, sndAuraSlider:0.5,
+  sndLeadSlider:0.55, sndCanonSlider:0.4,
+  leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.20 // = lead at concert pitch, canon +12, tempo 1×
 };
+const _condSnap = { leadOctSlider:1, canonOctSlider:1 }; // discrete controls: jump at the movement change, never crawl between octaves
+// Rubato: a slow breathing wobble laid over the target so a held movement is never perfectly static.
+// Amplitude in fraction-space; period + phase are re-rolled for every movement.
+const _condLFOAmp = { tempoSlider:0.045, auraOpacitySlider:0.10, sndSpreadSlider:0.08, boltzRotSlider:0.06, sndColorSlider:0.06, imgScaleSlider:0.035 };
+const _condLFOPer={}, _condLFOPh={};
 const _CONDUCT_POOL = _condDemoIds.concat(_condArtIds);
 // Movements: pop = desired population as a FRACTION of the user's target-pop; art = character overrides.
 const _CONDUCT_MOVES = {
-  awaken:   { label:'awakening',            pop:0.75, hold:[24,36], art:{ boltzRotSlider:0.20, auraOpacitySlider:0.5, sndMasterSlider:0.85, sndClimaxSlider:0.4, sndSpreadSlider:0.45 } },
-  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.12, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, climaxPopSlider:0.42, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35 } },
-  diaspora: { label:'the diaspora',         pop:0.60, hold:[16,26], art:{ cohKSlider:0.03, sensingSlider:0.25, alignSlider:0.10, boltzRotSlider:0.85, speedSlider:0.72, imgScaleSlider:0.08, sndSpreadSlider:0.95, auraOpacitySlider:0.35, sndMasterSlider:0.9 } },
-  dieoff:   { label:'a die-off',            pop:0.35, hold:[16,26], art:{ fatalitySlider:0.72, lifeSlider:0.28, boltzRotSlider:0.35, sndDiseaseSlider:0.75, sndThudSlider:0.9, sndMasterSlider:0.92 } },
-  predators:{ label:'a predator storm',     pop:0.55, hold:[16,26], art:{ predatorSlider:0.78, predatorDietSlider:0.75, cohKSlider:0.55, boltzRotSlider:0.35, sndPredSlider:0.92, sndMasterSlider:0.94 } },
-  calm:     { label:'a calm',               pop:0.85, hold:[26,40], art:{ boltzRotSlider:0.22, auraOpacitySlider:0.5, sndSpreadSlider:0.5, sndDiseaseSlider:0.4, sndPredSlider:0.4, sndClimaxSlider:0.5, sndThudSlider:0.5, sndMasterSlider:0.85 } }
+  awaken:   { label:'awakening',            pop:0.75, hold:[24,36], art:{ boltzRotSlider:0.20, auraOpacitySlider:0.5, sndMasterSlider:0.85, sndClimaxSlider:0.4, sndSpreadSlider:0.45,
+                                                                          sndLeadSlider:0.45, sndCanonSlider:0.20, leadOctSlider:0.333, canonOctSlider:0.75, tempoSlider:0.13, sndDroneSlider:0.65, sndColorSlider:0.45 } },
+  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.12, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, climaxPopSlider:0.42, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35,
+                                                                          sndLeadSlider:0.90, sndCanonSlider:0.70, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.31, sndColorSlider:0.80, sndChimeSlider:0.70, sndAuraSlider:0.7 } },
+  diaspora: { label:'the diaspora',         pop:0.60, hold:[16,26], art:{ cohKSlider:0.03, sensingSlider:0.25, alignSlider:0.10, boltzRotSlider:0.85, speedSlider:0.72, imgScaleSlider:0.08, sndSpreadSlider:0.95, auraOpacitySlider:0.35, sndMasterSlider:0.9,
+                                                                          sndLeadSlider:0.35, sndCanonSlider:0.85, leadOctSlider:0.333, canonOctSlider:1.0, tempoSlider:0.13, sndColorSlider:0.30, sndSighSlider:0.75 } }, // voices two octaves apart — the parts scatter with the flock
+  dieoff:   { label:'a die-off',            pop:0.35, hold:[16,26], art:{ fatalitySlider:0.72, lifeSlider:0.28, boltzRotSlider:0.35, sndDiseaseSlider:0.75, sndThudSlider:0.9, sndMasterSlider:0.92,
+                                                                          sndLeadSlider:0.50, sndCanonSlider:0.30, leadOctSlider:0.333, canonOctSlider:0.25, tempoSlider:0.10, sndDroneSlider:0.80, sndColorSlider:0.28, sndSighSlider:0.90, sndChimeSlider:0.30, sndClimaxSlider:0.2 } }, // canon answers BELOW: a dark echo
+  predators:{ label:'a predator storm',     pop:0.55, hold:[16,26], art:{ predatorSlider:0.78, predatorDietSlider:0.75, cohKSlider:0.55, boltzRotSlider:0.35, sndPredSlider:0.92, sndMasterSlider:0.94,
+                                                                          sndLeadSlider:0.30, sndCanonSlider:0.25, leadOctSlider:0.667, canonOctSlider:0.5, tempoSlider:0.40, sndColorSlider:0.35, sndThudSlider:0.8, sndSighSlider:0.7 } }, // hurried, the melody driven under the ostinato
+  calm:     { label:'a calm',               pop:0.85, hold:[26,40], art:{ boltzRotSlider:0.22, auraOpacitySlider:0.5, sndSpreadSlider:0.5, sndDiseaseSlider:0.4, sndPredSlider:0.4, sndClimaxSlider:0.5, sndThudSlider:0.5, sndMasterSlider:0.85,
+                                                                          sndLeadSlider:0.60, sndCanonSlider:0.50, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.20, sndColorSlider:0.55, sndDroneSlider:0.5 } },
+  nocturne: { label:'a nocturne',           pop:0.45, hold:[28,44], art:{ boltzRotSlider:0.10, speedSlider:0.25, alignSlider:0.30, cohKSlider:0.70, imgScaleSlider:0.10, auraOpacitySlider:0.75, climaxPopSlider:0.25,
+                                                                          sndLeadSlider:0.70, sndCanonSlider:0.60, leadOctSlider:0.333, canonOctSlider:0.25, tempoSlider:0.09, sndDroneSlider:0.70, sndColorSlider:0.35,
+                                                                          sndChimeSlider:0.35, sndThudSlider:0.35, sndClimaxSlider:0.30, sndAuraSlider:0.80, sndSpreadSlider:0.35, sndSizeSlider:0.65, sndMasterSlider:0.82 } }, // few, slow, low and lit — the quiet movement
+  invention:{ label:'a two-part invention', pop:0.90, hold:[24,38], art:{ boltzRotSlider:0.08, speedSlider:0.70, alignSlider:0.70, cohKSlider:0.70, imgScaleSlider:0.15, auraOpacitySlider:0.4,
+                                                                          sndLeadSlider:0.95, sndCanonSlider:0.90, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.47,
+                                                                          sndDroneSlider:0.30, sndColorSlider:0.35, sndClimaxSlider:0.35, sndSpreadSlider:0.30, sndChimeSlider:0.4, sndThudSlider:0.4, sndMasterSlider:0.92 } }, // pads pulled back so the counterpoint is the piece
+  procession:{label:'a procession',         pop:1.00, hold:[26,40], art:{ boltzRotSlider:0.05, speedSlider:0.55, alignSlider:0.85, cohKSlider:0.80, imgScaleSlider:0.22, auraOpacitySlider:0.55,
+                                                                          sndLeadSlider:0.75, sndCanonSlider:0.65, leadOctSlider:0.667, canonOctSlider:0.5, tempoSlider:0.25,
+                                                                          sndDroneSlider:0.60, sndColorSlider:0.60, sndSizeSlider:0.65, sndSpreadSlider:0.30, sndMasterSlider:0.9 } }, // canon at the UNISON one bar behind = a round, over a marching flock
+  ascension:{ label:'an ascension',         pop:0.70, hold:[22,34], art:{ boltzRotSlider:0.30, speedSlider:0.62, alignSlider:0.55, imgScaleSlider:0.06, auraOpacitySlider:0.95, climaxPopSlider:0.3,
+                                                                          sndLeadSlider:0.85, sndCanonSlider:0.70, leadOctSlider:1.0, canonOctSlider:0.75, tempoSlider:0.35,
+                                                                          sndDroneSlider:0.30, sndColorSlider:0.70, sndClimaxSlider:0.80, sndAuraSlider:0.95, sndSizeSlider:0.30, sndMasterSlider:0.9 } } // everything climbs: tiny boids, top octave, halo wide
 };
+const _condDisrupt = { diaspora:1, dieoff:1, predators:1, ascension:1, nocturne:1 }; // what may follow a full bloom
 const _condLethal = { fatalitySlider:1, predatorSlider:1, lifeSlider:1 }; // released to the controller if pop goes critical (safety veto)
 let _condOn=false, _condRAF=0, _condActuate=0, _condHoldUntil=0, _condPaceMul=1, _condLabel='';
-let _condInteg=0, _condPopFrac=0.75, _condArt={};
+let _condInteg=0, _condPopFrac=0.75, _condArt={}, _condT0=0;
 const _condCur={};
 const _condPaceMap={ languid:1.6, measured:1.0, restless:0.6 };
 function _condRnd(a,b){ return a+Math.random()*(b-a); }
+// pick from a list, avoiding whatever was played most recently (so a style doesn't stutter on one scene)
+function _condPick(list, hist){
+  const fresh = hist ? list.filter(k=>hist.indexOf(k)<0) : list;
+  const pool = fresh.length ? fresh : list;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+// Long-form arc: a performance opens restrained and grows bolder over ~9 minutes, so an hour of
+// conducting has a SHAPE instead of being a flat shuffle of equally-loud scenes. Scales how far a
+// movement is allowed to depart from its resting value, and how far its population target swings.
+function _condContrast(){ return 0.70 + 0.40*Math.min(1,(performance.now()-_condT0)/540000); }
 function _condHoldFor(mv){ return _condRnd(mv.hold[0],mv.hold[1])*_condPaceMul; }
 function _condTargetPop(){ return parseFloat(document.getElementById('targetSlider').value)||300; } // the user's anchor
 function _condFracToVal(id, frac){ const el=document.getElementById(id); if(!el) return 0;
@@ -5996,34 +6042,63 @@ function _condDrive(){
   _condInteg=Math.max(-1.3,Math.min(1.3,_condInteg+err*0.05));  // integral, with anti-windup clamp
   return Math.max(-1,Math.min(1, err*1.6 + _condInteg));
 }
+function _condGesture(key){ const mv=_CONDUCT_MOVES[key]; return { label:mv.label, pop:mv.pop, hold:_condHoldFor(mv), art:mv.art }; }
 const _conductorStyles = {
-  drama: { label:'Drama', _last:'', next(){ // reactive: it WAITS for the population to actually reach a crowd before disrupting
+  drama: { label:'Drama', _last:'', _hist:[], next(){ // reactive: it WAITS for the population to actually reach a crowd before disrupting
     const pf = _popEMAready ? (_condPop||0)/Math.max(1,_condTargetPop()) : 0;
     let key;
     if(pf<0.30) key='awaken';                                  // recover from a crash
-    else if(this._last==='awaken') key = pf>0.55 ? 'bloom' : 'awaken';   // climb once off the floor
-    else if(this._last==='bloom') key = pf>0.85 ? ['dieoff','predators','diaspora'][Math.floor(Math.random()*3)] : 'bloom'; // hold the climax until it truly arrives
-    else if(this._last==='dieoff'||this._last==='predators'||this._last==='diaspora') key='calm';
-    else key = pf<0.6 ? 'awaken' : 'bloom';
-    this._last=key; const mv=_CONDUCT_MOVES[key];
-    return { label:mv.label, pop:mv.pop, hold:_condHoldFor(mv), art:mv.art };
+    else if(this._last==='awaken') key = pf>0.55 ? _condPick(['bloom','bloom','procession','invention'], this._hist) : 'awaken'; // climb once off the floor
+    else if(this._last==='bloom') key = pf>0.85 ? _condPick(Object.keys(_condDisrupt), this._hist) : 'bloom'; // hold the climax until it truly arrives
+    else if(_condDisrupt[this._last]) key = _condPick(['calm','calm','nocturne','procession'], this._hist); // recover — but not always the same recovery
+    else if(this._last==='calm') key = _condPick(['bloom','ascension','invention','procession'], this._hist);
+    else key = pf<0.6 ? 'awaken' : _condPick(['bloom','invention','procession'], this._hist);
+    this._last=key; this._hist=[key].concat(this._hist).slice(0,2); // don't repeat the last two scenes when there's a choice
+    return _condGesture(key);
   }},
   zen: { label:'Zen', next(){ // a calm, coherent plateau with slow drift, no disruptions
     const art={ boltzRotSlider:_condRnd(0.15,0.30), auraOpacitySlider:_condRnd(0.4,0.6), imgScaleSlider:_condRnd(0.08,0.20),
-      cohKSlider:_condRnd(0.6,0.85), sndMasterSlider:0.82, sndSpreadSlider:0.5, sndClimaxSlider:0.55 };
+      cohKSlider:_condRnd(0.6,0.85), sndMasterSlider:0.82, sndSpreadSlider:0.5, sndClimaxSlider:0.55,
+      sndLeadSlider:_condRnd(0.4,0.7), sndCanonSlider:_condRnd(0.3,0.6), tempoSlider:_condRnd(0.08,0.18),
+      leadOctSlider:_condPick([0.333,0.667]), canonOctSlider:0.75, sndDroneSlider:_condRnd(0.5,0.7), sndColorSlider:_condRnd(0.45,0.65) };
     return { label:'drifting', pop:_condRnd(0.7,0.9), hold:_condRnd(34,52)*_condPaceMul, art };
   }},
-  moods: { label:'Moods', _seq:['awaken','bloom','calm','diaspora','calm','dieoff','calm','predators'], _i:0, next(){
-    const key=this._seq[this._i++ % this._seq.length], mv=_CONDUCT_MOVES[key];
-    return { label:mv.label, pop:mv.pop, hold:_condHoldFor(mv), art:mv.art };
+  moods: { label:'Moods', _seq:['awaken','bloom','calm','diaspora','nocturne','procession','dieoff','calm','invention','predators','ascension','calm'], _i:0, next(){
+    return _condGesture(this._seq[this._i++ % this._seq.length]);
+  }},
+  // Counterpoint: the population is held steady and the COMPOSITION does the moving — the two
+  // voices are re-scored every movement (register, spacing, tempo, who is silent), the flock
+  // becoming the accompaniment rather than the subject.
+  counterpoint: { label:'Counterpoint', _pair:0, next(){
+    const pairs=[[0.667,0.75],[0.333,0.75],[0.667,0.5],[1.0,0.75],[0.333,1.0],[0.667,1.0],[0.333,0.5]]; // [lead octave, canon octave] fractions
+    const p=pairs[(this._pair=(this._pair+1+Math.floor(Math.random()*3))%pairs.length)];
+    const solo=Math.random();                       // occasionally strip to one voice — space is a musical choice too
+    const art={ leadOctSlider:p[0], canonOctSlider:p[1], tempoSlider:_condRnd(0.10,0.45),
+      sndLeadSlider: solo<0.15?0:_condRnd(0.65,1.0), sndCanonSlider: solo>0.88?0:_condRnd(0.45,0.95),
+      sndColorSlider:_condRnd(0.20,0.50), sndDroneSlider:_condRnd(0.20,0.55), sndClimaxSlider:_condRnd(0.25,0.60),
+      sndSpreadSlider:_condRnd(0.30,0.70), sndChimeSlider:_condRnd(0.30,0.55), sndThudSlider:_condRnd(0.30,0.55),
+      sndDiseaseSlider:0.35, sndPredSlider:0.35, sndAuraSlider:_condRnd(0.4,0.8), sndSizeSlider:_condRnd(0.4,0.7), sndMasterSlider:0.9,
+      cohKSlider:_condRnd(0.50,0.85), alignSlider:_condRnd(0.30,0.80), speedSlider:_condRnd(0.35,0.80),
+      imgScaleSlider:_condRnd(0.06,0.24), boltzRotSlider:_condRnd(0.05,0.35), auraOpacitySlider:_condRnd(0.35,0.8) };
+    const lab = solo<0.15 ? 'the canon alone' : solo>0.88 ? 'the lead alone' : (p[1]===0.5?'a round at the unison':'a two-part invention');
+    return { label:lab, pop:_condRnd(0.75,1.0), hold:_condRnd(22,40)*_condPaceMul, art };
   }}
 };
 function _condStatus(m){ const el=document.getElementById('conductorStatus'); if(el) el.textContent=m; }
 function _condStyle(){ return _conductorStyles[document.getElementById('conductorStyle').value] || _conductorStyles.drama; }
 function _condDecide(){
-  const st=_condStyle(), g=st.next();
-  _condPopFrac=g.pop; _condArt={};
-  for(const id in g.art) if(_CONDUCT_POOL.indexOf(id)>=0) _condArt[id]=_condFracToVal(id, g.art[id]);
+  const st=_condStyle(), g=st.next(), con=_condContrast();
+  _condPopFrac = (1+(g.pop-1)*con) * _condRnd(0.93,1.09);      // arc-scaled, then jittered
+  _condArt={};
+  for(const id in g.art) if(_CONDUCT_POOL.indexOf(id)>=0){
+    let fr=g.art[id];
+    if(!_condSnap[id]){                                        // discrete controls take their value literally
+      const home=_condArtHome[id]!==undefined?_condArtHome[id]:0.4;
+      fr = home+(fr-home)*con + _condRnd(-0.06,0.06);           // jitter: no two readings of a movement are identical
+    }
+    _condArt[id]=Math.max(0,Math.min(1,fr));
+  }
+  for(const id in _condLFOAmp){ _condLFOPer[id]=_condRnd(14,46)*_condPaceMul; _condLFOPh[id]=Math.random()*6.283; } // re-roll the rubato
   _condHoldUntil=performance.now()+g.hold*1000;
   _condLabel='▮ '+st.label+' — '+g.label; _condStatus(_condLabel);
 }
@@ -6034,14 +6109,17 @@ function _condTick(ts){
     _condActuate=ts;
     const drive=_condDrive(), gmix=(drive+1)/2;      // 0 = anti-natal … 1 = pro-natal
     const crit = _popEMAready && (_condPop||0) < Math.max(25, 0.18*_condTargetPop()); // safety veto near extinction
-    const f=0.05/_condPaceMul;                       // ease (~1.35 s half-life at "measured")
+    const f=0.05/_condPaceMul, tsec=ts/1000;          // ease (~1.35 s half-life at "measured")
     for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(!el) continue;
-      let tg;
-      if(_condArt[id]!==undefined && !(crit && _condLethal[id])) tg=_condArt[id];               // movement claims it (unless critical + lethal)
-      else if(_condDemo[id]){ const p=_condDemo[id]; tg=_condFracToVal(id, p[0]+(p[1]-p[0])*gmix); } // controller owns demographics
-      else tg=_condFracToVal(id, _condArtHome[id]!==undefined?_condArtHome[id]:0.4);            // else rest at home
+      let fr;
+      if(_condArt[id]!==undefined && !(crit && _condLethal[id])) fr=_condArt[id];               // movement claims it (unless critical + lethal)
+      else if(_condDemo[id]){ const p=_condDemo[id]; fr=p[0]+(p[1]-p[0])*gmix; }                // controller owns demographics
+      else fr=(_condArtHome[id]!==undefined?_condArtHome[id]:0.4);                              // else rest at home
+      const amp=_condLFOAmp[id];
+      if(amp && _condLFOPer[id]) fr+=amp*Math.sin(6.283*tsec/_condLFOPer[id]+_condLFOPh[id]);   // rubato breathing
+      const tg=_condFracToVal(id, fr);
       if(_condCur[id]===undefined) _condCur[id]=parseFloat(el.value);
-      _condCur[id]+=(tg-_condCur[id])*f; _condSet(id, _condCur[id]);
+      _condCur[id]+=(tg-_condCur[id])*(_condSnap[id]?1:f); _condSet(id, _condCur[id]);          // octaves jump, everything else glides
     }
     if(_popEMAready){ const desired=Math.round(_condPopFrac*_condTargetPop());
       _condStatus(_condLabel+' · pop '+(_condPop||0)+'/'+desired+(drive>0.5?' ↑ breeding hard':drive<-0.4?' ↓ thinning':'')); }
@@ -6050,7 +6128,7 @@ function _condTick(ts){
 }
 function _condStart(){
   if(_condOn) return;
-  _condOn=true; _condActuate=0; _condHoldUntil=0; _condInteg=0;
+  _condOn=true; _condActuate=0; _condHoldUntil=0; _condInteg=0; _condT0=performance.now(); // restart the long-form arc
   for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(el) _condCur[id]=parseFloat(el.value); } // seed from current
   _condDecide();
   _condRAF=requestAnimationFrame(_condTick);
