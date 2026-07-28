@@ -1758,6 +1758,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label>hunt</label>
 <button id="huntModeBtn" title="bump: targets nearest boid each frame&#10;lock: commits to one random target and chases until eaten" class="mini-btn" style="color:#54a0ff;min-width:52px;">bump</button>
 </div>
+<div class="mini-note">Once every boid wears an uploaded image, the predator turns invisible — it still hunts and kills, but its teardrop body, fins, trail and eyes are not drawn, since they belong to a different picture. You hear it instead: the menace ostinato and the kill snare carry on.</div>
 </section>
 
 <section class="panel">
@@ -2670,6 +2671,16 @@ if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _sharedTex=t; _predTex=t; });
 else { _sharedTex=_defaultTex; _predTex=_defaultTex; }
 _rebuildPool(_boidPoolM, _poolPNG_M, false, false); _rebuildPool(_boidPoolM, _poolPNG_MU, true, true); // normal images then the always-upright ones, tagged
 _rebuildPool(_boidPoolF, _poolPNG_F, false, false); _rebuildPool(_boidPoolF, _poolPNG_FU, true, true);
+}
+// "Photo tank": EVERY boid on screen wears an uploaded image — either both per-sex pools are
+// stocked, or a shared upload stands in for whoever is missing. In that world the predator's
+// white teardrop with a beak and hunting eyes reads as an intruder from another drawing, so it
+// is not rendered at all (body, trail, tail fin, beak, eyes and family dot all go). It still
+// hunts, still catches and still kills — and the Jaws ostinato + kill snare still play, so the
+// menace is heard rather than seen. Pools are baked into exports and mirrored to the tank over
+// the bridge, so the tank and standalone exports behave the same.
+function _photoTank(){
+return (_boidPoolM.length>0 || !!_customBoidPNG) && (_boidPoolF.length>0 || !!_customBoidPNG);
 }
 // Image assignment: prefer the least-used image in the sex's pool so a small set of
 // uploaded images spreads evenly instead of clumping by chance. Counts only living
@@ -5502,7 +5513,8 @@ if(HUNT_MODE==='lock') for(const p of predators) if(p.alive&&p.lockedBoidId!==nu
 _maxVisR=RADIUS; // recomputed as each boid draws below; read by next frame's separation
 _drawList.length=0;
 for(const b of boids) _drawList.push(b);
-for(const p of predators) if(p.alive) _drawList.push(p);
+const _predSeen = !_photoTank(); // photo tank → the predator hunts unseen; only its sound gives it away
+if(_predSeen) for(const p of predators) if(p.alive) _drawList.push(p);
 _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order always matches size (far first)
 for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
 drawDeathSplashes();
