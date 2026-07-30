@@ -1463,7 +1463,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <span class="ctrl-val" id="climaxPopVal">624</span>
   </div>
   <div class="ctrl-row">
-    <label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set.">↳ auto-set</label>
+    <label title="Auto-set: snaps 'climax pop' to where the population is currently settling — a running average of the live count (needs the aquarium open). Click any time; after changing target pop and letting it re-settle, click again. During recording, each click is captured, so the composition replays the value you set. While the AI conductor is performing it drives this slider itself — from each movement's population goal — so the button is disabled until you stop it.">↳ auto-set</label>
     <button id="autoClimaxBtn" class="mini-btn" title="Set climax pop to the current settling average">set to settling</button>
     <span class="ctrl-val" id="climaxAutoVal">~—</span>
   </div>
@@ -5895,6 +5895,10 @@ _presetBuild(); _presetRestore();
 // is captured with its concrete value, so playback replays the calibrated number.
 let _popEMA=0, _popEMAready=false, _condPop=0;
 document.getElementById('autoClimaxBtn').addEventListener('click',()=>{
+  // While the conductor performs it owns climax pop (derived from each movement's population goal,
+  // re-actuated at 10 Hz), so a manual snap would be glided away within seconds. The button is
+  // disabled for the duration (_condClimaxBtnUI); this guard covers a programmatic click.
+  if(_condOn) return;
   if(!_popEMAready || !_tankAlive()){ const av=document.getElementById('climaxAutoVal'); if(av) av.textContent='no pop yet'; return; }
   const v=Math.max(2,Math.min(2000,Math.round(_popEMA)));
   const sl=document.getElementById('climaxPopSlider');
@@ -5990,7 +5994,8 @@ const _condArtIds = ['boltzRotSlider','speedSlider','alignSlider','imgScaleSlide
 // ~0.02 as a deliberately chaotic scene, not a default.
 const _condArtHome = { // resting fractions for the non-demographic sliders
   boltzRotSlider:0.006, speedSlider:0.5, alignSlider:0.35, imgScaleSlider:0.12, auraOpacitySlider:0.45,
-  predatorDietSlider:0.5, climaxPopSlider:0.4, popCeilSlider:0.0, // ceiling OFF so it never caps growth
+  predatorDietSlider:0.5, popCeilSlider:0.0, // ceiling OFF so it never caps growth
+  // (no climaxPopSlider home: it is DERIVED every tick from the movement's population goal — see _condTick)
   sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.5, sndPredSlider:0.5, sndClimaxSlider:0.55, sndThudSlider:0.55,
   sndDroneSlider:0.55, sndColorSlider:0.55, sndChimeSlider:0.5, sndSighSlider:0.5, sndSizeSlider:0.5, sndAuraSlider:0.5,
   sndLeadSlider:0.55, sndCanonSlider:0.4,
@@ -6006,7 +6011,7 @@ const _CONDUCT_POOL = _condDemoIds.concat(_condArtIds);
 const _CONDUCT_MOVES = {
   awaken:   { label:'awakening',            pop:0.75, hold:[24,36], art:{ boltzRotSlider:0.008, auraOpacitySlider:0.5, sndMasterSlider:0.85, sndClimaxSlider:0.4, sndSpreadSlider:0.45,
                                                                           sndLeadSlider:0.45, sndCanonSlider:0.20, leadOctSlider:0.333, canonOctSlider:0.75, tempoSlider:0.13, sndDroneSlider:0.65, sndColorSlider:0.45 } },
-  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.005, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, climaxPopSlider:0.42, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35,
+  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.005, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35,
                                                                           sndLeadSlider:0.90, sndCanonSlider:0.70, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.31, sndColorSlider:0.80, sndChimeSlider:0.70, sndAuraSlider:0.7 } },
   diaspora: { label:'the diaspora',         pop:0.60, hold:[16,26], art:{ cohKSlider:0.03, sensingSlider:0.25, alignSlider:0.10, boltzRotSlider:0.045, speedSlider:0.72, imgScaleSlider:0.08, sndSpreadSlider:0.95, auraOpacitySlider:0.35, sndMasterSlider:0.9,
                                                                           sndLeadSlider:0.35, sndCanonSlider:0.85, leadOctSlider:0.333, canonOctSlider:1.0, tempoSlider:0.13, sndColorSlider:0.30, sndSighSlider:0.75 } }, // voices two octaves apart — the parts scatter with the flock
@@ -6016,7 +6021,7 @@ const _CONDUCT_MOVES = {
                                                                           sndLeadSlider:0.30, sndCanonSlider:0.25, leadOctSlider:0.667, canonOctSlider:0.5, tempoSlider:0.40, sndColorSlider:0.35, sndThudSlider:0.8, sndSighSlider:0.7 } }, // hurried, the melody driven under the ostinato
   calm:     { label:'a calm',               pop:0.85, hold:[26,40], art:{ boltzRotSlider:0.006, auraOpacitySlider:0.5, sndSpreadSlider:0.5, sndDiseaseSlider:0.4, sndPredSlider:0.4, sndClimaxSlider:0.5, sndThudSlider:0.5, sndMasterSlider:0.85,
                                                                           sndLeadSlider:0.60, sndCanonSlider:0.50, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.20, sndColorSlider:0.55, sndDroneSlider:0.5 } },
-  nocturne: { label:'a nocturne',           pop:0.45, hold:[28,44], art:{ boltzRotSlider:0.002, speedSlider:0.25, alignSlider:0.30, cohKSlider:0.70, imgScaleSlider:0.10, auraOpacitySlider:0.75, climaxPopSlider:0.25,
+  nocturne: { label:'a nocturne',           pop:0.45, hold:[28,44], art:{ boltzRotSlider:0.002, speedSlider:0.25, alignSlider:0.30, cohKSlider:0.70, imgScaleSlider:0.10, auraOpacitySlider:0.75,
                                                                           sndLeadSlider:0.70, sndCanonSlider:0.60, leadOctSlider:0.333, canonOctSlider:0.25, tempoSlider:0.09, sndDroneSlider:0.70, sndColorSlider:0.35,
                                                                           sndChimeSlider:0.35, sndThudSlider:0.35, sndClimaxSlider:0.30, sndAuraSlider:0.80, sndSpreadSlider:0.35, sndSizeSlider:0.65, sndMasterSlider:0.82 } }, // few, slow, low and lit — the quiet movement
   invention:{ label:'a two-part invention', pop:0.90, hold:[24,38], art:{ boltzRotSlider:0.004, speedSlider:0.70, alignSlider:0.70, cohKSlider:0.70, imgScaleSlider:0.15, auraOpacitySlider:0.4,
@@ -6025,7 +6030,7 @@ const _CONDUCT_MOVES = {
   procession:{label:'a procession',         pop:1.00, hold:[26,40], art:{ boltzRotSlider:0.002, speedSlider:0.55, alignSlider:0.85, cohKSlider:0.80, imgScaleSlider:0.22, auraOpacitySlider:0.55,
                                                                           sndLeadSlider:0.75, sndCanonSlider:0.65, leadOctSlider:0.667, canonOctSlider:0.5, tempoSlider:0.25,
                                                                           sndDroneSlider:0.60, sndColorSlider:0.60, sndSizeSlider:0.65, sndSpreadSlider:0.30, sndMasterSlider:0.9 } }, // canon at the UNISON one bar behind = a round, over a marching flock
-  ascension:{ label:'an ascension',         pop:0.70, hold:[22,34], art:{ boltzRotSlider:0.013, speedSlider:0.62, alignSlider:0.55, imgScaleSlider:0.06, auraOpacitySlider:0.95, climaxPopSlider:0.3,
+  ascension:{ label:'an ascension',         pop:0.70, hold:[22,34], art:{ boltzRotSlider:0.013, speedSlider:0.62, alignSlider:0.55, imgScaleSlider:0.06, auraOpacitySlider:0.95,
                                                                           sndLeadSlider:0.85, sndCanonSlider:0.70, leadOctSlider:1.0, canonOctSlider:0.75, tempoSlider:0.35,
                                                                           sndDroneSlider:0.30, sndColorSlider:0.70, sndClimaxSlider:0.80, sndAuraSlider:0.95, sndSizeSlider:0.30, sndMasterSlider:0.9 } } // everything climbs: tiny boids, top octave, halo wide
 };
@@ -6115,6 +6120,15 @@ const _conductorStyles = {
   }}
 };
 function _condStatus(m){ const el=document.getElementById('conductorStatus'); if(el) el.textContent=m; }
+// "set to settling" calibrates climax pop by hand; the conductor derives the same slider from each
+// movement's goal. Rather than let one silently undo the other, the button goes dead while the
+// conductor performs, and says why. The live '~N' settling readout keeps updating either way.
+function _condClimaxBtnUI(){
+  const b=document.getElementById('autoClimaxBtn'); if(!b) return;
+  b.disabled=_condOn; b.style.opacity=_condOn?'0.4':''; b.style.cursor=_condOn?'not-allowed':'';
+  b.title=_condOn ? 'The conductor is driving climax pop — it follows each movement\'s population goal. Stop the conductor to set it by hand.'
+                  : 'Set climax pop to the current settling average';
+}
 function _condStyle(){ return _conductorStyles[document.getElementById('conductorStyle').value] || _conductorStyles.drama; }
 function _condDecide(){
   // A style may declare itself LITERAL (its values are taken exactly as written — no arc scaling,
@@ -6148,7 +6162,22 @@ function _condTick(ts){
     const drive=_condDrive(), gmix=(drive+1)/2;      // 0 = anti-natal … 1 = pro-natal
     const crit = _popEMAready && (_condPop||0) < Math.max(25, 0.18*_condTargetPop()); // safety veto near extinction
     const f=0.05/_condPaceMul*_condEaseMul, tsec=ts/1000; // ease (~1.35 s half-life at "measured"; a calm style slows it further)
+    // climax pop is DERIVED, not a fraction. The climax voice blooms only while the living
+    // population DWELLS near CLIMAX_POP (bell width max(25, pop*0.18)), so that slider has to name
+    // a REACHABLE number of boids. Treating it like every other control — a fraction of its own
+    // 2–2000 range — parked it near 800 while 30 boids swam below: the level fader animated, but
+    // the bell was ~e^-29 and the voice never spoke. Aim at the movement's population goal; if the
+    // society is stubbornly living somewhere else, stay within reach of the observed settling
+    // average so the bloom is still attainable. When the controller is on target the clamp is
+    // inactive and the climax is earned at the goal, exactly as designed.
+    const desiredPop=_condPopFrac*_condTargetPop();
+    let climaxTgt=desiredPop;
+    if(_popEMAready && _popEMA>0) climaxTgt=Math.max(0.55*_popEMA, Math.min(1.8*_popEMA, climaxTgt));
     for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(!el) continue;
+      if(id==='climaxPopSlider'){
+        if(_condCur[id]===undefined) _condCur[id]=parseFloat(el.value);
+        _condCur[id]+=(climaxTgt-_condCur[id])*f; _condSet(id, _condCur[id]); continue;
+      }
       let fr;
       if(_condArt[id]!==undefined && !(crit && _condLethal[id])) fr=_condArt[id];               // movement claims it (unless critical + lethal)
       else if(_condDemo[id]){ const p=_condDemo[id]; fr=p[0]+(p[1]-p[0])*gmix; }                // controller owns demographics
@@ -6159,8 +6188,9 @@ function _condTick(ts){
       if(_condCur[id]===undefined) _condCur[id]=parseFloat(el.value);
       _condCur[id]+=(tg-_condCur[id])*(_condSnap[id]?1:f); _condSet(id, _condCur[id]);          // octaves jump, everything else glides
     }
-    if(_popEMAready){ const desired=Math.round(_condPopFrac*_condTargetPop());
-      _condStatus(_condLabel+' · pop '+(_condPop||0)+'/'+desired+(drive>0.5?' ↑ breeding hard':drive<-0.4?' ↓ thinning':'')); }
+    if(_popEMAready) _condStatus(_condLabel+' · pop '+(_condPop||0)+'/'+Math.round(desiredPop)
+      +(drive>0.5?' ↑ breeding hard':drive<-0.4?' ↓ thinning':'')
+      +' · climax @'+Math.round(climaxTgt)); // shown so a silent climax is diagnosable at a glance
   }
   _condRAF=requestAnimationFrame(_condTick);
 }
@@ -6171,11 +6201,13 @@ function _condStart(){
   _condDecide();
   _condRAF=requestAnimationFrame(_condTick);
   const b=document.getElementById('conductorBtn'); if(b){ b.classList.add('on'); b.textContent='🤖 conductor: on'; }
+  _condClimaxBtnUI();
 }
 function _condStop(){
   if(!_condOn) return;
   _condOn=false; if(_condRAF){ cancelAnimationFrame(_condRAF); _condRAF=0; }
   const b=document.getElementById('conductorBtn'); if(b){ b.classList.remove('on'); b.textContent='🤖 conductor: off'; }
+  _condClimaxBtnUI();
   _condStatus('■ stopped');
 }
 _condPaceMul=_condPaceMap[document.getElementById('conductorPace').value]||1;
