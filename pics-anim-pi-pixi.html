@@ -5965,8 +5965,11 @@ const _condDemo = {
   fatalitySlider: [0.70, 0.00],  // fatality: high → none
   breedDistSlider:[0.20, 1.00],  // conceive distance: strict → generous
   singleSlider:   [0.80, 0.00],  // % staying single: many → none (everyone pairs)
-  sensingSlider:  [0.20, 0.85],  // mate-finding radius: myopic → far-seeing
-  cohKSlider:     [0.30, 0.85],  // cohesion: loose → clustered (so they actually meet)
+  sensingSlider:  [0.30, 0.72],  // mate-finding radius: myopic → far-seeing (narrowed: these two are the most
+  cohKSlider:     [0.45, 0.85],  // cohesion: loose → clustered — VISIBLE levers, and swinging them end to end
+                                 // made the flock reshape constantly; the strong demographic authority is in
+                                 // the breeding/lifespan/fatality rows above. Widen again if the controller
+                                 // starts undershooting large target populations.
   divorceSlider:  [0.60, 0.05],  // divorce rate: high → low
   predatorSlider: [0.35, 0.00]   // predators thin the herd → none (a storm overrides this)
 };
@@ -5979,8 +5982,14 @@ const _condArtIds = ['boltzRotSlider','speedSlider','alignSlider','imgScaleSlide
   'sndMasterSlider','sndSpreadSlider','sndDiseaseSlider','sndPredSlider','sndClimaxSlider','sndThudSlider',
   'sndDroneSlider','sndColorSlider','sndChimeSlider','sndSighSlider','sndSizeSlider','sndAuraSlider',
   'sndLeadSlider','sndCanonSlider','leadOctSlider','canonOctSlider','tempoSlider'];
+// TEMP (boltzRotSlider) IS THE RESTLESSNESS DIAL, AND IT IS FIERCE. _BOLTZ_ROT = slider/100 is the
+// per-frame gaussian sigma IN RADIANS on every boid's heading, so slider 2 (displayed "0.02") is
+// already a visibly jittery tank. The conductor used to rest at fraction 0.25 of the 0–150 range =
+// slider 37 = 0.37 rad = 21° of random kick EVERY FRAME, which is what made all the movements look
+// wild. All temp fractions here are now in the 0.000–0.05 band (slider 0–7); treat anything above
+// ~0.02 as a deliberately chaotic scene, not a default.
 const _condArtHome = { // resting fractions for the non-demographic sliders
-  boltzRotSlider:0.25, speedSlider:0.5, alignSlider:0.35, imgScaleSlider:0.12, auraOpacitySlider:0.45,
+  boltzRotSlider:0.006, speedSlider:0.5, alignSlider:0.35, imgScaleSlider:0.12, auraOpacitySlider:0.45,
   predatorDietSlider:0.5, climaxPopSlider:0.4, popCeilSlider:0.0, // ceiling OFF so it never caps growth
   sndMasterSlider:0.85, sndSpreadSlider:0.55, sndDiseaseSlider:0.5, sndPredSlider:0.5, sndClimaxSlider:0.55, sndThudSlider:0.55,
   sndDroneSlider:0.55, sndColorSlider:0.55, sndChimeSlider:0.5, sndSighSlider:0.5, sndSizeSlider:0.5, sndAuraSlider:0.5,
@@ -5990,33 +5999,33 @@ const _condArtHome = { // resting fractions for the non-demographic sliders
 const _condSnap = { leadOctSlider:1, canonOctSlider:1 }; // discrete controls: jump at the movement change, never crawl between octaves
 // Rubato: a slow breathing wobble laid over the target so a held movement is never perfectly static.
 // Amplitude in fraction-space; period + phase are re-rolled for every movement.
-const _condLFOAmp = { tempoSlider:0.045, auraOpacitySlider:0.10, sndSpreadSlider:0.08, boltzRotSlider:0.06, sndColorSlider:0.06, imgScaleSlider:0.035 };
+const _condLFOAmp = { tempoSlider:0.045, auraOpacitySlider:0.10, sndSpreadSlider:0.08, boltzRotSlider:0.004, sndColorSlider:0.06, imgScaleSlider:0.035 };
 const _condLFOPer={}, _condLFOPh={};
 const _CONDUCT_POOL = _condDemoIds.concat(_condArtIds);
 // Movements: pop = desired population as a FRACTION of the user's target-pop; art = character overrides.
 const _CONDUCT_MOVES = {
-  awaken:   { label:'awakening',            pop:0.75, hold:[24,36], art:{ boltzRotSlider:0.20, auraOpacitySlider:0.5, sndMasterSlider:0.85, sndClimaxSlider:0.4, sndSpreadSlider:0.45,
+  awaken:   { label:'awakening',            pop:0.75, hold:[24,36], art:{ boltzRotSlider:0.008, auraOpacitySlider:0.5, sndMasterSlider:0.85, sndClimaxSlider:0.4, sndSpreadSlider:0.45,
                                                                           sndLeadSlider:0.45, sndCanonSlider:0.20, leadOctSlider:0.333, canonOctSlider:0.75, tempoSlider:0.13, sndDroneSlider:0.65, sndColorSlider:0.45 } },
-  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.12, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, climaxPopSlider:0.42, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35,
+  bloom:    { label:'blooming to a climax', pop:1.15, hold:[30,46], art:{ boltzRotSlider:0.005, alignSlider:0.6, imgScaleSlider:0.30, auraOpacitySlider:0.9, climaxPopSlider:0.42, sndClimaxSlider:0.85, sndMasterSlider:0.95, sndSpreadSlider:0.35,
                                                                           sndLeadSlider:0.90, sndCanonSlider:0.70, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.31, sndColorSlider:0.80, sndChimeSlider:0.70, sndAuraSlider:0.7 } },
-  diaspora: { label:'the diaspora',         pop:0.60, hold:[16,26], art:{ cohKSlider:0.03, sensingSlider:0.25, alignSlider:0.10, boltzRotSlider:0.85, speedSlider:0.72, imgScaleSlider:0.08, sndSpreadSlider:0.95, auraOpacitySlider:0.35, sndMasterSlider:0.9,
+  diaspora: { label:'the diaspora',         pop:0.60, hold:[16,26], art:{ cohKSlider:0.03, sensingSlider:0.25, alignSlider:0.10, boltzRotSlider:0.045, speedSlider:0.72, imgScaleSlider:0.08, sndSpreadSlider:0.95, auraOpacitySlider:0.35, sndMasterSlider:0.9,
                                                                           sndLeadSlider:0.35, sndCanonSlider:0.85, leadOctSlider:0.333, canonOctSlider:1.0, tempoSlider:0.13, sndColorSlider:0.30, sndSighSlider:0.75 } }, // voices two octaves apart — the parts scatter with the flock
-  dieoff:   { label:'a die-off',            pop:0.35, hold:[16,26], art:{ fatalitySlider:0.72, lifeSlider:0.28, boltzRotSlider:0.35, sndDiseaseSlider:0.75, sndThudSlider:0.9, sndMasterSlider:0.92,
+  dieoff:   { label:'a die-off',            pop:0.35, hold:[16,26], art:{ fatalitySlider:0.72, lifeSlider:0.28, boltzRotSlider:0.020, sndDiseaseSlider:0.75, sndThudSlider:0.9, sndMasterSlider:0.92,
                                                                           sndLeadSlider:0.50, sndCanonSlider:0.30, leadOctSlider:0.333, canonOctSlider:0.25, tempoSlider:0.10, sndDroneSlider:0.80, sndColorSlider:0.28, sndSighSlider:0.90, sndChimeSlider:0.30, sndClimaxSlider:0.2 } }, // canon answers BELOW: a dark echo
-  predators:{ label:'a predator storm',     pop:0.55, hold:[16,26], art:{ predatorSlider:0.78, predatorDietSlider:0.75, cohKSlider:0.55, boltzRotSlider:0.35, sndPredSlider:0.92, sndMasterSlider:0.94,
+  predators:{ label:'a predator storm',     pop:0.55, hold:[16,26], art:{ predatorSlider:0.78, predatorDietSlider:0.75, cohKSlider:0.55, boltzRotSlider:0.022, sndPredSlider:0.92, sndMasterSlider:0.94,
                                                                           sndLeadSlider:0.30, sndCanonSlider:0.25, leadOctSlider:0.667, canonOctSlider:0.5, tempoSlider:0.40, sndColorSlider:0.35, sndThudSlider:0.8, sndSighSlider:0.7 } }, // hurried, the melody driven under the ostinato
-  calm:     { label:'a calm',               pop:0.85, hold:[26,40], art:{ boltzRotSlider:0.22, auraOpacitySlider:0.5, sndSpreadSlider:0.5, sndDiseaseSlider:0.4, sndPredSlider:0.4, sndClimaxSlider:0.5, sndThudSlider:0.5, sndMasterSlider:0.85,
+  calm:     { label:'a calm',               pop:0.85, hold:[26,40], art:{ boltzRotSlider:0.006, auraOpacitySlider:0.5, sndSpreadSlider:0.5, sndDiseaseSlider:0.4, sndPredSlider:0.4, sndClimaxSlider:0.5, sndThudSlider:0.5, sndMasterSlider:0.85,
                                                                           sndLeadSlider:0.60, sndCanonSlider:0.50, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.20, sndColorSlider:0.55, sndDroneSlider:0.5 } },
-  nocturne: { label:'a nocturne',           pop:0.45, hold:[28,44], art:{ boltzRotSlider:0.10, speedSlider:0.25, alignSlider:0.30, cohKSlider:0.70, imgScaleSlider:0.10, auraOpacitySlider:0.75, climaxPopSlider:0.25,
+  nocturne: { label:'a nocturne',           pop:0.45, hold:[28,44], art:{ boltzRotSlider:0.002, speedSlider:0.25, alignSlider:0.30, cohKSlider:0.70, imgScaleSlider:0.10, auraOpacitySlider:0.75, climaxPopSlider:0.25,
                                                                           sndLeadSlider:0.70, sndCanonSlider:0.60, leadOctSlider:0.333, canonOctSlider:0.25, tempoSlider:0.09, sndDroneSlider:0.70, sndColorSlider:0.35,
                                                                           sndChimeSlider:0.35, sndThudSlider:0.35, sndClimaxSlider:0.30, sndAuraSlider:0.80, sndSpreadSlider:0.35, sndSizeSlider:0.65, sndMasterSlider:0.82 } }, // few, slow, low and lit — the quiet movement
-  invention:{ label:'a two-part invention', pop:0.90, hold:[24,38], art:{ boltzRotSlider:0.08, speedSlider:0.70, alignSlider:0.70, cohKSlider:0.70, imgScaleSlider:0.15, auraOpacitySlider:0.4,
+  invention:{ label:'a two-part invention', pop:0.90, hold:[24,38], art:{ boltzRotSlider:0.004, speedSlider:0.70, alignSlider:0.70, cohKSlider:0.70, imgScaleSlider:0.15, auraOpacitySlider:0.4,
                                                                           sndLeadSlider:0.95, sndCanonSlider:0.90, leadOctSlider:0.667, canonOctSlider:0.75, tempoSlider:0.47,
                                                                           sndDroneSlider:0.30, sndColorSlider:0.35, sndClimaxSlider:0.35, sndSpreadSlider:0.30, sndChimeSlider:0.4, sndThudSlider:0.4, sndMasterSlider:0.92 } }, // pads pulled back so the counterpoint is the piece
-  procession:{label:'a procession',         pop:1.00, hold:[26,40], art:{ boltzRotSlider:0.05, speedSlider:0.55, alignSlider:0.85, cohKSlider:0.80, imgScaleSlider:0.22, auraOpacitySlider:0.55,
+  procession:{label:'a procession',         pop:1.00, hold:[26,40], art:{ boltzRotSlider:0.002, speedSlider:0.55, alignSlider:0.85, cohKSlider:0.80, imgScaleSlider:0.22, auraOpacitySlider:0.55,
                                                                           sndLeadSlider:0.75, sndCanonSlider:0.65, leadOctSlider:0.667, canonOctSlider:0.5, tempoSlider:0.25,
                                                                           sndDroneSlider:0.60, sndColorSlider:0.60, sndSizeSlider:0.65, sndSpreadSlider:0.30, sndMasterSlider:0.9 } }, // canon at the UNISON one bar behind = a round, over a marching flock
-  ascension:{ label:'an ascension',         pop:0.70, hold:[22,34], art:{ boltzRotSlider:0.30, speedSlider:0.62, alignSlider:0.55, imgScaleSlider:0.06, auraOpacitySlider:0.95, climaxPopSlider:0.3,
+  ascension:{ label:'an ascension',         pop:0.70, hold:[22,34], art:{ boltzRotSlider:0.013, speedSlider:0.62, alignSlider:0.55, imgScaleSlider:0.06, auraOpacitySlider:0.95, climaxPopSlider:0.3,
                                                                           sndLeadSlider:0.85, sndCanonSlider:0.70, leadOctSlider:1.0, canonOctSlider:0.75, tempoSlider:0.35,
                                                                           sndDroneSlider:0.30, sndColorSlider:0.70, sndClimaxSlider:0.80, sndAuraSlider:0.95, sndSizeSlider:0.30, sndMasterSlider:0.9 } } // everything climbs: tiny boids, top octave, halo wide
 };
@@ -6091,7 +6100,7 @@ const _conductorStyles = {
       sndSpreadSlider:_condRnd(0.30,0.70), sndChimeSlider:_condRnd(0.30,0.55), sndThudSlider:_condRnd(0.30,0.55),
       sndDiseaseSlider:0.35, sndPredSlider:0.35, sndAuraSlider:_condRnd(0.4,0.8), sndSizeSlider:_condRnd(0.4,0.7), sndMasterSlider:0.9,
       cohKSlider:_condRnd(0.50,0.85), alignSlider:_condRnd(0.30,0.80), speedSlider:_condRnd(0.35,0.80),
-      imgScaleSlider:_condRnd(0.06,0.24), boltzRotSlider:_condRnd(0.05,0.35), auraOpacitySlider:_condRnd(0.35,0.8) };
+      imgScaleSlider:_condRnd(0.06,0.24), boltzRotSlider:_condRnd(0.001,0.020), auraOpacitySlider:_condRnd(0.35,0.8) };
     const lab = solo<0.15 ? 'the canon alone' : solo>0.88 ? 'the lead alone' : (p[1]===0.5?'a round at the unison':'a two-part invention');
     return { label:lab, pop:_condRnd(0.75,1.0), hold:_condRnd(22,40)*_condPaceMul, art };
   }}
