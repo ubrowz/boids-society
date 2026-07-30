@@ -1494,13 +1494,13 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 
 <section class="panel" id="conductorPanel">
 <h2>AI conductor <span style="font:500 11px/1 'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:0;text-transform:none;">— it plays the sliders for you</span></h2>
-<div class="mini-note" style="margin:-2px 0 4px;">A self-contained performer that eases the controls over time so the society composes itself — no internet, works offline. It drives the sliders through the same events the recorder captures, so you can ● record its performance and 📦 export it. Built for the flock world; it touches the simulation sliders and the whole mixer — including the lead, the canon, their octaves and the tempo, so each movement scores its own melody — but never the top-row buttons. No two readings of a movement are alike, and a long performance builds: scenes open restrained and grow bolder over the first nine minutes.</div>
+<div class="mini-note" style="margin:-2px 0 4px;">A self-contained performer that eases the controls over time so the society composes itself — no internet, works offline. It drives the sliders through the same events the recorder captures, so you can ● record its performance and 📦 export it. Built for the flock world; it touches the simulation sliders and the whole mixer — including the lead, the canon, their octaves and the tempo, so each movement scores its own melody — but never the top-row buttons. No two readings of a movement are alike, and a long performance builds: scenes open restrained and grow bolder over the first nine minutes. Zen is the exception — it holds the tank near-still, floating at the lowest speeds with the thermal mixing off, and takes minutes to move anything.</div>
 <div class="cond-row">
   <button id="conductorBtn">🤖 conductor: off</button>
   <span class="cond-lab">style</span>
   <select id="conductorStyle" class="cond-sel">
     <option value="drama">Drama — reactive, goal-seeking</option>
-    <option value="zen">Zen — calm wander</option>
+    <option value="zen">Zen — floating, near-still</option>
     <option value="moods">Moods — cycle named scenes</option>
     <option value="counterpoint">Counterpoint — it composes the melody</option>
   </select>
@@ -6033,6 +6033,7 @@ const _condDisrupt = { diaspora:1, dieoff:1, predators:1, ascension:1, nocturne:
 const _condLethal = { fatalitySlider:1, predatorSlider:1, lifeSlider:1 }; // released to the controller if pop goes critical (safety veto)
 let _condOn=false, _condRAF=0, _condActuate=0, _condHoldUntil=0, _condPaceMul=1, _condLabel='';
 let _condInteg=0, _condPopFrac=0.75, _condArt={}, _condT0=0;
+let _condEaseMul=1, _condLFOMul=1; // per-style actuation slowdown (see _condDecide)
 const _condCur={};
 const _condPaceMap={ languid:1.6, measured:1.0, restless:0.6 };
 function _condRnd(a,b){ return a+Math.random()*(b-a); }
@@ -6077,12 +6078,20 @@ const _conductorStyles = {
     this._last=key; this._hist=[key].concat(this._hist).slice(0,2); // don't repeat the last two scenes when there's a choice
     return _condGesture(key);
   }},
-  zen: { label:'Zen', next(){ // a calm, coherent plateau with slow drift, no disruptions
-    const art={ boltzRotSlider:_condRnd(0.15,0.30), auraOpacitySlider:_condRnd(0.4,0.6), imgScaleSlider:_condRnd(0.08,0.20),
-      cohKSlider:_condRnd(0.6,0.85), sndMasterSlider:0.82, sndSpreadSlider:0.5, sndClimaxSlider:0.55,
+  // Zen: FLOATING, not flocking. Near-zero thermal mixing, the slowest speeds the sim offers, wide
+  // soft cohesion — boids should hang and drift rather than dart. literal:true takes these values
+  // exactly as written (no arc scaling toward the livelier resting values, no ±0.06 jitter), and
+  // ease/lfo slow the actuation right down so nothing visibly moves on the dashboard either. It
+  // claims sensing as well, so the population controller can't swing the flock radius underneath it.
+  zen: { label:'Zen', literal:true, ease:0.35, lfo:0.30, next(){
+    const art={ boltzRotSlider:_condRnd(0.000,0.006),   // temp 0.00–0.01 — well under the 0.02 that already reads as restless
+      speedSlider:_condRnd(0.05,0.16),                  // slider 1–2 of 1–10: a drift, not a dash
+      alignSlider:_condRnd(0.22,0.38), cohKSlider:_condRnd(0.55,0.75), sensingSlider:_condRnd(0.35,0.55),
+      auraOpacitySlider:_condRnd(0.4,0.6), imgScaleSlider:_condRnd(0.10,0.18), predatorSlider:0,
+      sndMasterSlider:0.82, sndSpreadSlider:0.5, sndClimaxSlider:0.55, sndDiseaseSlider:0.30, sndPredSlider:0.25, sndThudSlider:0.40,
       sndLeadSlider:_condRnd(0.4,0.7), sndCanonSlider:_condRnd(0.3,0.6), tempoSlider:_condRnd(0.08,0.18),
       leadOctSlider:_condPick([0.333,0.667]), canonOctSlider:0.75, sndDroneSlider:_condRnd(0.5,0.7), sndColorSlider:_condRnd(0.45,0.65) };
-    return { label:'drifting', pop:_condRnd(0.7,0.9), hold:_condRnd(34,52)*_condPaceMul, art };
+    return { label:'drifting', pop:_condRnd(0.7,0.9), hold:_condRnd(70,110)*_condPaceMul, art }; // long scenes: minutes, not seconds
   }},
   moods: { label:'Moods', _seq:['awaken','bloom','calm','diaspora','nocturne','procession','dieoff','calm','invention','predators','ascension','calm'], _i:0, next(){
     return _condGesture(this._seq[this._i++ % this._seq.length]);
@@ -6108,18 +6117,26 @@ const _conductorStyles = {
 function _condStatus(m){ const el=document.getElementById('conductorStatus'); if(el) el.textContent=m; }
 function _condStyle(){ return _conductorStyles[document.getElementById('conductorStyle').value] || _conductorStyles.drama; }
 function _condDecide(){
-  const st=_condStyle(), g=st.next(), con=_condContrast();
-  _condPopFrac = (1+(g.pop-1)*con) * _condRnd(0.93,1.09);      // arc-scaled, then jittered
+  // A style may declare itself LITERAL (its values are taken exactly as written — no arc scaling,
+  // no jitter), and may slow the actuation with ease/lfo multipliers. Zen needs all three: arc
+  // scaling would drag its near-zero temp back up toward the livelier resting value, and jitter
+  // alone is ±0.06 — nine slider units of temp, five times what already looks restless.
+  const st=_condStyle(), g=st.next(), lit=!!(g.literal||st.literal);
+  const con = lit ? 1 : _condContrast();
+  _condEaseMul = g.ease||st.ease||1;
+  _condLFOMul  = (g.lfo!==undefined?g.lfo:(st.lfo!==undefined?st.lfo:1));
+  _condPopFrac = lit ? g.pop : (1+(g.pop-1)*con)*_condRnd(0.93,1.09); // arc-scaled, then jittered
   _condArt={};
   for(const id in g.art) if(_CONDUCT_POOL.indexOf(id)>=0){
     let fr=g.art[id];
-    if(!_condSnap[id]){                                        // discrete controls take their value literally
+    if(!_condSnap[id] && !lit){                                // discrete + literal controls take their value as-is
       const home=_condArtHome[id]!==undefined?_condArtHome[id]:0.4;
       fr = home+(fr-home)*con + _condRnd(-0.06,0.06);           // jitter: no two readings of a movement are identical
     }
     _condArt[id]=Math.max(0,Math.min(1,fr));
   }
-  for(const id in _condLFOAmp){ _condLFOPer[id]=_condRnd(14,46)*_condPaceMul; _condLFOPh[id]=Math.random()*6.283; } // re-roll the rubato
+  // rubato periods stretch with the ease, so a calm style breathes over minutes rather than seconds
+  for(const id in _condLFOAmp){ _condLFOPer[id]=_condRnd(14,46)*_condPaceMul/Math.max(0.2,_condEaseMul); _condLFOPh[id]=Math.random()*6.283; }
   _condHoldUntil=performance.now()+g.hold*1000;
   _condLabel='▮ '+st.label+' — '+g.label; _condStatus(_condLabel);
 }
@@ -6130,14 +6147,14 @@ function _condTick(ts){
     _condActuate=ts;
     const drive=_condDrive(), gmix=(drive+1)/2;      // 0 = anti-natal … 1 = pro-natal
     const crit = _popEMAready && (_condPop||0) < Math.max(25, 0.18*_condTargetPop()); // safety veto near extinction
-    const f=0.05/_condPaceMul, tsec=ts/1000;          // ease (~1.35 s half-life at "measured")
+    const f=0.05/_condPaceMul*_condEaseMul, tsec=ts/1000; // ease (~1.35 s half-life at "measured"; a calm style slows it further)
     for(const id of _CONDUCT_POOL){ const el=document.getElementById(id); if(!el) continue;
       let fr;
       if(_condArt[id]!==undefined && !(crit && _condLethal[id])) fr=_condArt[id];               // movement claims it (unless critical + lethal)
       else if(_condDemo[id]){ const p=_condDemo[id]; fr=p[0]+(p[1]-p[0])*gmix; }                // controller owns demographics
       else fr=(_condArtHome[id]!==undefined?_condArtHome[id]:0.4);                              // else rest at home
       const amp=_condLFOAmp[id];
-      if(amp && _condLFOPer[id]) fr+=amp*Math.sin(6.283*tsec/_condLFOPer[id]+_condLFOPh[id]);   // rubato breathing
+      if(amp && _condLFOPer[id]) fr+=amp*_condLFOMul*Math.sin(6.283*tsec/_condLFOPer[id]+_condLFOPh[id]); // rubato breathing
       const tg=_condFracToVal(id, fr);
       if(_condCur[id]===undefined) _condCur[id]=parseFloat(el.value);
       _condCur[id]+=(tg-_condCur[id])*(_condSnap[id]?1:f); _condSet(id, _condCur[id]);          // octaves jump, everything else glides
