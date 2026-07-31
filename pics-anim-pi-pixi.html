@@ -3941,7 +3941,16 @@ const baseAlpha = alpha * ((fertile||!DIM_INFERTILE) ? 1.0 : 0.55) * Math.min(1,
 
 // aura glow — mode 0 = off, 1 = flat disc, 2 = gradient (three concentric circles)
 if(SHOW_DETAILS && AURA_MODE>0 && AURA_OPACITY>0 && (isBonded||fertile)){
-  const glowR=RADIUS*2.0*zs;
+  // The halo must not be swallowed by the body. Every other decoration scales by rDeco
+  // (= r*_imgScaleShown, defined below with the sprite), but this block runs before it —
+  // the glow is drawn early because it belongs behind the body — and it used to be a flat
+  // RADIUS*2, so past IMG_SCALE≈1.4 the body outgrew it and the "halo" became a translucent
+  // blob painted over the middle of the image (_gfx.boids sits above _gfx.bodySprites).
+  // Take the larger of the two: identical to the old look for every IMG_SCALE ≤ 1, and from
+  // there proportional at the layer's own design ratio of 2× the body. The factor is 2.0 rather
+  // than something smaller because FLAT mode draws at glowR*0.6 — at 1.6 the flat disc would
+  // still sit at 0.96× the body radius, i.e. still swallowed.
+  const glowR=Math.max(RADIUS*2.0*zs, r*_imgScaleShown*2.0);
   // aura follows the boid's own hue (and greys out with the colour toggle, via _drawHex);
   // bonded boids just glow a touch brighter (L60) so they still read as paired, in-palette.
   const glowCol = _drawHex(boid, isBonded ? 60 : 50);
