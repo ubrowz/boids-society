@@ -1921,19 +1921,20 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="bodyImgFName" class="mini-note">0 imgs</span>
 </div>
 <div class="ctrl-row flock-only">
-<label title="Male images that always render upright, regardless of the Upright toggle.">♂ upright</label>
+<label title="Male images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♂ upright</label>
 <input type="file" id="bodyImgMUFile" accept="image/*" multiple style="display:none">
-<button id="bodyImgMUBtn" title="Add one or more PNGs to the male pool that ALWAYS stay upright (ignore the Upright toggle)" class="mini-btn">add ↑</button>
+<button id="bodyImgMUBtn" title="Add one or more PNGs to the male pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
 <button id="bodyImgMUClear" title="Clear the male always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgMUName" class="mini-note">0 imgs</span>
 </div>
 <div class="ctrl-row flock-only">
-<label title="Female images that always render upright, regardless of the Upright toggle.">♀ upright</label>
+<label title="Female images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♀ upright</label>
 <input type="file" id="bodyImgFUFile" accept="image/*" multiple style="display:none">
-<button id="bodyImgFUBtn" title="Add one or more PNGs to the female pool that ALWAYS stay upright (ignore the Upright toggle)" class="mini-btn">add ↑</button>
+<button id="bodyImgFUBtn" title="Add one or more PNGs to the female pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
 <button id="bodyImgFUClear" title="Clear the female always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgFUName" class="mini-note">0 imgs</span>
 </div>
+<div class="mini-note">Upright images are also <b>unique</b>: only one boid can wear each at a time. They are claimed first, released when their wearer dies, and picked up by the next boid to look — so a face travels through the tank instead of being duplicated. Everyone else wears the ordinary images; if the upright pool is the only one and all its faces are taken, the rest fall back to the plain body.</div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
 <input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
@@ -2671,6 +2672,12 @@ if(_customBoidPNG) _loadTex(_customBoidPNG, t=>{ _sharedTex=t; _predTex=t; });
 else { _sharedTex=_defaultTex; _predTex=_defaultTex; }
 _rebuildPool(_boidPoolM, _poolPNG_M, false, false); _rebuildPool(_boidPoolM, _poolPNG_MU, true, true); // normal images then the always-upright ones, tagged
 _rebuildPool(_boidPoolF, _poolPNG_F, false, false); _rebuildPool(_boidPoolF, _poolPNG_FU, true, true);
+// The pools are rebuilt from scratch, so every index shifts: a boid's imgIdx now names a different
+// image, and two boids could end up on the same upright unique. Drop all assignments and let them
+// re-pick lazily on the next draw — that is the only way the uniqueness rule stays honest across an
+// upload or a clear.
+if(typeof boids!=='undefined') for(const b of boids) b.imgIdx=-1;
+_imgUseStale=true;
 }
 // "Photo tank": EVERY boid on screen wears an uploaded image — either both per-sex pools are
 // stocked, or a shared upload stands in for whoever is missing. In that world the predator's
@@ -2682,18 +2689,48 @@ _rebuildPool(_boidPoolF, _poolPNG_F, false, false); _rebuildPool(_boidPoolF, _po
 function _photoTank(){
 return (_boidPoolM.length>0 || !!_customBoidPNG) && (_boidPoolF.length>0 || !!_customBoidPNG);
 }
+// Live per-image usage tally, rebuilt at most once a frame (flagged stale by the draw pass and by
+// any pool change). Assignment used to walk every boid on each pick, which is O(N) per birth; with
+// the uniqueness rule below an unimaged boid retries every frame, so the scan had to go.
+const _imgUse={M:null,F:null}; let _imgUseStale=true;
+function _imgUseTally(){
+if(!_imgUseStale) return;
+const m=new Array(_boidPoolM.length).fill(0), f=new Array(_boidPoolF.length).fill(0);
+if(typeof boids!=='undefined') for(const b of boids){
+  if(!b.alive || b.imgIdx===undefined || b.imgIdx<0) continue;
+  const a = b.sex==='M'?m:f; if(b.imgIdx<a.length) a[b.imgIdx]++;
+}
+_imgUse.M=m; _imgUse.F=f; _imgUseStale=false;
+}
 // Image assignment: prefer the least-used image in the sex's pool so a small set of
 // uploaded images spreads evenly instead of clumping by chance. Counts only living
 // boids of that sex, so as boids die and are replaced the distribution self-heals;
 // a random tie-break keeps it varied when many images share the lowest count (the
 // large-population case). Called once per boid at birth (first draw) — see drawBoid.
+//
+// THE UPRIGHT-ONLY RULE: an image uploaded through the "♂/♀ upright" rows is UNIQUE — at most one
+// living boid may wear it at a time. Those are the pool entries tagged upright:true. Free ones have
+// a count of 0, so the least-used rule claims them first; once worn they drop out of the candidate
+// list entirely and everyone else falls back to the ordinary images. When a wearer dies its image is
+// released and the next boid to look picks it up, so a unique face moves through the tank rather
+// than being duplicated. Returns -1 when the pool holds nothing this boid may wear (an upright-only
+// pool with every image already taken); the caller then draws the shared/default body instead.
+// Uniqueness is per sex pool: the same file uploaded to BOTH ♂ and ♀ upright is two entries, and can
+// appear twice. Returns an index into the sex's pool.
 function _pickLeastUsedImg(sex, poolLen){
-if(poolLen<=1) return 0;
-const counts=new Array(poolLen).fill(0);
-for(const b of boids){ if(b.alive && b.sex===sex && b.imgIdx>=0 && b.imgIdx<poolLen) counts[b.imgIdx]++; }
-let min=Infinity; for(const c of counts) if(c<min) min=c;
-const cands=[]; for(let i=0;i<poolLen;i++) if(counts[i]===min) cands.push(i);
-return cands[Math.floor(Math.random()*cands.length)];
+if(poolLen<=0) return -1;
+_imgUseTally();
+const pool = sex==='M' ? _boidPoolM : _boidPoolF;
+const counts = (sex==='M' ? _imgUse.M : _imgUse.F) || [];
+const taken = i => pool[i] && pool[i].upright && (counts[i]||0)>0; // a unique already on a living boid
+let min=Infinity;
+for(let i=0;i<poolLen;i++){ if(taken(i)) continue; const c=counts[i]||0; if(c<min) min=c; }
+if(min===Infinity) return -1;                    // every image is a taken unique
+const cands=[];
+for(let i=0;i<poolLen;i++){ if(taken(i)) continue; if((counts[i]||0)===min) cands.push(i); }
+const idx=cands[Math.floor(Math.random()*cands.length)];
+counts[idx]=(counts[idx]||0)+1;                  // reserve it, so two boids picking in one frame can't collide
+return idx;
 }
 function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
 function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
@@ -3988,10 +4025,14 @@ const spr=_getBodySprite(_spriteCount++);
 const _pool = boid.sex==='M' ? _boidPoolM : _boidPoolF;
 let _bt, _forceUpright=false;
 if(_pool.length){
+  // imgIdx -1 = "nothing free to wear" (upright-only pool, all uniques taken). Retry every frame:
+  // the tally is cached per frame so this is O(pool), and it means a unique freed by a death is
+  // picked up on the very next frame.
   if(boid.imgIdx===undefined || boid.imgIdx<0 || boid.imgIdx>=_pool.length)
     boid.imgIdx = _pickLeastUsedImg(boid.sex, _pool.length);
-  const _e = _pool[boid.imgIdx];
-  _bt = _e.tex; _forceUpright = _e.upright; // images from the "always upright" uploads ignore the toggle
+  const _e = boid.imgIdx>=0 ? _pool[boid.imgIdx] : null;
+  if(_e){ _bt = _e.tex; _forceUpright = _e.upright; } // images from the "always upright" uploads ignore the toggle
+  else _bt = _sharedTex || _defaultTex;
 } else {
   _bt = _sharedTex || _defaultTex;
 }
@@ -5505,6 +5546,7 @@ updateDisease(dt);
 
 // hide all pooled sprites then re-show only those needed this frame
 _spriteCount=0;
+_imgUseStale=true; // re-tally image usage once this frame (upright uniqueness + least-used spread)
 for(const s of _bodySprites) s.visible=false;
 _gfx.tails.clear();     // boid forked tail fins
 _gfx.predFin.clear();   // predator trail + tail fin
