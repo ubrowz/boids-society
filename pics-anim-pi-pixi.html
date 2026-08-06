@@ -5534,7 +5534,16 @@ function astroFrame(dt){
 }
 
 // ── main loop ─────────────────────────────────────────────────────────────────
-const TARGET_FPS = 30;
+// Lowered 30 → 24 for the Pi. Judder comes from VARIANCE in frame time, not from a low rate: a
+// target the machine can always meet paces evenly, while a target it keeps missing does not.
+// NB the display quantises this. rAF only fires on refresh boundaries, so on a 60Hz panel the
+// reachable rates are 60/30/20/15 — a 24 target lands on 20 (every 3rd refresh), steady. That is
+// the intent; it buys the Pi ~50ms of headroom per frame instead of 33ms.
+// NB ALSO: movement is per-frame, not per-second (boid.x += boid.vx with no dt term), so fewer
+// frames per second means less ground covered per second — the flock will look slower, and will
+// breed a little less, since the biology clock still runs on real time. Raise the speed slider to
+// compensate if the new pace is too sedate.
+const TARGET_FPS = 24;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
 const _fpsEl = document.getElementById('fpsDisplay');
 let _statusThrottle = 0; // updateStatus runs every 5th frame (~6fps) — it's O(N²)
