@@ -3208,6 +3208,17 @@ if(px===0&&py===0) return;
 steerToward(boid,boid.x+px*100,boid.y+py*100,2.0);
 }
 
+// Render-position low-pass. Same idea as _drawAngle's 0.20 lerp on the heading, applied to
+// translation. k=0.35 → a steady-state lag of v*(1-k)/k ≈ 7.5px at the default speed, which is
+// invisible on a flock (there is no un-lagged reference on screen) but enough to absorb a
+// frame's worth of jitter. Trails are recorded from the SAME filtered path, so a boid always
+// sits exactly on its own trail head rather than drifting behind it.
+const _DRAW_POS_K = 0.35;
+function _drawPosStep(b){
+if(b._drawX===undefined){ b._drawX=b.x; b._drawY=b.y; return; }
+b._drawX += (b.x-b._drawX)*_DRAW_POS_K;
+b._drawY += (b.y-b._drawY)*_DRAW_POS_K;
+}
 function clampToBounds(boid){
 const w=canvas.width,h=canvas.height;
 let bounced=false;
@@ -3220,6 +3231,7 @@ boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
 if(bounced){
   boid._sa=Math.atan2(boid.vy,boid.vx);       // physics angle: snap immediately
   boid._drawAngle=boid._sa;                    // display angle: snap too — avoids lerping through 180°
+  boid._drawX=boid.x; boid._drawY=boid.y;      // and the display position, or the lag pokes through the wall
 }
 }
 
@@ -3959,7 +3971,10 @@ const flashTime=spawnFlashPairs.get(key)||0;
 const lw = flashTime>0 ? 2.4 : fertile ? 1.8 : 1.3;
 const a  = flashTime>0 ? 0.55 : fertile ? 0.40 : 0.28;
 g.lineStyle(lw*((zScaleOf(boid)+zScaleOf(partner))/2), 0xffffff, alpha*a);
-g.moveTo(boid.x,boid.y); g.lineTo(partner.x,partner.y);
+// filtered positions, so the threads stay attached to the bodies. Guarded: a boid drawn before
+// its first _drawPosStep has no _drawX yet, and undefined in a Graphics path is NaN geometry.
+g.moveTo(boid._drawX!==undefined?boid._drawX:boid.x, boid._drawY!==undefined?boid._drawY:boid.y);
+g.lineTo(partner._drawX!==undefined?partner._drawX:partner.x, partner._drawY!==undefined?partner._drawY:partner.y);
 }
 g.lineStyle(0);
 }
@@ -4070,6 +4085,15 @@ if(boid.birthTimer>0) alpha=_birthAlpha(boid);
 if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
 alpha=Math.max(0,Math.min(1,alpha));
 if(alpha<=0) return;
+// Render from the LOW-PASSED position, never the raw one. Heading has always been filtered
+// (boid._drawAngle lerps toward the true angle), which is why turning looks smooth while
+// translation does not: position and scale land on screen raw, so every per-frame discontinuity
+// shows — the wander's random heading nudges, the separation solver's positional pushes (up to
+// 3.2px/frame per overlapping neighbour, against a boid speed of 4.05px/frame), and any residual
+// frame-time variance. One filter on the rendered position absorbs all three. Physics keeps using
+// the exact positions; only what you see is smoothed. Everything below — sprite, tail, beak, eyes,
+// aura, disease dot, birth ring — reads bx/by, so the whole boid moves as one piece.
+const bx=boid._drawX!==undefined?boid._drawX:boid.x, by=boid._drawY!==undefined?boid._drawY:boid.y;
 
 const isBonded = boid.partnerId!==null;
 const fertile = isFertile(boid);
@@ -4096,11 +4120,11 @@ if(SHOW_DETAILS && AURA_MODE>0 && AURA_OPACITY>0 && (isBonded||fertile)){
   const glowCol = _drawHex(boid, isBonded ? 60 : 50);
   const aA = baseAlpha*AURA_OPACITY; // "aura opacity" slider: scales all glow alphas (clamped below)
   if(AURA_MODE===2){ // gradient — soft radial falloff
-    g.beginFill(glowCol, Math.min(1,aA*0.06)); g.drawCircle(boid.x,boid.y,glowR);      g.endFill();
-    g.beginFill(glowCol, Math.min(1,aA*0.20)); g.drawCircle(boid.x,boid.y,glowR*0.40); g.endFill();
-    g.beginFill(glowCol, Math.min(1,aA*0.40)); g.drawCircle(boid.x,boid.y,glowR*0.15); g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.06)); g.drawCircle(bx,by,glowR);      g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.20)); g.drawCircle(bx,by,glowR*0.40); g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.40)); g.drawCircle(bx,by,glowR*0.15); g.endFill();
   } else { // flat — a single even disc
-    g.beginFill(glowCol, Math.min(1,aA*0.18)); g.drawCircle(boid.x,boid.y,glowR*0.6); g.endFill();
+    g.beginFill(glowCol, Math.min(1,aA*0.18)); g.drawCircle(bx,by,glowR*0.6); g.endFill();
   }
 }
 
@@ -4108,7 +4132,6 @@ if(SHOW_DETAILS && AURA_MODE>0 && AURA_OPACITY>0 && (isBonded||fertile)){
 // Scale r/13 makes the shape appear roughly the right display size;
 // tweak this constant if bodies need to be bigger or smaller.
 const ang=Math.atan2(boid.vy,boid.vx);
-const bx=boid.x, by=boid.y;
 
 // ── smoothed display angle ────────────────────────────────────────────────────
 // Compute _drawAngle FIRST so tail, eyes, beak and sprite all use the same angle.
@@ -4194,9 +4217,9 @@ const noseEdge = rDeco * (_noseOffset / _bodyScale);
 // beak: males only — attaches at the sprite nose edge, points further forward
 if(SHOW_DETAILS && boid.sex==='M'){
   const beakLen=rDeco*(0.3+boid.beakGene/255*1.7);
-  const bkBx=boid.x+cos*noseEdge*0.93, bkBy=boid.y+sin*noseEdge*0.93; // base just inside nose
-  const bkTx=boid.x+cos*(noseEdge+beakLen), bkTy=boid.y+sin*(noseEdge+beakLen);
-  const bkCpx=boid.x+cos*(noseEdge+beakLen*0.5), bkCpy=boid.y+sin*(noseEdge+beakLen*0.5);
+  const bkBx=bx+cos*noseEdge*0.93, bkBy=by+sin*noseEdge*0.93; // base just inside nose
+  const bkTx=bx+cos*(noseEdge+beakLen), bkTy=by+sin*(noseEdge+beakLen);
+  const bkCpx=bx+cos*(noseEdge+beakLen*0.5), bkCpy=by+sin*(noseEdge+beakLen*0.5);
   const bkW=rDeco*0.18;
   const beakCol=_drawHex(boid,56);
   g.beginFill(beakCol, baseAlpha);
@@ -4212,8 +4235,8 @@ if(SHOW_DETAILS){
 const er=rDeco*(0.15+(boid.eyeGene/255)*0.4);
 const eyeSpread=rDeco*0.35+er*0.4;
 const eyeFwd=noseEdge*0.55;                           // ≈1.35r ahead
-const elx=boid.x+cos*eyeFwd+px*eyeSpread, ely=boid.y+sin*eyeFwd+py*eyeSpread;
-const erx=boid.x+cos*eyeFwd-px*eyeSpread, ery=boid.y+sin*eyeFwd-py*eyeSpread;
+const elx=bx+cos*eyeFwd+px*eyeSpread, ely=by+sin*eyeFwd+py*eyeSpread;
+const erx=bx+cos*eyeFwd-px*eyeSpread, ery=by+sin*eyeFwd-py*eyeSpread;
 g.beginFill(0x000000, baseAlpha*0.85);
 g.drawCircle(elx,ely,er); g.drawCircle(erx,ery,er);
 g.endFill();
@@ -4226,7 +4249,7 @@ g.endFill();
 // disease spot
 if(SHOW_DETAILS && boid.diseased){
   g.beginFill(0xffffff, alpha*0.95);
-  g.drawCircle(boid.x,boid.y,rDeco*0.28);
+  g.drawCircle(bx,by,rDeco*0.28);
   g.endFill();
 }
 
@@ -4237,7 +4260,7 @@ if(boid.birthTimer>0 && SHOW_EVENTS){
   const bt=boid.birthTimer/BIRTH_DURATION;
   const ringCol = boid.immigrantGeneration===0 ? 0xffffff : boidHex(boid);
   g.lineStyle(bt*8*zs, ringCol, bt*bt*0.9);
-  g.drawCircle(boid.x,boid.y,RADIUS*zs*(1+(1-bt)*4));
+  g.drawCircle(bx,by,RADIUS*zs*(1+(1-bt)*4));
   g.lineStyle(0);
 }
 }
@@ -5643,9 +5666,11 @@ if(DIFF_MODE){ // damp net translation toward the frame's start; committing free
   const _mot=DIFF_MOTILITY*(1-DIFF_SETTLE*boid.commitment); // undecided → motility; committed → ~0
   if(_mot<1){ boid.x=_mx0+(boid.x-_mx0)*_mot; boid.y=_my0+(boid.y-_my0)*_mot; }
 }
-_trailPush(boid.trail, boid.x, boid.y);
-} else if(boid.trail.length>0){
-boid.trail.shift(); // shed one position per frame so trail dissipates during fade
+_drawPosStep(boid);                       // low-pass the rendered position
+_trailPush(boid.trail, boid._drawX, boid._drawY); // trail follows the same filtered path
+} else {
+_drawPosStep(boid);                       // keep converging while fading, so it can't freeze mid-lag
+if(boid.trail.length>0) boid.trail.shift(); // shed one position per frame so trail dissipates
 }
 }
 
