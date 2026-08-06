@@ -1904,8 +1904,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="trailOpacityVal">40%</span>
 </div>
 <div class="ctrl-row">
-<label>trail length</label>
-<input type="range" id="trailLengthSlider" min="5" max="150" value="20" step="5">
+<label title="Points kept per trail. This is the single most expensive thing on screen — every segment is its own stroke, re-triangulated each frame, so cost is linear in this number: 600 boids at 20 is 11,400 strokes per frame. 0 = off, and then no trail data is stored at all.">trail length</label>
+<input type="range" id="trailLengthSlider" min="0" max="150" value="20" step="5">
 <span class="ctrl-val" id="trailLengthVal">20</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
@@ -2465,7 +2465,7 @@ wire('diffGradientSlider', 'diffGradientVal',  v=>parseInt(v)/100, v=>(parseInt(
 wire('diffMotilitySlider', 'diffMotilityVal',  v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_MOTILITY=v; });
 wire('diffRateSlider',     'diffRateVal',      v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_RATE=v; });
 wire('diffSettleSlider',   'diffSettleVal',    v=>parseInt(v)/100, v=>(parseInt(v)/100).toFixed(2), v=>{ DIFF_SETTLE=v; });
-wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>v,       v=>{ MAX_TRAIL=v; });
+wire('trailLengthSlider',  'trailLengthVal',   v=>parseInt(v),   v=>parseInt(v)<2?'off':v, v=>{ MAX_TRAIL=v; });
 wire('pyramidRefreshSlider','pyramidRefreshVal',v=>parseInt(v),   v=>v+' s',  v=>{ pyramidRefreshInterval=v; });
 
 // ── canvas sizing ─────────────────────────────────────────────────────────────
@@ -2955,6 +2955,7 @@ trail:[]
 }
 
 let boids = [];
+let _flockSumX=0, _flockSumY=0, _flockN=0; // frame-start centroid tally (see nearnessBehavior)
 let birthRings = [];
 
 // ── pair maps ─────────────────────────────────────────────────────────────────
@@ -3096,10 +3097,15 @@ if(dx*dx+dy*dy<_cohR2){ cx+=o.x; cy+=o.y; count++; if(_ALIGN_K>0){ hx+=o.vx; hy+
 }
 if(count===0){
 boid._hasAlign=false;
-// lone emigrant — weak pull toward the global flock centre so it doesn't get permanently lost
-let gx=0,gy=0,gc=0;
-for(const o of boids){ if(o.alive&&!o.dying&&o!==boid){gx+=o.x;gy+=o.y;gc++;} }
-if(gc>0){ const k=_COH_K*EMIG_RETURN; boid.x+=k*(gx/gc-boid.x); boid.y+=k*(gy/gc-boid.y); }
+// Lone emigrant — weak pull toward the global flock centre so it doesn't get permanently lost.
+// This used to sum EVERY boid, per lone boid, per frame: fine when one straggler drifts off,
+// but O(N²) exactly when it hurts most — a dispersed flock (low cohesion, big sensing radius,
+// the conductor's diaspora movement) is nearly all lone boids. The sums are now tallied once a
+// frame in the main loop; subtracting self reproduces the same centroid arithmetic in O(1).
+const gc=_flockN-1;
+if(gc>0){ const k=_COH_K*EMIG_RETURN;
+  boid.x+=k*((_flockSumX-boid.x)/gc-boid.x);
+  boid.y+=k*((_flockSumY-boid.y)/gc-boid.y); }
 return;
 }
 
@@ -3747,8 +3753,7 @@ if(pred.x>w-PREDATOR_RADIUS){ pred.x=w-PREDATOR_RADIUS; pred.vx=-Math.abs(pred.v
 if(pred.y<PREDATOR_RADIUS){ pred.y=PREDATOR_RADIUS; pred.vy=Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
 if(pred.y>h-PREDATOR_RADIUS){ pred.y=h-PREDATOR_RADIUS; pred.vy=-Math.abs(pred.vy); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
 // trail
-pred.trail.push({x:pred.x,y:pred.y});
-if(pred.trail.length>MAX_TRAIL) pred.trail.shift();
+_trailPush(pred.trail, pred.x, pred.y);
 // eating collision — triggers when beak tip enters boid body
 if(isHungry){
 const pAng=Math.atan2(pred.vy,pred.vx);
@@ -3805,7 +3810,7 @@ const bx=pred.x, by=pred.y;
 if(pred.trail.length>=2){
   const n=pred.trail.length;
   for(let i=1;i<n;i++){
-    const t=Math.pow(i/(n-1),0.5);
+    const t=Math.sqrt(i/(n-1)); // pow(x,0.5) → sqrt: same value, cheaper
     gf.lineStyle((t*7+0.8)*zs, 0xffffff, t*0.85*TRAIL_OPACITY);
     gf.moveTo(pred.trail[i-1].x,pred.trail[i-1].y);
     gf.lineTo(pred.trail[i].x,  pred.trail[i].y);
@@ -3948,9 +3953,26 @@ g.moveTo(boid.x,boid.y); g.lineTo(partner.x,partner.y);
 g.lineStyle(0);
 }
 
+// Append a point to a trail WITHOUT allocating: once at capacity the oldest point object is
+// recycled as the new head. Observably identical to push({x,y})+shift() — same array, same order —
+// but in the steady state it allocates nothing. The old form created one object per living boid
+// per frame: ~18,000 short-lived objects a second at 600 boids, and that GC churn is exactly what
+// surfaces as stutter on a Pi. It also makes a LOWERED trail-length slider actually shorten
+// existing trails, which the old push-one/shift-one form never did (net length was constant).
+function _trailPush(t, x, y){
+if(MAX_TRAIL<2){ if(t.length) t.length=0; return; } // trails off: store nothing, drop what's held
+if(t.length>=MAX_TRAIL){
+  const p=t.shift(); p.x=x; p.y=y; t.push(p);
+  if(t.length>MAX_TRAIL) t.shift(); // slider lowered → shed one per frame, as before
+} else t.push({x,y});
+}
 function drawTrails(){
 const g=_gfx.trails; g.clear();
-if(!SHOW_DETAILS) return;
+// Trails are the most expensive thing on screen: every segment is its own lineStyle, so the
+// stroke geometry is re-triangulated from scratch each frame — MAX_TRAIL-1 strokes PER BOID
+// (11,400 a frame at 600 boids and the default length of 20). Bail out before any of that when
+// the result would be invisible anyway; the opacity slider at 0 used to build the full geometry.
+if(!SHOW_DETAILS || TRAIL_OPACITY<=0 || MAX_TRAIL<2) return;
 for(const boid of boids){
 if(!boid.alive||boid.trail.length<2) continue;
 let bAlpha=1;
@@ -3961,7 +3983,7 @@ const n=boid.trail.length;
 const col=_drawHex(boid,50);
 const zsc=zScaleOf(boid); // trail width tracks the boid's current depth
 for(let i=1;i<n;i++){
-  const t=Math.pow(i/(n-1),0.5);
+  const t=Math.sqrt(i/(n-1)); // was Math.pow(x,0.5) — identical result, far cheaper per segment
   g.lineStyle((t*7+0.8)*zsc, col, t*0.85*bAlpha*TRAIL_OPACITY);
   g.moveTo(boid.trail[i-1].x,boid.trail[i-1].y);
   g.lineTo(boid.trail[i].x,  boid.trail[i].y);
@@ -5130,10 +5152,11 @@ if(HUE_LOCK){
   if(fam!==preferredFamily){ preferredFamily=fam; const i=COLOR_FAMILY_CYCLE.indexOf(fam); if(i>=0) preferredFamilyIdx=i; }
   familyConvergedTimer=0; return;
 }
-const alive=boids.filter(b=>b.alive&&!b.dying);
-if(alive.length<3){ familyConvergedTimer=0; return; }
-const inFam=alive.filter(b=>boidInPreferredFamily(b)).length;
-if(inFam/alive.length>=0.9){
+// One counting pass, no allocation: this used to build two throwaway arrays per frame.
+let nAlive=0, inFam=0;
+for(const b of boids){ if(!b.alive||b.dying) continue; nAlive++; if(boidInPreferredFamily(b)) inFam++; }
+if(nAlive<3){ familyConvergedTimer=0; return; }
+if(inFam/nAlive>=0.9){
   familyConvergedTimer+=dt;
   if(familyConvergedTimer>=FAMILY_CONVERGE_HOLD){
     familyConvergedTimer=0;
@@ -5500,7 +5523,7 @@ function astroFrame(dt){
       return !(receding&&unbound);
     });
   }
-  for(const b of boids){ b.trail.push({x:b.x,y:b.y}); if(b.trail.length>MAX_TRAIL) b.trail.shift(); } // record orbital path
+  for(const b of boids) _trailPush(b.trail, b.x, b.y); // record orbital path (no per-frame allocation)
   drawBackground();
   _spriteCount=0;
   for(const sp of _bodySprites) sp.visible=false;
@@ -5515,10 +5538,15 @@ const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
 const _fpsEl = document.getElementById('fpsDisplay');
 let _statusThrottle = 0; // updateStatus runs every 5th frame (~6fps) — it's O(N²)
+let _fpsThrottle = 0, _fpsLastHTML = ''; // same treatment for the boid-count overlay
 function loop(ts){
 if(!running) return;
 rafId=requestAnimationFrame(loop);
-if(lastTime!==null && ts-lastTime < FRAME_MIN_MS) return;
+// Tolerance of 2ms: without it a rAF that lands a hair under the threshold (33.31 vs 33.33)
+// waits a whole extra refresh, turning one frame into a 50ms stutter on a 60Hz display. The
+// steady-state cadence is unchanged — 16.67 is still far below the gate — but near-misses no
+// longer cost a frame.
+if(lastTime!==null && ts-lastTime < FRAME_MIN_MS-2) return;
 const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
 lastTime=ts;
 simClock+=dt;
@@ -5528,14 +5556,28 @@ _sndLeadSchedule(); // generative Bach-arpeggio lead — same per-frame look-ahe
 if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch (rafId already queued)
 _imgScaleShown += (IMG_SCALE-_imgScaleShown)*0.16; // ease boid size toward the slider value (~0.3 s glide, one scalar/frame — no Pi cost)
 // Overlay: live boid count + preferred colour family
-if(_fpsEl){
+// The overlay used to re-parse its innerHTML EVERY frame (30 Hz HTML parse + layout, for a
+// string that changes a few times a second at most). Throttled to ~6 Hz like updateStatus, and
+// only written when the text actually differs — an unchanged assignment still costs a parse.
+if(_fpsEl && ++_fpsThrottle>=5){
+  _fpsThrottle=0;
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
-  _fpsEl.innerHTML=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')+_sndHint();
+  const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')+_sndHint();
+  if(html!==_fpsLastHTML){ _fpsLastHTML=html; _fpsEl.innerHTML=html; }
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
 
-boidMap.clear(); for(const b of boids) if(b.alive) boidMap.set(b.id, b);
+boidMap.clear();
+// Flock centroid sums for the lone-emigrant pull in nearnessBehavior — folded into the map
+// rebuild that already walks every boid, so it costs nothing extra. Snapshot at frame start
+// rather than live mid-update; for a weak recentring pull the difference is unmeasurable.
+_flockSumX=0; _flockSumY=0; _flockN=0;
+for(const b of boids){
+  if(!b.alive) continue;
+  boidMap.set(b.id, b);
+  if(!b.dying){ _flockSumX+=b.x; _flockSumY+=b.y; _flockN++; }
+}
 _buildSpatialGrid();
 
 updateFertileCounts();
@@ -5582,8 +5624,7 @@ if(DIFF_MODE){ // damp net translation toward the frame's start; committing free
   const _mot=DIFF_MOTILITY*(1-DIFF_SETTLE*boid.commitment); // undecided → motility; committed → ~0
   if(_mot<1){ boid.x=_mx0+(boid.x-_mx0)*_mot; boid.y=_my0+(boid.y-_my0)*_mot; }
 }
-boid.trail.push({x:boid.x,y:boid.y});
-if(boid.trail.length>MAX_TRAIL) boid.trail.shift();
+_trailPush(boid.trail, boid.x, boid.y);
 } else if(boid.trail.length>0){
 boid.trail.shift(); // shed one position per frame so trail dissipates during fade
 }
