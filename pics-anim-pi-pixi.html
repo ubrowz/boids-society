@@ -1616,6 +1616,22 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="familyPullSlider" min="0" max="100" value="60" step="5">
 <span class="ctrl-val" id="familyPullVal">60%</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label title="Wheel: the society converges on a colour family, then advances to the next — the built-in colour cycle. Locked: it holds the hue you choose below, indefinitely.">colour</label>
+<button id="hueLockBtn" title="Toggle between the rolling colour wheel and a single locked hue" class="mini-btn" style="color:#54a0ff;min-width:52px;">wheel</button>
+<span id="hueLockSwatch" style="width:16px;height:16px;border-radius:50%;display:inline-block;background:#ff4444;opacity:0.25;border:1px solid rgba(255,255,255,0.25);"></span>
+</div>
+<div class="ctrl-row">
+<label title="The hue the whole society is held at while locked. Move it during a performance and the flock follows over the next generations — newborns are pulled to the new hue, so the change sweeps through as the old colours die out.">locked hue</label>
+<input type="range" id="lockHueSlider" min="0" max="359" value="0" step="1">
+<span class="ctrl-val" id="lockHueVal">0°</span>
+</div>
+<div class="ctrl-row">
+<label title="How far either side of the locked hue the flock may vary. Small = near-monochrome, large = a loose family of related shades.">hue spread</label>
+<input type="range" id="lockSpreadSlider" min="2" max="60" value="20" step="1">
+<span class="ctrl-val" id="lockSpreadVal">±20°</span>
+</div>
+<div class="mini-note">Locked holds every boid within ±spread of your hue — seeding, immigration and every birth. Shades come from the spread plus each boid's own saturation. Note the sound's colour chord assigns one instrument per hue family, so a narrow lock settles it onto a single sustained voice instead of a shifting chord.</div>
 </section>
 
 <section class="panel">
@@ -2426,6 +2442,19 @@ wire('diseaseDurSlider',   'diseaseDurVal',    v=>parseInt(v),   v=>v+' s', v=>{
 wire('fatalitySlider',     'fatalityVal',      v=>parseInt(v),   v=>v+'%',  v=>{ DISEASE_FATALITY=v/100; });
 wire('mutationSlider',     'mutationVal',      v=>parseInt(v),   v=>v+'%',  v=>{ MUTATION_RATE=v/100; });
 wire('familyPullSlider',   'familyPullVal',    v=>parseInt(v),   v=>v+'%',  v=>{ FAMILY_PULL=v/100; });
+wire('lockHueSlider',      'lockHueVal',       v=>parseInt(v),   v=>v+'°',  v=>{ LOCK_HUE=v; _hueLockUI(); });
+wire('lockSpreadSlider',   'lockSpreadVal',    v=>parseInt(v),   v=>'±'+v+'°', v=>{ LOCK_SPREAD=v; _hueLockUI(); });
+// The swatch previews the locked colour at full saturation; it dims while the wheel is running so
+// the panel reads at a glance as "these two sliders are inert right now".
+function _hueLockUI(){
+  const b=document.getElementById('hueLockBtn'), sw=document.getElementById('hueLockSwatch');
+  if(b){ b.textContent=HUE_LOCK?'locked':'wheel'; b.style.color=HUE_LOCK?'#35d78a':'#54a0ff'; }
+  if(sw){ sw.style.background=hslToHex2(LOCK_HUE,75,55); sw.style.opacity=HUE_LOCK?'1':'0.25'; }
+}
+function hslToHex2(h,s,l){ // CSS string for the swatch (hslToHex returns a PIXI number)
+  return 'hsl('+Math.round(h)+','+s+'%,'+l+'%)';
+}
+document.getElementById('hueLockBtn').addEventListener('click',()=>{ HUE_LOCK=!HUE_LOCK; _hueLockUI(); });
 wire('predatorSlider',     'predatorVal',      v=>parseInt(v),   v=>v,       v=>{ syncPredatorCount(v); });
 wire('fullDurSlider',      'fullDurVal',       v=>parseInt(v),   v=>v+' s',  v=>{ FULL_DURATION=v; });
 wire('predatorDietSlider', 'predatorDietVal',  v=>parseInt(v),   v=>['','any','favored','other'][v], v=>{ PREDATOR_DIET=v; });
@@ -2494,6 +2523,29 @@ window.addEventListener('resize', () => { if(RUN_MODE==='dash') return; resize()
 
 // ── constants ─────────────────────────────────────────────────────────────────
 // ── colour family cycle ───────────────────────────────────────────────────────
+// ── colour lock ──────────────────────────────────────────────────────────────
+// The default behaviour is a WHEEL: the society is pulled toward preferredFamily, converges, and
+// updateFamilyCycle advances to the next family. Locked instead pins the whole society to one hue
+// of the user's choosing, ±HUE_SPREAD. Every colour in the sim comes from one of three places —
+// pickBoidColor (seeding + immigration), inheritColor (births), and the family pull on mate choice
+// — and all three consult the lock, so nothing leaks in from outside the band. LOCK_HUE stays live
+// while locked: move it and newborns are pulled to the new hue, so the change sweeps through the
+// flock over the following generations as the old colours die out.
+// NB _lockDelta, not _hueDelta: differentiation mode already declares a _hueDelta further down
+// (near _FATE_HUES) whose arguments are the other way round, so it returns the exact negation.
+// Function declarations hoist and the later one wins, so reusing that name here would silently
+// invert every pull and clamp below. Keep these names distinct.
+let HUE_LOCK = false, LOCK_HUE = 0, LOCK_SPREAD = 20;
+_hueLockUI(); // paint the button + swatch for the initial state (wire() only attaches listeners)
+function _lockDelta(a,b){ let d=(b-a)%360; if(d>180)d-=360; if(d<-180)d+=360; return d; } // signed a→b, shortest way round
+function _lockDist(a,b){ return Math.abs(_lockDelta(a,b)); }
+function _lockedHue(){ return (LOCK_HUE + (Math.random()*2-1)*LOCK_SPREAD + 360)%360; }
+// pull a hue into the locked band (no-op when it is already inside)
+function _clampToBand(h){
+  const d=_lockDelta(LOCK_HUE,h);
+  if(Math.abs(d)<=LOCK_SPREAD) return (h+360)%360;
+  return (LOCK_HUE + Math.sign(d)*LOCK_SPREAD + 360)%360;
+}
 const COLOR_FAMILY_CYCLE = ['red','yellow','green','cyan','blue','magenta'];
 const FAMILY_HUE = {red:0, yellow:60, green:120, cyan:180, blue:240, magenta:300};
 const FAMILY_CSS = {red:'#ff4444', yellow:'#ffd32a', green:'#0be881', cyan:'#00d2d3', blue:'#54a0ff', magenta:'#d980fa'};
@@ -2732,8 +2784,14 @@ const idx=cands[Math.floor(Math.random()*cands.length)];
 counts[idx]=(counts[idx]||0)+1;                  // reserve it, so two boids picking in one frame can't collide
 return idx;
 }
-function boidInPreferredFamily(b){ return b.sat>=0.15 && hueToFamily(b.hue)===preferredFamily; }
-function pickBoidColor(){ return {hue:Math.random()*360, sat:0.6+Math.random()*0.3}; }
+function boidInPreferredFamily(b){
+if(b.sat<0.15) return false;                                  // grey/undecided cells don't count
+if(HUE_LOCK) return _lockDist(b.hue,LOCK_HUE)<=LOCK_SPREAD;   // locked: the band IS the family
+return hueToFamily(b.hue)===preferredFamily;
+}
+function pickBoidColor(){
+return {hue: HUE_LOCK ? _lockedHue() : Math.random()*360, sat:0.6+Math.random()*0.3};
+}
 function blendHueSat(a,b){
 let dh=b.hue-a.hue;
 if(dh>180) dh-=360; if(dh<-180) dh+=360;
@@ -2762,6 +2820,19 @@ const seg=r[Math.floor(Math.random()*r.length)];
 return {hue:seg[0]+Math.random()*(seg[1]-seg[0]), sat:0.6+Math.random()*0.3};
 }
 function inheritColor(parentA,parentB){
+if(HUE_LOCK){
+  // Blend the parents, pull hard toward the locked hue, then clamp into the band — so a child of
+  // two stragglers still lands inside it, and a moved LOCK_HUE drags each new generation along.
+  const blended=mixHue(parentA.hue,parentB.hue);
+  const pulled=blended+_lockDelta(blended,LOCK_HUE)*0.35;     // pull strength: see the note below
+  const jitter=(Math.random()-0.5)*LOCK_SPREAD;               // keeps shades varied inside the band
+  // Tuned as a PAIR. A strong pull with small jitter collapses the flock onto the exact hue —
+  // at 0.6/0.7 sixty generations settled into ±9° of a ±20° band, so the spread slider was
+  // quietly delivering less than half of what it promised. 0.35/1.0 fills ~95% of the band and
+  // still walks the whole society onto a moved LOCK_HUE within a couple of generations.
+  const sat=Math.max(0.2,Math.min(1.0,(parentA.sat+parentB.sat)/2+(Math.random()-0.5)*0.12));
+  return {hue:_clampToBand(pulled+jitter), sat};
+}
 const aIn=boidInPreferredFamily(parentA), bIn=boidInPreferredFamily(parentB);
 if(aIn||bIn){
   const donor=aIn?parentA:parentB;
@@ -4995,7 +5066,7 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 return { app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE } };
+  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE, HUE_LOCK } };
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
@@ -5022,6 +5093,7 @@ if(t.DIM_INFERTILE!==undefined)     clickTo(!!DIM_INFERTILE    !== !!t.DIM_INFER
 if(t.UPRIGHT_SPRITE!==undefined)    clickTo(!!UPRIGHT_SPRITE   !== !!t.UPRIGHT_SPRITE,    'uprightBtn');
 if(t.immigrationEnabled!==undefined)clickTo(!!immigrationEnabled!== !!t.immigrationEnabled,'immigrationBtn');
 if(t.HUNT_MODE!==undefined)         clickTo(t.HUNT_MODE!==HUNT_MODE,'huntModeBtn');
+if(t.HUE_LOCK!==undefined)          clickTo(!!HUE_LOCK         !== !!t.HUE_LOCK,          'hueLockBtn');
 if(t.ASTRO_MERGE!==undefined)       clickTo(!!_ASTRO_MERGE         !== !!t.ASTRO_MERGE,   'astroMergeBtn');
 if(t.EVENT_FX!==undefined){ let n=((EVENT_FX-t.EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); } // bondLinesBtn cycles BACKWARD (EVENT_FX = (x+2)%3), so click count = (current − target) mod 3
 if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
@@ -5050,6 +5122,14 @@ updateViability();
 
 // ── family cycle ─────────────────────────────────────────────────────────────
 function updateFamilyCycle(dt){
+if(HUE_LOCK){
+  // No advancing while locked. Keep preferredFamily pointing at the locked hue so everything keyed
+  // off it — the HUD family name, the predator's family dot, the family-pull mate bias — agrees
+  // with what is actually on screen.
+  const fam=hueToFamily(LOCK_HUE);
+  if(fam!==preferredFamily){ preferredFamily=fam; const i=COLOR_FAMILY_CYCLE.indexOf(fam); if(i>=0) preferredFamilyIdx=i; }
+  familyConvergedTimer=0; return;
+}
 const alive=boids.filter(b=>b.alive&&!b.dying);
 if(alive.length<3){ familyConvergedTimer=0; return; }
 const inFam=alive.filter(b=>boidInPreferredFamily(b)).length;
@@ -5619,6 +5699,10 @@ AURA_OPACITY      = ${AURA_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
 AURA_MODE         = ${AURA_MODE};
 _applyAura(); // sync the aura button visual to the exported mode
+HUE_LOCK          = ${HUE_LOCK};
+LOCK_HUE          = ${LOCK_HUE};
+LOCK_SPREAD       = ${LOCK_SPREAD};
+_hueLockUI(); // sync the colour-lock button + swatch to the exported state
 DIFF_MODE         = ${DIFF_MODE};
 DIFF_COUPLING     = ${DIFF_COUPLING};
 DIFF_GRADIENT     = ${DIFF_GRADIENT};
@@ -5818,7 +5902,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','soundBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','soundBtn','hueLockBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
