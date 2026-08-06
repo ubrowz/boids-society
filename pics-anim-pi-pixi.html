@@ -2531,12 +2531,12 @@ window.addEventListener('resize', () => { if(RUN_MODE==='dash') return; resize()
 // — and all three consult the lock, so nothing leaks in from outside the band. LOCK_HUE stays live
 // while locked: move it and newborns are pulled to the new hue, so the change sweeps through the
 // flock over the following generations as the old colours die out.
+let HUE_LOCK = false, LOCK_HUE = 0, LOCK_SPREAD = 20;
+_hueLockUI(); // paint the button + swatch for the initial state (wire() only attaches listeners)
 // NB _lockDelta, not _hueDelta: differentiation mode already declares a _hueDelta further down
 // (near _FATE_HUES) whose arguments are the other way round, so it returns the exact negation.
 // Function declarations hoist and the later one wins, so reusing that name here would silently
 // invert every pull and clamp below. Keep these names distinct.
-let HUE_LOCK = false, LOCK_HUE = 0, LOCK_SPREAD = 20;
-_hueLockUI(); // paint the button + swatch for the initial state (wire() only attaches listeners)
 function _lockDelta(a,b){ let d=(b-a)%360; if(d>180)d-=360; if(d<-180)d+=360; return d; } // signed a→b, shortest way round
 function _lockDist(a,b){ return Math.abs(_lockDelta(a,b)); }
 function _lockedHue(){ return (LOCK_HUE + (Math.random()*2-1)*LOCK_SPREAD + 360)%360; }
@@ -2583,7 +2583,7 @@ let BOND_DIVORCE_DIST = parseInt(document.getElementById('divorceDistSlider').va
 let BOND_TURN_RAMP    = parseFloat(document.getElementById('bondRampSlider').value);    // reconvergence urgency: turn cap ×(1 .. 1+ramp)
 const COOLDOWN_FRAMES = 30;
 const FADE_DURATION = 2.0;
-const BIRTH_DURATION = 1.5;
+const BIRTH_DURATION = 2.0; // matched to FADE_DURATION so arriving and leaving take the same time
 const BASE_NEARNESS = 4.0;
 const MIN_NEARNESS = 0.05;
 const LIFESPAN_SCALE_MAX = 1.25; // at base 80s → ceiling of 100s
@@ -2968,6 +2968,17 @@ function setCool(a,b,v) { cooldown.set(pairKey(a,b),v); }
 function clearPair(a,b) { const k=pairKey(a,b); hits.delete(k); cooldown.delete(k); }
 
 // ── fertility ─────────────────────────────────────────────────────────────────
+// Birth fade-in alpha. EASED, not linear — and that is the whole point. Perceived brightness of a
+// sprite composited over a dark tank goes roughly as alpha^(1/2.2), so a linear ramp is already at
+// half its apparent brightness a fifth of the way in: it reads as a pop, then a long invisible
+// tail. Raising the progress to 2.2 makes the PERCEIVED ramp linear, which is what the eye accepts
+// as a fade. The death fade stays linear precisely because the same curve run downward is
+// perceptually back-loaded — it lingers and then goes, which is why dying already looks graceful.
+function _birthAlpha(boid){
+if(boid.birthTimer<=0) return 1;
+const p=1-boid.birthTimer/BIRTH_DURATION; // 0 at spawn → 1 fully arrived
+return p<=0 ? 0 : Math.pow(p,2.2);
+}
 function isFertile(boid){
 const life = boid.maxLifespan;
 const from = boid.sex==='M' ? M_FERTILE_FROM : F_FERTILE_FROM;
@@ -3954,11 +3965,10 @@ g.lineStyle(0);
 }
 
 // Append a point to a trail WITHOUT allocating: once at capacity the oldest point object is
-// recycled as the new head. Observably identical to push({x,y})+shift() — same array, same order —
-// but in the steady state it allocates nothing. The old form created one object per living boid
-// per frame: ~18,000 short-lived objects a second at 600 boids, and that GC churn is exactly what
-// surfaces as stutter on a Pi. It also makes a LOWERED trail-length slider actually shorten
-// existing trails, which the old push-one/shift-one form never did (net length was constant).
+// recycled as the new head. Observably identical to push({x,y})+shift() — same array, same order,
+// same convergence when the trail-length slider is lowered — but in the steady state it allocates
+// nothing. The old form created one object per living boid per frame: ~18,000 short-lived objects
+// a second at 600 boids, and that GC churn is exactly what surfaces as stutter on a Pi.
 function _trailPush(t, x, y){
 if(MAX_TRAIL<2){ if(t.length) t.length=0; return; } // trails off: store nothing, drop what's held
 if(t.length>=MAX_TRAIL){
@@ -3969,14 +3979,14 @@ if(t.length>=MAX_TRAIL){
 function drawTrails(){
 const g=_gfx.trails; g.clear();
 // Trails are the most expensive thing on screen: every segment is its own lineStyle, so the
-// stroke geometry is re-triangulated from scratch each frame — MAX_TRAIL-1 strokes PER BOID
-// (11,400 a frame at 600 boids and the default length of 20). Bail out before any of that when
-// the result would be invisible anyway; the opacity slider at 0 used to build the full geometry.
+// stroke geometry is re-triangulated from scratch each frame — MAX_TRAIL-1 strokes PER BOID.
+// Bail out before any of that when the result would be invisible anyway (opacity slider at 0
+// is the natural way to switch trails off, and it used to build the full geometry at alpha 0).
 if(!SHOW_DETAILS || TRAIL_OPACITY<=0 || MAX_TRAIL<2) return;
 for(const boid of boids){
 if(!boid.alive||boid.trail.length<2) continue;
 let bAlpha=1;
-if(boid.birthTimer>0) bAlpha=1-(boid.birthTimer/BIRTH_DURATION);
+if(boid.birthTimer>0) bAlpha=_birthAlpha(boid); // trail materialises with the body
 if(boid.dying)        bAlpha=1-(boid.fadeTimer/FADE_DURATION);
 bAlpha=Math.max(0,bAlpha);
 const n=boid.trail.length;
@@ -4056,7 +4066,7 @@ function drawBoid(boid){
 // NOTE: caller must do _gfx.boids.clear() once before the per-boid loop
 const g=_gfx.boids;
 let alpha=1;
-if(boid.birthTimer>0) alpha=1-(boid.birthTimer/BIRTH_DURATION);
+if(boid.birthTimer>0) alpha=_birthAlpha(boid);
 if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
 alpha=Math.max(0,Math.min(1,alpha));
 if(alpha<=0) return;
