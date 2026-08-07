@@ -1797,6 +1797,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="spriteLVal">50</span>
 </div>
 <div class="ctrl-row">
+<label title="Ripples the always-upright images like cloth in water — a travelling wave through the whole image, at a constant rate with a per-boid phase so they never pulse together. Only upright images ripple: they are unique (one wearer each), so this stays a handful of meshes rather than one per boid. 0 = off. Amplitude is a fraction of the image width, so it scales with image size.">ripple &uarr;imgs</label>
+<input type="range" id="rippleSlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="rippleVal">40%</span>
+</div>
+<div class="ctrl-row">
 <label title="Aerial perspective: distance drains colour. 100% = boids at the very back are fully grey, 0% = off. One-directional — the front keeps its own saturation, the back loses this fraction of it. Compounds with depth light. NOTE it cannot desaturate a photo: tint is a multiply, so with colour OFF the photo's own colours come through untouched and only depth light applies to them.">depth haze</label>
 <input type="range" id="depthHazeSlider" min="0" max="100" value="60" step="5">
 <span class="ctrl-val" id="depthHazeVal">60%</span>
@@ -2173,6 +2178,7 @@ let SHOW_COLOR = true;
 let SPRITE_L = parseInt(document.getElementById('spriteLSlider').value);
 let DEPTH_LIGHT = parseInt(document.getElementById('depthLightSlider').value); // L units added at the front / subtracted at the back
 let DEPTH_HAZE = parseInt(document.getElementById('depthHazeSlider').value)/100; // fraction of saturation lost by the furthest rank
+let RIPPLE_AMT = parseInt(document.getElementById('rippleSlider').value)/100*0.12; // wave amplitude as a fraction of image width
 const colorBtn   = document.getElementById('colorBtn');
 const colorKnob  = document.getElementById('colorKnob');
 const colorLabel = document.getElementById('colorLabel');
@@ -2361,6 +2367,7 @@ wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off'
 wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
 wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
+wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
@@ -2738,6 +2745,52 @@ return SHOW_COLOR ? hslToHex(b.hue,b.sat*100*_depthS(b),L) : hslToHex(0,0,L);
 function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 
 // Sprite pool — fetch or create the Nth sprite for this frame
+// ── ripple: upright-only images wave like cloth ──────────────────────────────
+// A free travelling wave through the whole image (both axes, no anchored edge), so it reads as
+// water or cloth rather than a flag on a pole. Constant rate, with a per-boid phase so a shoal of
+// them never pulses in unison.
+//
+// Only upright images ripple, and that is what makes it affordable: they are UNIQUE (one wearer
+// at a time — see _pickLeastUsedImg), so the number of meshes on screen equals the number of
+// upright images uploaded, a handful rather than the whole flock. A SimplePlane per image would
+// be ruinous at 600 boids: meshes do not batch, so each is its own draw call.
+//
+// One mesh per POOL ENTRY, not per boid, and never texture-swapped: SimplePlane builds its
+// geometry from the texture's dimensions, so reusing a mesh across differently-sized images would
+// need a geometry rebuild. Uniqueness makes one-per-image exactly right.
+const _RIPPLE_N     = 7;    // 7x7 vertices = 6x6 quads — enough for a smooth wave at these sizes
+const _RIPPLE_WAVES = 1.3;  // wave crests across the image
+const _RIPPLE_RATE  = 0.45; // cycles per second
+const _rippleMeshes = new Map(); // "M:3" → SimplePlane
+function _rippleKey(sex, idx){ return sex+':'+idx; }
+function _getRippleMesh(key, tex){
+let m=_rippleMeshes.get(key);
+if(!m){
+  m=new PIXI.SimplePlane(tex, _RIPPLE_N, _RIPPLE_N);
+  m.pivot.set(tex.width/2, tex.height/2); // match the sprites' 0.5 anchor
+  _gfx.bodySprites.addChild(m);
+  m._rest=Float32Array.from(m.geometry.getBuffer('aVertexPosition').data); // pristine grid to deform from
+  _rippleMeshes.set(key,m);
+}
+return m;
+}
+// Drop every mesh — the pools were rebuilt, so indices (and therefore keys) now mean something else
+function _clearRippleMeshes(){
+for(const m of _rippleMeshes.values()){ if(m.parent) m.parent.removeChild(m); m.destroy(); }
+_rippleMeshes.clear();
+}
+function _rippleDeform(m, tex, phase){
+const buf=m.geometry.getBuffer('aVertexPosition'), v=buf.data, rest=m._rest;
+const w=tex.width||1, h=tex.height||1;
+const amp=RIPPLE_AMT*w, t=simClock*_RIPPLE_RATE;
+for(let i=0;i<v.length;i+=2){
+  const x0=rest[i], y0=rest[i+1];
+  // two out-of-phase waves, one per axis, so the surface undulates instead of shearing
+  v[i]   = x0 + amp*Math.sin(6.2832*((y0/h)*_RIPPLE_WAVES - t) + phase);
+  v[i+1] = y0 + amp*0.6*Math.sin(6.2832*((x0/w)*_RIPPLE_WAVES - t*0.8) + phase*1.7);
+}
+buf.update();
+}
 function _getBodySprite(idx){
 if(idx>=_bodySprites.length){
   const spr=new PIXI.Sprite(_defaultTex);
@@ -2777,6 +2830,7 @@ _rebuildPool(_boidPoolF, _poolPNG_F, false, false); _rebuildPool(_boidPoolF, _po
 // upload or a clear.
 if(typeof boids!=='undefined') for(const b of boids) b.imgIdx=-1;
 _imgUseStale=true;
+_clearRippleMeshes(); // meshes are keyed by pool index, and every index just changed meaning
 }
 // "Photo tank": EVERY boid on screen wears an uploaded image — either both per-sex pools are
 // stocked, or a shared upload stands in for whoever is missing. In that world the predator's
@@ -3911,6 +3965,8 @@ if(pred.trail.length>=2){
 const spr=_getBodySprite(_spriteCount++);
 if(spr.texture!==_predTex) spr.texture=_predTex;
 spr.visible=true;
+spr.zIndex=_zOrder++; // shares the container with the boids — must carry a depth rank too, or it
+                      // sorts to an arbitrary layer as soon as a ripple mesh turns sorting on
 spr.x=bx; spr.y=by;
 spr.rotation=UPRIGHT_SPRITE ? 0 : pred._drawAngle;
 spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
@@ -4191,7 +4247,6 @@ boid._drawAngle+=_dda*0.20; // lerp: 0.20 — smooth turns, no jitter
 const cos=Math.cos(boid._drawAngle), sin=Math.sin(boid._drawAngle);
 const px=-sin, py=cos; // perpendicular (left)
 
-const spr=_getBodySprite(_spriteCount++);
 // pooled sprites are reused across boids — pick the per-sex body texture each frame
 // per-sex image pool: each boid picks one image at birth (lazily on first draw,
 // same frame it appears) via imgIdx and keeps it for life; empty pool → shared/default
@@ -4209,16 +4264,26 @@ if(_pool.length){
 } else {
   _bt = _sharedTex || _defaultTex;
 }
-if(spr.texture!==_bt) spr.texture=_bt;
+// A rippling upright takes a mesh instead of a pooled sprite. Wait for the real texture to decode
+// (_loadTex starts every pool entry on _defaultTex) or the geometry would be built at the wrong
+// size and cached that way for good.
+const _rip = _forceUpright && RIPPLE_AMT>0 && _bt && _bt!==_defaultTex && _bt.width>0;
+const spr = _rip ? _getRippleMesh(_rippleKey(boid.sex, boid.imgIdx), _bt) : _getBodySprite(_spriteCount++);
+if(_rip){
+  if(boid._ripplePhase===undefined) boid._ripplePhase=Math.random()*6.2832; // per-boid, so they never pulse in unison
+  _rippleDeform(spr, _bt, boid._ripplePhase);
+  _rippleDrawn=true;
+} else if(spr.texture!==_bt) spr.texture=_bt;
 spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? 0 : boid._drawAngle;
 spr.tint=_drawHex(boid, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // greyscale: anchored so the FRONT lands on white — see _depthL
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale*_imgScaleShown); // _bodyScale calibration × user image-scale slider (eased so size changes glide)
+spr.zIndex=_zOrder++; // meshes are appended to the container wherever they are created, so depth order has to be explicit
 // true on-screen half-extent of THIS boid's image (px) — pool images can differ in
 // pixel size, so the depth layering measures each boid's real footprint, not a constant
-boid._visR = 0.5 * Math.max(spr.texture.width, spr.texture.height) * spr.scale.x;
+boid._visR = 0.5 * Math.max(_bt.width, _bt.height) * spr.scale.x; // from the texture, not spr.texture — a mesh's is the same but this is unambiguous
 if(boid._visR > _maxVisR) _maxVisR = boid._visR;
 
 // decorations (tail, beak, eyes, disease spot) attach to the rendered body, so they
@@ -5607,6 +5672,11 @@ function astroFrame(dt){
   drawBackground();
   _spriteCount=0;
   for(const sp of _bodySprites) sp.visible=false;
+  // Astro shares the body container. It assigns sprites in depth order, so no sorting is wanted —
+  // and the flock's ripple meshes must be hidden or they would hang over the orbital field with
+  // whatever visibility they held when the mode switched.
+  for(const m of _rippleMeshes.values()) m.visible=false;
+  _gfx.bodySprites.sortableChildren=false;
   _gfx.tails.clear(); _gfx.predFin.clear(); _gfx.predators.clear(); _gfx.boids.clear();
   astroTrails();
   astroDraw();
@@ -5625,6 +5695,7 @@ const TARGET_FPS = 30;
 const FRAME_MIN_MS = 1000 / TARGET_FPS;
 const _fpsEl = document.getElementById('fpsDisplay');
 let _statusThrottle = 0; // updateStatus runs every 5th frame (~6fps) — it's O(N²)
+let _zOrder = 0, _rippleDrawn = false; // explicit depth order, and whether a ripple mesh is on screen this frame
 let _fpsThrottle = 0, _fpsLastHTML = ''; // same treatment for the boid-count overlay
 function loop(ts){
 if(!running) return;
@@ -5756,8 +5827,10 @@ updateDisease(dt);
 
 // hide all pooled sprites then re-show only those needed this frame
 _spriteCount=0;
+_zOrder=0; _rippleDrawn=false;
 _imgUseStale=true; // re-tally image usage once this frame (upright uniqueness + least-used spread)
 for(const s of _bodySprites) s.visible=false;
+for(const m of _rippleMeshes.values()) m.visible=false;
 _gfx.tails.clear();     // boid forked tail fins
 _gfx.predFin.clear();   // predator trail + tail fin
 _gfx.predators.clear(); // predator beak + eyes overlay
@@ -5778,6 +5851,11 @@ const _predSeen = !_photoTank(); // photo tank → the predator hunts unseen; on
 if(_predSeen) for(const p of predators) if(p.alive) _drawList.push(p);
 _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order always matches size (far first)
 for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
+// Pooled sprites are assigned in depth order, so their child order already IS the draw order and
+// no sorting is needed. Ripple meshes are created whenever an image first appears and sit wherever
+// they landed in the child list, which would put them on top of everything. Turn on zIndex sorting
+// only while one is actually visible — it costs a sort of every child, every frame.
+_gfx.bodySprites.sortableChildren=_rippleDrawn;
 drawDeathSplashes();
 if(simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
@@ -5826,6 +5904,7 @@ const bootScript = `<script>
 MAX_TRAIL         = ${MAX_TRAIL};
 DEPTH_LIGHT       = ${DEPTH_LIGHT};
 DEPTH_HAZE        = ${DEPTH_HAZE};
+RIPPLE_AMT        = ${RIPPLE_AMT};
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 AURA_OPACITY      = ${AURA_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
