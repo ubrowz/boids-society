@@ -1796,6 +1796,16 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="spriteLSlider" min="50" max="100" value="50" step="1">
 <span class="ctrl-val" id="spriteLVal">50</span>
 </div>
+<div class="ctrl-row">
+<label title="Aerial perspective: distance drains colour. 100% = boids at the very back are fully grey, 0% = off. One-directional — the front keeps its own saturation, the back loses this fraction of it. Compounds with depth light. NOTE it cannot desaturate a photo: tint is a multiply, so with colour OFF the photo's own colours come through untouched and only depth light applies to them.">depth haze</label>
+<input type="range" id="depthHazeSlider" min="0" max="100" value="60" step="5">
+<span class="ctrl-val" id="depthHazeVal">60%</span>
+</div>
+<div class="ctrl-row">
+<label title="Ties lightness to depth: boids at the front render lighter, boids at the back darker, by this many L units either side of the tint L above. 0 = off (flat lighting, the original look). Needs depth &gt; 0. Keep tint L + this &lt;= 100 or the front half clips and the effect loses range; at the default tint L of 50 the full ±50 is available. Applies to body, trail, tail, beak and aura together — and works in greyscale too.">depth light</label>
+<input type="range" id="depthLightSlider" min="0" max="50" value="30" step="1">
+<span class="ctrl-val" id="depthLightVal">±30</span>
+</div>
 <div class="ctrl-row" style="gap:8px;">
 <label>details</label>
 <button id="detailsBtn" title="Toggle beak, forked tail and trail" style="
@@ -2161,6 +2171,8 @@ if(NO_OVERLAP){
 // ── colour toggle + tint lightness ───────────────────────────────────────────
 let SHOW_COLOR = true;
 let SPRITE_L = parseInt(document.getElementById('spriteLSlider').value);
+let DEPTH_LIGHT = parseInt(document.getElementById('depthLightSlider').value); // L units added at the front / subtracted at the back
+let DEPTH_HAZE = parseInt(document.getElementById('depthHazeSlider').value)/100; // fraction of saturation lost by the furthest rank
 const colorBtn   = document.getElementById('colorBtn');
 const colorKnob  = document.getElementById('colorKnob');
 const colorLabel = document.getElementById('colorLabel');
@@ -2347,6 +2359,8 @@ wire('targetSlider','targetVal', v=>parseInt(v), v=>v, v=>{ TARGET_POP=v; });
 wire('initPopSlider','initPopVal', v=>parseInt(v), v=>v, v=>{ INIT_POP=v; }); // takes effect on the next startSim (restart / play after pause)
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
 wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
+wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
+wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
@@ -2686,8 +2700,41 @@ const f=n=>Math.round(Math.max(0,Math.min(1,l-a*Math.max(-1,Math.min(k(n)-3,9-k(
 return(f(0)<<16)|(f(8)<<8)|f(4);
 }
 function boidHex(b){ return hslToHex(b.hue,b.sat*100,50); }
-// draw-time colour helper — returns grey when SHOW_COLOR is off
-function _drawHex(b, l){ return SHOW_COLOR ? hslToHex(b.hue,b.sat*100,l) : hslToHex(0,0,l); }
+// Depth → lightness. Boids nearer the front render lighter, ones further back darker, so the
+// flock reads as a lit foreground receding into shadow. Linear in z rather than in the
+// perspective scale zs, so the near and far halves get equal shares of the swing and the slider
+// means the same thing at any DEPTH. Returns 0 — exactly today's colours — when the slider is
+// off or the tank is flat (DEPTH=0).
+// NB this is a per-hue lever the wheel does not otherwise give you: HSL lightness is NOT
+// perceived lightness, so at a fixed L the families already span L* 31 (blue) to 86 (yellow).
+// This adds an independent light/dark axis on top of that one.
+// CLIPPING IS THE TRAP HERE. The offset is added to a base and then clamped to 0-100, so if
+// base+DEPTH_LIGHT exceeds 100 the entire front half flattens onto one value and the effect
+// silently loses half its range. That is why the greyscale/photo path passes 100-DEPTH_LIGHT
+// rather than 100: it puts the TOP of the swing exactly on white instead of clipping everything
+// nearer than the midplane. Same applies in colour: with tint L at 50 there is room for ±50, but
+// raise tint L and the front clips — keep tint L + depth light <= 100.
+function _depthL(b){
+if(DEPTH_LIGHT<=0 || DEPTH<=0) return 0;
+const t=Math.max(0,Math.min(1,(b.z||0)/DEPTH));   // 0 = nearest, 1 = furthest
+return DEPTH_LIGHT*(1-2*t);                        // +DEPTH_LIGHT at the very front, −DEPTH_LIGHT at the back
+}
+// draw-time colour helper — returns grey when SHOW_COLOR is off. l is clamped AFTER the depth
+// offset: hslToHex misbehaves outside 0-100, and SPRITE_L can already sit at 100.
+// Aerial perspective: distance washes colour out, not just down. One-directional, unlike the
+// lightness swing — full saturation at the front, falling to (1-DEPTH_HAZE) of it at the back —
+// because that is how the real cue works: nothing gets MORE saturated by being close, it just
+// stops losing. Compounds with _depthL rather than fighting it, and since the tank background is
+// black the pair reads as the far ranks sinking into the murk.
+function _depthS(b){
+if(DEPTH_HAZE<=0 || DEPTH<=0) return 1;
+const t=Math.max(0,Math.min(1,(b.z||0)/DEPTH));
+return 1-DEPTH_HAZE*t;   // 1 at the very front → 1-DEPTH_HAZE at the very back
+}
+function _drawHex(b, l){
+const L=Math.max(0,Math.min(100, l+_depthL(b)));
+return SHOW_COLOR ? hslToHex(b.hue,b.sat*100*_depthS(b),L) : hslToHex(0,0,L);
+}
 function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 
 // Sprite pool — fetch or create the Nth sprite for this frame
@@ -4166,7 +4213,7 @@ if(spr.texture!==_bt) spr.texture=_bt;
 spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? 0 : boid._drawAngle;
-spr.tint=SHOW_COLOR ? _drawHex(boid,SPRITE_L) : 0xffffff;
+spr.tint=_drawHex(boid, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // greyscale: anchored so the FRONT lands on white — see _depthL
 spr.alpha=baseAlpha;
 spr.scale.set(r/_bodyScale*_imgScaleShown); // _bodyScale calibration × user image-scale slider (eased so size changes glide)
 // true on-screen half-extent of THIS boid's image (px) — pool images can differ in
@@ -5499,7 +5546,7 @@ function astroDraw(){
     if(spr.texture!==bt) spr.texture=bt;
     spr.visible=true; spr.x=sx; spr.y=sy;
     spr.rotation=UPRIGHT_SPRITE?0:Math.atan2(b.vy,b.vx);
-    spr.tint=SHOW_COLOR ? _drawHex(b,SPRITE_L) : 0xffffff;
+    spr.tint=_drawHex(b, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // as in the flock branch
     spr.alpha=1;
     spr.scale.set(scale);
     if(SHOW_DETAILS && b.m>3){ // glow around accreted "stars"
@@ -5777,6 +5824,8 @@ html = html.replace('<head>', '<head>\n' + exportCSS);
 const bootScript = `<script>
 (function(){
 MAX_TRAIL         = ${MAX_TRAIL};
+DEPTH_LIGHT       = ${DEPTH_LIGHT};
+DEPTH_HAZE        = ${DEPTH_HAZE};
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 AURA_OPACITY      = ${AURA_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
