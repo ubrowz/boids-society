@@ -2013,6 +2013,7 @@ const _BOID_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAAC
 let _defaultTex = null;  // embedded teardrop texture
 let _sharedTex  = null;  // shared image — predators + fallback for a sex with an empty pool
 let _predTex    = null;  // predator body texture (follows the shared image)
+let _hasUpright = false; // any always-upright image uploaded? suppresses the default-shape stand-in
 const _boidPoolM = [];   // male body textures   — [{tex,data}]; each male picks one at birth
 const _boidPoolF = [];   // female body textures — [{tex,data}]
 const _bodySprites = []; // reusable Sprite pool — one per visible boid per frame
@@ -2831,6 +2832,7 @@ _rebuildPool(_boidPoolF, _poolPNG_F, false, false); _rebuildPool(_boidPoolF, _po
 if(typeof boids!=='undefined') for(const b of boids) b.imgIdx=-1;
 _imgUseStale=true;
 _clearRippleMeshes(); // meshes are keyed by pool index, and every index just changed meaning
+_hasUpright = _poolPNG_MU.length>0 || _poolPNG_FU.length>0; // gates the default-shape fallback
 }
 // "Photo tank": EVERY boid on screen wears an uploaded image — either both per-sex pools are
 // stocked, or a shared upload stands in for whoever is missing. In that world the predator's
@@ -4061,6 +4063,7 @@ for(const boid of boids){
 if(!boid.alive||boid.partnerId===null) continue;
 const partner=boidMap.get(boid.partnerId);
 if(!partner||!partner.alive) continue;
+if(!_bodyShown(boid)||!_bodyShown(partner)) continue; // no thread to a body that isn't drawn
 const key=Math.min(boid.id,partner.id)+'-'+Math.max(boid.id,partner.id);
 if(drawn.has(key)) continue; drawn.add(key);
 const alpha=Math.min(
@@ -4094,6 +4097,14 @@ if(t.length>=MAX_TRAIL){
   if(t.length>MAX_TRAIL) t.shift(); // slider lowered → shed one per frame, as before
 } else t.push({x,y});
 }
+// Mirrors the fallback rule in drawBoid: a boid that is not drawn should not trail one either.
+// Read-only — drawBoid does the picking, and imgIdx persists between frames, so by the time this
+// runs the value is the one the body will use.
+function _bodyShown(b){
+if(!_hasUpright) return true;                       // no uprights → the old stand-in still applies
+const pool = b.sex==='M' ? _boidPoolM : _boidPoolF;
+return pool.length>0 && b.imgIdx>=0 && b.imgIdx<pool.length;
+}
 function drawTrails(){
 const g=_gfx.trails; g.clear();
 // Trails are the most expensive thing on screen: every segment is its own lineStyle, so the
@@ -4102,7 +4113,7 @@ const g=_gfx.trails; g.clear();
 // is the natural way to switch trails off, and it used to build the full geometry at alpha 0).
 if(!SHOW_DETAILS || TRAIL_OPACITY<=0 || MAX_TRAIL<2) return;
 for(const boid of boids){
-if(!boid.alive||boid.trail.length<2) continue;
+if(!boid.alive||boid.trail.length<2||!_bodyShown(boid)) continue;
 let bAlpha=1;
 if(boid.birthTimer>0) bAlpha=_birthAlpha(boid); // trail materialises with the body
 if(boid.dying)        bAlpha=1-(boid.fadeTimer/FADE_DURATION);
@@ -4188,6 +4199,30 @@ if(boid.birthTimer>0) alpha=_birthAlpha(boid);
 if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
 alpha=Math.max(0,Math.min(1,alpha));
 if(alpha<=0) return;
+// Resolve this boid's image FIRST, because a boid with nothing to wear may not be drawn at all —
+// and that decision has to be made before the aura, which is painted further down but sits behind
+// the body. Per-sex image pool: each boid picks one at birth (lazily on first draw, the same frame
+// it appears) via imgIdx and keeps it for life.
+const _pool = boid.sex==='M' ? _boidPoolM : _boidPoolF;
+let _bt, _forceUpright=false;
+if(_pool.length){
+  // imgIdx -1 = "nothing free to wear" (upright-only pool, all uniques taken). Retry every frame:
+  // the tally is cached per frame so this is O(pool), and it means a unique freed by a death is
+  // picked up on the very next frame.
+  if(boid.imgIdx===undefined || boid.imgIdx<0 || boid.imgIdx>=_pool.length)
+    boid.imgIdx = _pickLeastUsedImg(boid.sex, _pool.length);
+  const _e = boid.imgIdx>=0 ? _pool[boid.imgIdx] : null;
+  if(_e){ _bt = _e.tex; _forceUpright = _e.upright; } // images from the "always upright" uploads ignore the toggle
+} else if(!_hasUpright){
+  _bt = _sharedTex || _defaultTex;
+}
+// THE UPRIGHT-ONLY VIEW. The shared/default body is a stand-in for a boid with no image of its
+// own. Once any always-upright image has been uploaded that stand-in is suppressed: uprights are
+// unique, so most of the flock can never wear one, and filling the tank with teardrops hides the
+// very thing being looked at. With uprights present, a boid with nothing to wear is simply not
+// drawn — leaving a tank of only those photographs. Upload ordinary images alongside and everyone
+// is clothed again, so this only bites in the case it is meant for.
+if(_bt===undefined) return;
 // Render from the LOW-PASSED position, never the raw one. Heading has always been filtered
 // (boid._drawAngle lerps toward the true angle), which is why turning looks smooth while
 // translation does not: position and scale land on screen raw, so every per-frame discontinuity
@@ -4247,23 +4282,6 @@ boid._drawAngle+=_dda*0.20; // lerp: 0.20 — smooth turns, no jitter
 const cos=Math.cos(boid._drawAngle), sin=Math.sin(boid._drawAngle);
 const px=-sin, py=cos; // perpendicular (left)
 
-// pooled sprites are reused across boids — pick the per-sex body texture each frame
-// per-sex image pool: each boid picks one image at birth (lazily on first draw,
-// same frame it appears) via imgIdx and keeps it for life; empty pool → shared/default
-const _pool = boid.sex==='M' ? _boidPoolM : _boidPoolF;
-let _bt, _forceUpright=false;
-if(_pool.length){
-  // imgIdx -1 = "nothing free to wear" (upright-only pool, all uniques taken). Retry every frame:
-  // the tally is cached per frame so this is O(pool), and it means a unique freed by a death is
-  // picked up on the very next frame.
-  if(boid.imgIdx===undefined || boid.imgIdx<0 || boid.imgIdx>=_pool.length)
-    boid.imgIdx = _pickLeastUsedImg(boid.sex, _pool.length);
-  const _e = boid.imgIdx>=0 ? _pool[boid.imgIdx] : null;
-  if(_e){ _bt = _e.tex; _forceUpright = _e.upright; } // images from the "always upright" uploads ignore the toggle
-  else _bt = _sharedTex || _defaultTex;
-} else {
-  _bt = _sharedTex || _defaultTex;
-}
 // A rippling upright takes a mesh instead of a pooled sprite. Wait for the real texture to decode
 // (_loadTex starts every pool entry on _defaultTex) or the geometry would be built at the wrong
 // size and cached that way for good.
