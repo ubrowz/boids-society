@@ -1313,8 +1313,8 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
   <div id="dbLink"><span id="linkDot">●</span><span id="linkLabel">no aquarium open</span></div>
   <div id="dbActions">
     <button id="astroModeBtn" title="Switch between Active Matter (flocking) and Astro (gravitational N-body)">✦ Astro</button>
-    <button id="aquariumBtn" title="Open the live aquarium in a new tab">open aquarium ↗</button>
-    <button id="popoutBtn" title="Open the live tank as a tall canvas-only strip filling the screen height">pop-out canvas ↗</button>
+    <button id="aquariumBtn" title="Open the live aquarium in a new tab. Click any boid in the tank to bring it to the front for a couple of seconds, then it drifts back.">open aquarium ↗</button>
+    <button id="popoutBtn" title="Open the live tank as a tall canvas-only strip filling the screen height. Click any boid in the tank to bring it to the front for a couple of seconds, then it drifts back.">pop-out canvas ↗</button>
     <button id="playBtn" title="Pause / resume the aquarium">▶</button>
     <span class="hsep"></span>
     <button id="soundBtn" class="hbtn" title="Play sound — sonification of the tank (drone, colour chord, climax shimmer, event chimes). Tap the tank once to unlock audio.">🔇</button>
@@ -3179,6 +3179,15 @@ steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*
 // proximity once DEPTH>0). DEPTH=0 pins everything to z=0 (pure 2D).
 function updateZ(boid){
 if(DEPTH<=0){ boid.z=0; boid.vz=0; return; }
+// Clicked in the tank: glide to the near plane and hold there briefly, then let the normal drift
+// resume and carry it back. The random walk is skipped and vz damped while surfacing, or the two
+// would fight; the soft depth walls are skipped too since z=0 IS the near wall.
+if(boid._front>0){
+  boid.z += (0-boid.z)*0.12;   // ~0.18s half-life: a glide, not a jump
+  boid.vz *= 0.7;
+  if(boid.z<0) boid.z=0;
+  return;
+}
 const vmax=SPEED*Z_SPEED_FRAC;
 boid.vz+=(Math.random()-0.5)*vmax*0.25;
 if(boid.partnerId!==null){
@@ -3445,6 +3454,7 @@ function updateLifespan(boid,dt){
 if(!boid.alive) return;
 if(boid.birthTimer>0) boid.birthTimer=Math.max(0,boid.birthTimer-dt);
 if(boid._imgTimer>0)  boid._imgTimer =Math.max(0,boid._imgTimer-dt); // image-acquisition fade
+if(boid._front>0)     boid._front    =Math.max(0,boid._front-dt);    // clicked-to-front hold
 if(boid.dying){ boid.fadeTimer+=dt; if(boid.fadeTimer>=FADE_DURATION) killBoid(boid); return; }
 boid.effectiveLifespan=effectiveLifespanFor(boid); // display/fertility only
 boid.age+=dt;
@@ -5712,6 +5722,37 @@ function astroFrame(dt){
   astroTrails();
   astroDraw();
   app.renderer.render(app.stage);
+}
+
+// ── click a boid to bring it forward ─────────────────────────────────────────
+// Tank and standalone only — the dashboard has no canvas. Deliberately NOT using Pixi's
+// interaction system: sprites are pooled and reassigned to a different boid every frame, so
+// per-sprite handlers would be wrong, and enabling eventMode across hundreds of children costs
+// hit-testing work on every pointer move. A manual scan is O(N) but runs only on an actual click,
+// so the per-frame cost of this feature is exactly zero.
+const _FRONT_HOLD = 2.0; // seconds held at the near plane before normal drift resumes
+if(RUN_MODE!=='dash'){
+canvas.addEventListener('click', e => {
+  if(SIM_MODE!=='flock' || DEPTH<=0) return; // nothing to come forward to in a flat tank
+  // Map to canvas space: clientWidth/clientLeft exclude the 1px CSS border, and the canvas can be
+  // scaled by CSS (max-width:100%), so never assume 1:1 with client coordinates.
+  const rect=canvas.getBoundingClientRect();
+  const sx=canvas.width/(canvas.clientWidth||rect.width||1);
+  const sy=canvas.height/(canvas.clientHeight||rect.height||1);
+  const mx=(e.clientX-rect.left-(canvas.clientLeft||0))*sx;
+  const my=(e.clientY-rect.top -(canvas.clientTop ||0))*sy;
+  let hit=null;
+  for(const b of boids){
+    if(!b.alive || b.dying || !_bodyShown(b)) continue;   // can't pick what isn't drawn
+    const r=b._visR||RADIUS;                              // the image's true on-screen half-extent
+    const dx=mx-(b._drawX!==undefined?b._drawX:b.x), dy=my-(b._drawY!==undefined?b._drawY:b.y);
+    if(dx*dx+dy*dy > r*r) continue;
+    // Whichever is drawn on top wins. Draw order is far-first (z descending, id descending on
+    // ties), so the topmost body is the smallest z — and the smallest id among equal z.
+    if(!hit || b.z<hit.z || (b.z===hit.z && b.id<hit.id)) hit=b;
+  }
+  if(hit) hit._front=_FRONT_HOLD;
+});
 }
 
 // ── main loop ─────────────────────────────────────────────────────────────────
