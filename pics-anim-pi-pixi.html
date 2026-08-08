@@ -2538,6 +2538,7 @@ _gfx.predators = new PIXI.Graphics(); app.stage.addChild(_gfx.predators);
 _gfx.splashes  = new PIXI.Graphics(); app.stage.addChild(_gfx.splashes);
 // Body sprite texture embedded as base64 — no file loading needed
 _defaultTex = PIXI.Texture.from(_BOID_PNG);
+_maskWhenReady(_defaultTex); // the teardrop has transparent corners too, so mask it as well
 _sharedTex = _predTex = _defaultTex;
 } // end if(RUN_MODE!=='dash')
 
@@ -2811,12 +2812,40 @@ if(idx>=_bodySprites.length){
 }
 return _bodySprites[idx];
 }
+// ── alpha masks, for click hit-testing ───────────────────────────────────────
+// A downsampled copy of each image's alpha channel, so a click can tell painted pixels from
+// transparent margin. Built once per texture when it decodes; ~4KB each at 64x64. Held in a
+// WeakMap so a mask dies with its texture. Works offline and in exports because the images are
+// data URLs, which do not taint a canvas — a remote URL would, and getImageData would throw.
+const _MASK_N   = 64; // mask resolution — ample for "is this pixel painted?"
+const _MASK_MIN = 32; // alpha (0-255) at or above which a pixel counts as solid
+const _alphaMasks = new WeakMap(); // PIXI.Texture → Uint8Array(_MASK_N²)
+function _buildAlphaMask(tex){
+if(!tex || _alphaMasks.has(tex)) return;
+const src = tex.baseTexture && tex.baseTexture.resource && tex.baseTexture.resource.source;
+if(!src) return;
+try{
+  const c=document.createElement('canvas'); c.width=c.height=_MASK_N;
+  const g2=c.getContext('2d',{willReadFrequently:true});
+  if(!g2) return;
+  g2.drawImage(src,0,0,_MASK_N,_MASK_N); // smooth downscale: a hard edge becomes a short ramp,
+  const d=g2.getImageData(0,0,_MASK_N,_MASK_N).data; // which _MASK_MIN then errs on the generous side
+  const a=new Uint8Array(_MASK_N*_MASK_N);
+  for(let i=0,q=3;i<a.length;i++,q+=4) a[i]=d[q];
+  _alphaMasks.set(tex,a);
+}catch(err){ /* unreadable image or no 2d context — hit test falls back to the bounding circle */ }
+}
+function _maskWhenReady(tex){
+if(!tex) return;
+if(tex.baseTexture.valid) _buildAlphaMask(tex);
+else tex.baseTexture.on('loaded', () => _buildAlphaMask(tex));
+}
 // Load a data URL into a PIXI texture (async when not yet decoded)
 function _loadTex(dataURL, assign){
 const tex=PIXI.Texture.from(dataURL);
-if(tex.baseTexture.valid) assign(tex);
+if(tex.baseTexture.valid){ _buildAlphaMask(tex); assign(tex); }
 else {
-  tex.baseTexture.on('loaded', () => assign(tex));
+  tex.baseTexture.on('loaded', () => { _buildAlphaMask(tex); assign(tex); });
   tex.baseTexture.on('error',  () => console.warn('Body image failed to load'));
 }
 }
@@ -4344,6 +4373,8 @@ spr.zIndex=_zOrder++; // meshes are appended to the container wherever they are 
 // true on-screen half-extent of THIS boid's image (px) — pool images can differ in
 // pixel size, so the depth layering measures each boid's real footprint, not a constant
 boid._visR = 0.5 * Math.max(_bt.width, _bt.height) * _s; // from _s, not spr.scale.x — a mesh's scale already has the texture size folded in
+// what this boid was drawn WITH, so a click can map back into image space (see _hitBoid)
+boid._tex=_bt; boid._drawScale=_s; boid._drawRot=spr.rotation;
 if(boid._visR > _maxVisR) _maxVisR = boid._visR;
 
 // decorations (tail, beak, eyes, disease spot) attach to the rendered body, so they
@@ -5750,8 +5781,32 @@ function astroFrame(dt){
 // hit-testing work on every pointer move. A manual scan is O(N) but runs only on an actual click,
 // so the per-frame cost of this feature is exactly zero.
 const _FRONT_HOLD = 2.0; // seconds held at the near plane before normal drift resumes
+// Is (mx,my) on a PAINTED pixel of this boid? The bounding circle is the cheap reject; the alpha
+// mask then rejects transparent margin, so clicking the empty corner of a near boid falls through
+// to whatever is actually visible behind it — which is what made this feel broken with cut-out
+// photos. Falls back to the circle when no mask could be built.
+// The ripple deformation is ignored: the sample can be off by at most the wave amplitude, a few
+// pixels, which is far below the precision anyone clicks with.
+function _hitBoid(b, mx, my){
+const bx=b._drawX!==undefined?b._drawX:b.x, by=b._drawY!==undefined?b._drawY:b.y;
+let dx=mx-bx, dy=my-by;
+const r=b._visR||RADIUS;
+if(dx*dx+dy*dy > r*r) return false;                    // outside the image's extent entirely
+const mask=b._tex && _alphaMasks.get(b._tex);
+if(!mask) return true;                                 // no mask → bounding circle, as before
+const rot=b._drawRot||0;                               // undo the draw rotation (0 for upright)
+if(rot){ const c=Math.cos(rot), sn=Math.sin(rot), nx=dx*c+dy*sn; dy=-dx*sn+dy*c; dx=nx; }
+const sc=b._drawScale||1, hw=b._tex.width*sc*0.5, hh=b._tex.height*sc*0.5;
+if(hw<=0 || hh<=0) return true;
+const u=dx/hw*0.5+0.5, v=dy/hh*0.5+0.5;                // → 0..1 across the image
+if(u<0 || u>=1 || v<0 || v>=1) return false;
+return mask[((v*_MASK_N)|0)*_MASK_N + ((u*_MASK_N)|0)] >= _MASK_MIN;
+}
 if(RUN_MODE!=='dash'){
-canvas.addEventListener('click', e => {
+// pointerdown, not click: 'click' needs press AND release on the same element, and the first
+// click into an unfocused popup (the pop-out strip is one) is often consumed activating the
+// window rather than delivered to the page. pointerdown also covers touch on the Pi.
+canvas.addEventListener('pointerdown', e => {
   if(SIM_MODE!=='flock' || DEPTH<=0) return; // nothing to come forward to in a flat tank
   // Map to canvas space: clientWidth/clientLeft exclude the 1px CSS border, and the canvas can be
   // scaled by CSS (max-width:100%), so never assume 1:1 with client coordinates.
@@ -5763,9 +5818,7 @@ canvas.addEventListener('click', e => {
   let hit=null;
   for(const b of boids){
     if(!b.alive || b.dying || !_bodyShown(b)) continue;   // can't pick what isn't drawn
-    const r=b._visR||RADIUS;                              // the image's true on-screen half-extent
-    const dx=mx-(b._drawX!==undefined?b._drawX:b.x), dy=my-(b._drawY!==undefined?b._drawY:b.y);
-    if(dx*dx+dy*dy > r*r) continue;
+    if(!_hitBoid(b, mx, my)) continue;
     // Whichever is drawn on top wins. Draw order is far-first (z descending, id descending on
     // ties), so the topmost body is the smallest z — and the smallest id among equal z.
     if(!hit || b.z<hit.z || (b.z===hit.z && b.id<hit.id)) hit=b;
