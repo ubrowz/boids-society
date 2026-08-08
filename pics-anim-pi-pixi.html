@@ -3077,10 +3077,12 @@ function clearPair(a,b) { const k=pairKey(a,b); hits.delete(k); cooldown.delete(
 // tail. Raising the progress to 2.2 makes the PERCEIVED ramp linear, which is what the eye accepts
 // as a fade. The death fade stays linear precisely because the same curve run downward is
 // perceptually back-loaded — it lingers and then goes, which is why dying already looks graceful.
+function _fadeInAlpha(t){ const p=1-t/BIRTH_DURATION; return p<=0 ? 0 : Math.pow(p,2.2); } // 0 → 1 over BIRTH_DURATION
 function _birthAlpha(boid){
-if(boid.birthTimer<=0) return 1;
-const p=1-boid.birthTimer/BIRTH_DURATION; // 0 at spawn → 1 fully arrived
-return p<=0 ? 0 : Math.pow(p,2.2);
+let a=1;
+if(boid.birthTimer>0) a=_fadeInAlpha(boid.birthTimer);
+if(boid._imgTimer>0)  a=Math.min(a,_fadeInAlpha(boid._imgTimer)); // arriving by acquiring an image
+return a;
 }
 function isFertile(boid){
 const life = boid.maxLifespan;
@@ -3442,6 +3444,7 @@ return Math.min(BASE_LIFESPAN * lifespanScale(boid.globalPressure), MAX_LIFESPAN
 function updateLifespan(boid,dt){
 if(!boid.alive) return;
 if(boid.birthTimer>0) boid.birthTimer=Math.max(0,boid.birthTimer-dt);
+if(boid._imgTimer>0)  boid._imgTimer =Math.max(0,boid._imgTimer-dt); // image-acquisition fade
 if(boid.dying){ boid.fadeTimer+=dt; if(boid.fadeTimer>=FADE_DURATION) killBoid(boid); return; }
 boid.effectiveLifespan=effectiveLifespanFor(boid); // display/fertility only
 boid.age+=dt;
@@ -4115,7 +4118,7 @@ if(!SHOW_DETAILS || TRAIL_OPACITY<=0 || MAX_TRAIL<2) return;
 for(const boid of boids){
 if(!boid.alive||boid.trail.length<2||!_bodyShown(boid)) continue;
 let bAlpha=1;
-if(boid.birthTimer>0) bAlpha=_birthAlpha(boid); // trail materialises with the body
+bAlpha=_birthAlpha(boid); // trail materialises with the body — on birth AND on acquiring an image
 if(boid.dying)        bAlpha=1-(boid.fadeTimer/FADE_DURATION);
 bAlpha=Math.max(0,bAlpha);
 const n=boid.trail.length;
@@ -4194,11 +4197,6 @@ ctx.lineWidth=4; ctx.stroke();
 function drawBoid(boid){
 // NOTE: caller must do _gfx.boids.clear() once before the per-boid loop
 const g=_gfx.boids;
-let alpha=1;
-if(boid.birthTimer>0) alpha=_birthAlpha(boid);
-if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
-alpha=Math.max(0,Math.min(1,alpha));
-if(alpha<=0) return;
 // Resolve this boid's image FIRST, because a boid with nothing to wear may not be drawn at all —
 // and that decision has to be made before the aura, which is painted further down but sits behind
 // the body. Per-sex image pool: each boid picks one at birth (lazily on first draw, the same frame
@@ -4213,8 +4211,19 @@ if(_pool.length){
     boid.imgIdx = _pickLeastUsedImg(boid.sex, _pool.length);
   const _e = boid.imgIdx>=0 ? _pool[boid.imgIdx] : null;
   if(_e){ _bt = _e.tex; _forceUpright = _e.upright; } // images from the "always upright" uploads ignore the toggle
-} else if(!_hasUpright){
-  _bt = _sharedTex || _defaultTex;
+  // ACQUIRING an image is its own arrival, and needs its own fade. A boid that has been waiting
+  // with nothing to wear — the upright-only case, where every unique is taken — picks up a freed
+  // image the instant its previous wearer dies. By then birthTimer is long since 0, so without
+  // this it snaps to full opacity: a body materialising out of nowhere, which is exactly what the
+  // birth fade was meant to prevent. Same ramp, same duration as being born.
+  if(_e && !boid._hasImg) boid._imgTimer=BIRTH_DURATION;
+  boid._hasImg = !!_e;
+} else {
+  // No pool at all for this sex: nothing of its own to wear, so the flag has to be cleared here
+  // too — otherwise it stays stale from an earlier pool and would suppress the fade when images
+  // are finally uploaded for this sex.
+  boid._hasImg=false;
+  if(!_hasUpright) _bt = _sharedTex || _defaultTex;
 }
 // THE UPRIGHT-ONLY VIEW. The shared/default body is a stand-in for a boid with no image of its
 // own. Once any always-upright image has been uploaded that stand-in is suppressed: uprights are
@@ -4223,6 +4232,10 @@ if(_pool.length){
 // drawn — leaving a tank of only those photographs. Upload ordinary images alongside and everyone
 // is clothed again, so this only bites in the case it is meant for.
 if(_bt===undefined) return;
+let alpha=_birthAlpha(boid);
+if(boid.dying) alpha=1-(boid.fadeTimer/FADE_DURATION);
+alpha=Math.max(0,Math.min(1,alpha));
+if(alpha<=0) return;
 // Render from the LOW-PASSED position, never the raw one. Heading has always been filtered
 // (boid._drawAngle lerps toward the true angle), which is why turning looks smooth while
 // translation does not: position and scale land on screen raw, so every per-frame discontinuity
