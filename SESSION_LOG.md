@@ -1,3 +1,116 @@
+# Session Log — 2026-07-27 / 2026-08-09
+
+## What we worked on (pics-anim-pi-pixi.html only)
+
+20 commits, all pushed. Roughly three threads: finishing the AI conductor, a Pi smoothness
+investigation, and a run of visual work driven by what reads on a 192×32 LED panel.
+
+### 1. AI conductor — it plays the melody, and three real bugs
+The conductor drove only 6 of the 14 mixer faders and never touched the melody at all. It now
+scores each movement: lead and canon levels, both octave transposes and the tempo multiplier. The
+canon octave carries most of the character — `0` is a round at the unison (procession), `−12` a dark
+answer below (die-off, nocturne), `+24` the parts two octaves apart (diaspora). Added four movements
+(nocturne, invention, procession, ascension), a `Counterpoint` style that holds population steady and
+re-scores the two voices instead, per-instance jitter so no two readings are alike, a rubato LFO so a
+held scene breathes, and a long-form arc that grows contrast over nine minutes.
+
+Then the user watched it run and found three things wrong:
+- **Temp was 20× too wild.** `_BOLTZ_ROT = boltzRotSlider/100` is the per-frame gaussian sigma **in
+  radians** on each boid's heading, and the slider spans 0–150. A conductor fraction of 0.25 meant
+  slider 37 = 0.37 rad = **21° of random kick every frame**, against a user calibration of "slider 2
+  is already very restless". Every style was affected; the rubato LFO was independently worse,
+  swinging temp ±0.09 rad no matter what the scene asked for.
+- **Zen was anything but calm.** Rebuilt as floating: temp ~0, speed slider 1–2, 70–110s scenes. It
+  needed three new general per-style knobs — `literal` (skip the arc and the jitter, both of which
+  were dragging its near-zero temp back up), `ease`, `lfo`.
+- **The climax voice could never speak.** `climaxPopSlider` was being driven as a fraction of its own
+  2–2000 range, parking it near 800 while 30 boids swam below. The bell evaluated to ~e⁻²⁹, so the
+  level fader animated exactly as scored and the voice was silent. Now derived from the movement's
+  population goal, clamped to stay within reach of the observed settling average.
+
+### 2. Pi smoothness — and a structural finding
+Six per-frame inefficiencies fixed: trails allocated an object per boid per frame (~18,000
+short-lived objects a second — GC churn is what surfaces as *stutter* rather than low framerate); the
+boid-count overlay re-parsed its innerHTML every frame; `updateFamilyCycle` built two throwaway
+arrays per frame; the lone-emigrant pull was O(N²) and fired hardest exactly when dispersed.
+
+The structural finding matters more than any of them: **the simulation is a hybrid.** Biology runs on
+real `dt` (lifespan, breeding, disease, predators) but motion runs *per frame* — `boid.x += boid.vx`
+with no time term. So a slower machine covers less ground per real second while ageing and breeding
+at the same rate: **the Pi runs a measurably different society from identical sliders.** Making it
+`dt`-correct is not a one-liner — relaxation terms need `1-(1-k)^dtScale` (alignment reaches exactly
+1.0 at slider 100 and would oscillate under a plain multiply) and random walks need `√dtScale`.
+
+We tried lowering `TARGET_FPS` to 24 for even pacing, then reverted it: rAF only fires on refresh
+boundaries, so on a 60Hz panel "24" lands on 20, and wander/temp are applied once per *frame*, so
+that made the random walk a third coarser. The real fix was **low-passing the rendered position**,
+mirroring the `_drawAngle` lerp the heading has always had. That absorbed wander kinks, separation
+pushes and frame-time variance together — measured 71% reduction in frame-to-frame acceleration.
+Trails had to be recorded from the filtered path too, or every boid trailed 7.5px behind its own
+trail head.
+
+### 3. Colour, depth and the LED panel
+- **Colour lock**: pin the society to one hue ±spread instead of rolling the family wheel; the hue
+  slider stays live so moving it walks the flock to a new colour over 2–3 generations.
+- **Depth → lightness and saturation**: the wheel gives no independent light/dark axis, because *hue
+  itself carries brightness* (at identical HSL settings yellow emits 10.3× the luminance of blue —
+  L* 86 vs 31). Depth light and depth haze add that axis, ~57 L* of swing.
+- **Aura** was the one decoration ignoring the size slider — past IMG_SCALE ≈1.4 the body outgrew it
+  and the "halo" became a blob painted over the image.
+- **Two arrival fades.** Newborns had a fade but it looked abrupt: a *linear* alpha ramp is
+  perceptually front-loaded (half apparent brightness a fifth of the way in), while the same ramp run
+  downward is back-loaded, which is why dying always looked graceful. Fixed with a gamma-corrected
+  ramp. Then the user reported it *still* popping — a second arrival we had created ourselves:
+  acquiring an image. In the upright-only view a body enters the tank by picking up a freed unique,
+  not by being born, and `birthTimer` is long since 0 by then.
+
+### 4. Image behaviour and interaction
+- **Upright images are unique** — one wearer at a time, released when its wearer dies and picked up
+  by the next boid to look, so a face travels through the tank instead of being duplicated.
+- **The default-shape stand-in is suppressed** once any upright image is loaded, giving an
+  upright-only view of just those photographs.
+- **Ripple**: a free travelling wave through the whole image, per-boid phase. Initially scoped to
+  upright *images*; the user spotted that the Upright *switch* didn't trigger it, and after agreeing
+  he would run under 40 image boids we rescoped it to upright *rendering*. That needed unit-square
+  geometry so meshes could pool per boid rather than per image.
+- **Click a boid to bring it forward.** First version hit-tested a bounding circle, which felt broken
+  with cut-out photos — a click on a near boid's transparent corner "hit" it (a no-op) and shadowed
+  the visible boid behind. Now each texture carries a 64×64 alpha mask.
+- **The predator is invisible in a photo tank** — it still hunts and kills, and the Jaws ostinato and
+  kill snare still play, so the menace is heard rather than seen.
+
+## Key decisions
+- **Per-boid geometry is cheap on uniques, ruinous on the flock.** Meshes never batch, so one per
+  boid means one draw call each: fine at 40, 624 draw calls at full population. Count is the whole
+  story — rotation is nearly free. A hard cap is not a way out: with 624 boids the 41st-nearest looks
+  identical to the 40th, so the seam is visible; the cap that exists (120) is an emergency floor for
+  the public page, never the operating point.
+- **Filter the render, don't fix the simulation.** The separation solver and depth layering still
+  inject genuine per-frame discontinuities; the position low-pass hides them. That was the right
+  trade for smoothness, and it left `dt`-correctness optional rather than required.
+- **Behaviour over labels, once.** When the ripple/Upright inconsistency came up the user first chose
+  "leave the behaviour, fix the naming"; raising it again made clear he wanted the effect, and we
+  agreed the constraint (<40 image boids) before implementing.
+- **The deployment target is a 192×32 HUB75 LED panel**, not a monitor. At that scale silhouette,
+  brightness and colour are what read; tail fins, beaks, eyes and mesh subdivision fall below the
+  resolution floor. Future visual effort pays off in motion, brightness and colour — not detail.
+
+## Traps worth remembering
+- **Offset-then-clamp silently eats half a range.** The depth-light greyscale path passed a base of
+  100, so everything nearer than the midplane clamped to white: 8 L* of swing against 36 intended.
+- **Duplicate function declarations hoist and the later one wins.** A new `_hueDelta` would have been
+  silently overridden by differentiation mode's existing one, which takes its arguments in the
+  opposite order — an exact negation of every colour pull. Renamed to `_lockDelta`/`_lockDist`.
+- **`_visR` must not come from a mesh's `scale.x`** — the texture size is folded into it, and that
+  value feeds both depth-layering separation and the click hit test.
+- **Check which window you are looking at.** A "broken" ripple slider cost a debugging round; there
+  can be several tank windows open and each caches its code at open time.
+- **When the diff is provably innocent, question the original design.** The click bug was real but
+  lived in the hit test's *shape*, not in any recent change.
+
+## Files changed
+- `pics-anim-pi-pixi.html` — all of the above (+764 / −126 across 20 commits).
+
 # Session Log — 2026-04-22 / 2026-04-23
 
 ## What we worked on (merger.html only)
