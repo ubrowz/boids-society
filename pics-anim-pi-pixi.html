@@ -1842,6 +1842,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="uprightLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
+<div class="ctrl-row">
+<label title="How the physical LED panel hangs, rotating in its own plane. 0° = vertical (portrait), which is how it hangs today and what every upright image has always been drawn for. 90° = laid horizontal (landscape). Images rendered UPRIGHT counter-rotate by this angle so they stay upright in the room; the tank keeps its own shape and everything goes on floating as before. Boids that point where they swim need no correction — they swim in the tank, and the tank turns with the panel.">panel tilt</label>
+<input type="range" id="tiltSlider" min="0" max="90" value="0" step="1">
+<span class="ctrl-val" id="tiltVal">0°</span>
+</div>
 <div class="ctrl-row flock-only" style="gap:8px;">
 <label>aura</label>
 <button id="auraGradBtn" title="Cycle the bonded/fertile aura: off → flat → gradient" style="
@@ -2247,6 +2252,22 @@ if(UPRIGHT_SPRITE){
 }
 });
 
+// ── panel tilt (the physical panel rotating in its own plane) ────────────────
+// The LED panel hangs vertical today — portrait, a tall strip — and that is 0°, the
+// orientation every upright image has always been drawn for. Lay the panel down to
+// landscape and it reaches 90°. The canvas does not change shape: the pixel grid turns
+// with the panel, so the tank stays a tall strip in PANEL space and the boids go on
+// floating in it exactly as before. What does change is where the room's "up" points
+// in that space, which is why upright images counter-rotate by this angle.
+//
+// Only images rendered upright are corrected. A boid that points where it swims is
+// already right at any angle: it swims in the tank, and the tank turns with the panel.
+//
+// Radians. The sign assumes the panel turns one way from portrait to landscape; if
+// yours turns the other way the images will lean the wrong direction — negate the
+// parse in the wire() call and nothing else needs touching.
+let PANEL_TILT = 0;
+
 // ── event-fx toggle (3-state) ─────────────────────────────────────────────────
 // EVENT_FX: 2 = all events (bond lines + birth rings + death splashes)
 //           1 = bond lines only
@@ -2369,6 +2390,7 @@ wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
 wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
 wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
+wire('tiltSlider','tiltVal',             v=>parseInt(v)*Math.PI/180, v=>v+'°', v=>{ PANEL_TILT=v; }); // negate the parse if the panel turns the other way
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
 wire('lifeSlider', 'lifeVal', v=>parseInt(v), v=>v+' s', v=>{ BASE_LIFESPAN=v; updateViability(); });
@@ -4021,7 +4043,7 @@ spr.visible=true;
 spr.zIndex=_zOrder++; // shares the container with the boids — must carry a depth rank too, or it
                       // sorts to an arbitrary layer as soon as a ripple mesh turns sorting on
 spr.x=bx; spr.y=by;
-spr.rotation=UPRIGHT_SPRITE ? 0 : pred._drawAngle;
+spr.rotation=UPRIGHT_SPRITE ? PANEL_TILT : pred._drawAngle;
 spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
 spr.alpha=0.92*Math.min(1,0.45+0.55*zs); // dim with depth beyond the midplane
 spr.scale.set(r/_bodyScale); // r already includes the depth scale zs
@@ -4362,7 +4384,7 @@ if(_rip){
 }
 spr.visible=true;
 spr.x=bx; spr.y=by;
-spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? 0 : boid._drawAngle;
+spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? PANEL_TILT : boid._drawAngle; // upright means upright IN THE ROOM, so it follows the panel's tilt
 spr.tint=_drawHex(boid, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // greyscale: anchored so the FRONT lands on white — see _depthL
 spr.alpha=baseAlpha;
 // _bodyScale calibration × user image-scale slider (eased so size changes glide). A sprite scales
@@ -5701,7 +5723,7 @@ function astroDraw(){
     const spr=_getBodySprite(_spriteCount++);
     if(spr.texture!==bt) spr.texture=bt;
     spr.visible=true; spr.x=sx; spr.y=sy;
-    spr.rotation=UPRIGHT_SPRITE?0:Math.atan2(b.vy,b.vx);
+    spr.rotation=UPRIGHT_SPRITE?PANEL_TILT:Math.atan2(b.vy,b.vx);
     spr.tint=_drawHex(b, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // as in the flock branch
     spr.alpha=1;
     spr.scale.set(scale);
@@ -6049,6 +6071,7 @@ MAX_TRAIL         = ${MAX_TRAIL};
 DEPTH_LIGHT       = ${DEPTH_LIGHT};
 DEPTH_HAZE        = ${DEPTH_HAZE};
 RIPPLE_AMT        = ${RIPPLE_AMT};
+PANEL_TILT        = ${PANEL_TILT}; // radians — the panel's own orientation travels with the export
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 AURA_OPACITY      = ${AURA_OPACITY};
 immigrationEnabled= ${immigrationEnabled};
