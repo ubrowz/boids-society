@@ -1,3 +1,90 @@
+# Session Log — 2026-08-09 / 2026-08-10
+
+## What we worked on (pics-anim-pi-pixi.html only)
+
+3 commits, **none pushed**. Two threads: hardware sensors for the LED-panel installation, and
+finally explaining why the Pi pop-out has always been unusable.
+
+### 1. Two sensors — proximity and tilt
+The panel is getting a proximity sensor (digital, 1 = object close) and an inclinometer. The
+browser cannot touch GPIO at all — no Web API, and Chromium is sandboxed away from
+`/dev/gpiochip*` — so every approach is the same shape: a bridge process on the Pi owns the pin
+and the page subscribes over localhost. Settled on a ~40-line Python bridge serving SSE, with the
+page-side listener wrapped so it no-ops when nothing is listening (the same HTML is the public
+Pages build). Design written up in `sensor-interfacing-notes.md`, which is **git-ignored** — it is
+installation hardware, not part of the site.
+
+Neither sensor is wired yet. The tilt one is, however, already simulatable.
+
+### 2. Panel tilt — a slider now, the inclinometer later
+The panel rotates **in its own plane**, portrait ↔ landscape. That mattered more than it looked:
+only in-plane rotation is corrected by rotating the images. Had the panel tipped like a laptop lid
+instead, gravity's in-plane *direction* would never change — only its magnitude — and counter-
+rotating would actively make things worse. Worth being sure which mount you have before reusing
+this code.
+
+Implementation was almost free, because "upright" was expressed as a literal `0` in exactly three
+places and the tilt is that constant becoming a global. 0° is the panel hanging vertical, which is
+how it hangs today, so the default changes nothing. Only images rendered upright are corrected — a
+boid drawn at its heading is already right at any angle, since it swims in the tank and the tank
+turns with the panel. Three things came along for free: the click hit-test (it reads back
+`spr.rotation` rather than recomputing), tank sync, and settings save/load — the last two because
+both walk range inputs generically.
+
+### 3. The Pi pop-out — a two-year annoyance with a one-line-ish cause
+An exported file ftp'd to the Pi runs smooth; the pop-out tank on the same Pi crawls. The two
+documents are generated from the same `outerHTML` and differ only in title, run mode and
+auto-disease, so it was never the simulation.
+
+**A pop-out shares a renderer process — and therefore a main thread — with the dashboard that
+opened it.** `window.open` + `document.write` into `about:blank` keeps the two documents
+same-origin and script-connected, so Chromium puts them together. The export gets a process to
+itself with nothing in it, which is the entire advantage. Everything the tank sent home came
+straight out of the frame budget: a status mirror at 6 Hz driving ~25 DOM writes into the
+dashboard's *visible* control panel, plus a `toDataURL` PNG encode of the pyramid on the render
+thread.
+
+Fixed with a **Pi pop-out** button: a tank that sends nothing back. Control still flows in and the
+sliders steer it as before — only the telemetry going back is gone, which is the asymmetry that
+matters, since inbound messages arrive only when someone touches a control. Confirmed fixed on the
+Pi. Also stopped drawing the population pyramid in any document where nobody can see it, the
+standalone export included.
+
+## Key decisions
+- **Sensor notes stay local.** `.gitignore`d rather than committed — hardware for the installation,
+  with no bearing on the public site.
+- **Tilt zero is today's orientation.** Defining 0° as the panel hanging vertical makes the whole
+  feature a pure addition: the shipped default is byte-equivalent to the old behaviour.
+- **Image scale deliberately not tied to tilt.** Upright images have ~32px of vertical room in
+  portrait and ~192px in landscape, so one tuned for an extreme may read poorly at the other —
+  left alone until it actually looks wrong.
+- **The structural fix for the shared process was declined for now.** Giving the tank its own
+  process means a blob URL with `noopener` and `BroadcastChannel` instead of `opener`, which breaks
+  the "document.write a live copy of myself" trick the whole bridge rests on. Held in reserve; the
+  cheap fix turned out to be enough.
+- **Two commits, not one.** The tilt slider is a feature and had no business riding along with a
+  performance fix. Split via a patch applied to the index, and the intermediate commit was checked
+  to be self-consistent before being made.
+
+## Traps worth remembering
+- **`updateStatus()` looks like display code and is not.** It computes `_cachedDiversity`, which
+  feeds disease and hazard, so stripping it from a lean tank would quietly change how the society
+  behaves rather than just what it shows. `drawPopPyramid` is the exact opposite — no side effects
+  outside its own canvas — which is why one could be skipped and the other could not.
+- **`toDataURL` is not a cheap read.** It is a synchronous GPU→CPU readback plus a PNG encode plus
+  a base64 stringify, on the render thread, mid-loop.
+- **An existing slider made the decisive test free.** Dragging pyramid refresh from 3s to 10s and
+  seeing it barely help ruled out the PNG encode as the dominant cost before a line was written.
+- **A window opened from another window is not an independent process.** This is the general
+  version of the finding above, and it applies to anything measured in a pop-out: the dashboard's
+  repaints are competing with the tank's frames.
+
+## Files changed
+- `pics-anim-pi-pixi.html` — panel tilt, Pi pop-out, pyramid gating (+64 / −10 across 2 commits).
+- `.gitignore` — keep the sensor notes local.
+- `sensor-interfacing-notes.md` — created; **git-ignored, local only**.
+- `SESSION_LOG.md` — this entry.
+
 # Session Log — 2026-07-27 / 2026-08-09
 
 ## What we worked on (pics-anim-pi-pixi.html only)
