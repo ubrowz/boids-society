@@ -1973,6 +1973,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="rippleSlider" min="0" max="100" value="40" step="5">
 <span class="ctrl-val" id="rippleVal">40%</span>
 </div>
+<div class="ctrl-row flock-only">
+<label title="How dark the light wave gets — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved rather than flat. It only ever DARKENS: 100% means the trough of the wave falls to near-black, 0% turns the shading off and leaves the geometric wave alone. Needs ripple above 0, since the shading rides on the same mesh.">shade</label>
+<input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
+<span class="ctrl-val" id="shadeVal">30%</span>
+</div>
 <div class="mini-note">The ↑ rows are <b>unique</b>: one boid wears each at a time, released when its wearer dies and picked up by the next boid to look. They are claimed ahead of ordinary images. Once any ↑ image is loaded, boids with nothing to wear are not drawn at all — so an ↑-only pool shows just these images, while uploading ordinary images alongside clothes everyone again. <b>Ripple</b> waves ↑ images always, and ordinary images too whenever the Upright switch is on — one mesh each, so keep the population small for that.</div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
@@ -2414,6 +2419,7 @@ wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
 wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
 wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
+wire('shadeSlider','shadeVal',           v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_SHADE=v; });
 wire('tiltSlider','tiltVal',             v=>parseInt(v)*Math.PI/180, v=>v+'°', v=>{ PANEL_TILT=v; }); // negate the parse if the panel turns the other way
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
@@ -2817,13 +2823,72 @@ const _RIPPLE_RATE  = 0.45; // cycles per second
 // is with a small population of image boids — so in practice it is never reached, and the visible
 // seam it would cause is strictly better than a frozen tank.
 const _RIPPLE_MAX   = 120;
+// How dark the light wave gets, 0..0.95 — its own slider rather than a multiple of RIPPLE_AMT.
+// Deriving it kept the two in step automatically, but it also meant the only way to judge the
+// shading was to change the wave that causes it, which is no way to tune anything. The phase and
+// clock are still shared, so the two remain one surface however this is set.
+let RIPPLE_SHADE = parseInt(document.getElementById('shadeSlider').value)/100*0.95;
+
+// ── the light wave ────────────────────────────────────────────────────────────
+// A shadow rolling over the cloth, done in the fragment shader. Three things about this are
+// deliberate:
+//
+// SUBTRACTIVE, NEVER A HIGHLIGHT. The panel's flicker is a PWM-duty problem (see
+// led-flicker-notes.md): a black background helps precisely because most LEDs sit at zero duty.
+// Brightening pixels would work against that, so this only ever darkens — which is also the
+// honest reading, since cloth in water is shaded on the far slope of a wave, not lit above
+// ambient.
+//
+// A MULTIPLY IN THE SHADER, NOT A TINT FROM JS. _drawHex is where hue already carries brightness,
+// and it is where the offset-then-clamp trap lives. A multiply cannot clamp — it only ever
+// darkens — so composing here sidesteps that path entirely. Note the multiply lands on .rgb only:
+// Pixi's colour is premultiplied, so scaling all four channels would fade the image out rather
+// than shade it.
+//
+// DRIVEN BY THE SLOPE, NOT THE HEIGHT. The x displacement in _rippleDeform is a sin; its slope is
+// the cos of the same argument. Shading the slope is what makes the surface read as curved rather
+// than as a gradient sliding across a photo — and it costs a phase shift, nothing more.
+//
+// vTextureCoord is the UNDEFORMED unit position (the deform moves aVertexPosition, never the UVs),
+// so the light wave and the geometry wave are evaluated in the same space, from the same argument.
+//
+// _RIPPLE_WAVES goes in via toFixed(4), not raw: a whole-numbered value would interpolate as "2"
+// and GLSL rejects float * int. The decimal point has to survive the template.
+const _rippleProgram = PIXI.Program.from(`
+precision mediump float;
+attribute vec2 aVertexPosition;
+attribute vec2 aTextureCoord;
+uniform mat3 projectionMatrix;
+uniform mat3 translationMatrix;
+uniform mat3 uTextureMatrix;
+varying vec2 vTextureCoord;
+void main(void){
+  gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);
+  vTextureCoord = (uTextureMatrix * vec3(aTextureCoord, 1.0)).xy;
+}`, `
+precision mediump float;
+varying vec2 vTextureCoord;
+uniform vec4 uColor;
+uniform sampler2D uSampler;
+uniform float uAmt;    // shade depth, 0 = off
+uniform float uT;      // same clock as the geometry wave
+uniform float uPhase;  // per-boid, so a shoal never pulses in unison
+void main(void){
+  vec4 c = texture2D(uSampler, vTextureCoord) * uColor;
+  float s = cos(6.2832 * (vTextureCoord.y * ${_RIPPLE_WAVES.toFixed(4)} - uT) + uPhase); // slope of the x wave
+  c.rgb *= 1.0 - uAmt * (0.5 - 0.5 * s);   // 1.0 at the crest, 1.0-uAmt in the trough
+  gl_FragColor = c;
+}`);
 const _rippleMeshes = [];   // pool, indexed like _bodySprites
 let _rippleUsed = 0, _rippleRest = null;
 function _getRippleMesh(tex){
 if(_rippleUsed>=_RIPPLE_MAX) return null;            // ceiling — caller falls back to a sprite
 if(_rippleUsed>=_rippleMeshes.length){
   const g=new PIXI.PlaneGeometry(1,1,_RIPPLE_SEG,_RIPPLE_SEG); // positions 0..1, UVs 0..1
-  const m=new PIXI.Mesh(g, new PIXI.MeshMaterial(tex));
+  // Custom program, but still a MeshMaterial: tint, alpha and the texture matrix keep working.
+  // Every mesh shares one Program (Pixi caches them by source), so this costs no extra binds —
+  // and the meshes each carry their own draw call already, which is the cost this look pays.
+  const m=new PIXI.Mesh(g, new PIXI.MeshMaterial(tex, { program:_rippleProgram, uniforms:{ uAmt:0, uT:0, uPhase:0 } }));
   m.pivot.set(0.5,0.5);                              // matches the sprites' 0.5 anchor
   _gfx.bodySprites.addChild(m);
   _rippleMeshes.push(m);
@@ -2848,6 +2913,13 @@ for(let i=0;i<v.length;i+=2){
   v[i+1] = y0 + ampY*Math.sin(6.2832*(x0*_RIPPLE_WAVES - t*0.8) + phase*1.7);
 }
 buf.update();
+// The light wave: same clock, same phase, same argument as the x displacement above — the shader
+// takes the cos of it to shade the slope. Three uniform writes per mesh per frame is the entire
+// per-frame cost of the effect; the sine itself runs per fragment on the GPU.
+const u=m.shader.uniforms;
+u.uAmt   = RIPPLE_SHADE;
+u.uT     = t;
+u.uPhase = phase;
 }
 function _getBodySprite(idx){
 if(idx>=_bodySprites.length){
@@ -6095,6 +6167,7 @@ MAX_TRAIL         = ${MAX_TRAIL};
 DEPTH_LIGHT       = ${DEPTH_LIGHT};
 DEPTH_HAZE        = ${DEPTH_HAZE};
 RIPPLE_AMT        = ${RIPPLE_AMT};
+RIPPLE_SHADE      = ${RIPPLE_SHADE};
 PANEL_TILT        = ${PANEL_TILT}; // radians — the panel's own orientation travels with the export
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 AURA_OPACITY      = ${AURA_OPACITY};
