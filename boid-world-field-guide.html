@@ -362,13 +362,54 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <h3>What you're seeing</h3>
   <p class="note">Six recurring glyphs carry the story. Once you can read them, the tank narrates itself.</p>
   <div class="fx">
-    <figure><canvas id="fx1"></canvas><figcaption><b>Tinted body</b> — one teardrop texture, tinted per-boid at HSL&nbsp;L85; beak length and eye size are the genes made visible. Or swap in your own images — one pool per sex, picked at birth, sized by a scale slider.</figcaption></figure>
+    <figure><canvas id="fx1"></canvas><figcaption><b>Tinted body</b> — one teardrop texture, tinted per-boid at HSL&nbsp;L50; beak length and eye size are the genes made visible. Or swap in your own images — one pool per sex, picked at birth, sized by a scale slider.</figcaption></figure>
     <figure><canvas id="fx2"></canvas><figcaption><b>Aura glow</b> — the boid's own hue; a touch brighter for bonded pairs than for fertile adults still searching. The <em>aura</em> toggle sets it to gradient, flat, or off.</figcaption></figure>
     <figure><canvas id="fx3"></canvas><figcaption><b>Bond line</b> — a thin white thread between partners, a touch brighter while fertile or at a birth. One <em>event fx</em> switch cycles three states — all events, bond lines only, then none.</figcaption></figure>
     <figure><canvas id="fx4"></canvas><figcaption><b>Birth ring</b> — expanding pulse in the newborn's colour; white when the newcomer is an immigrant.</figcaption></figure>
     <figure><canvas id="fx5"></canvas><figcaption><b>Death splash</b> — rings and particles in the deceased's hue, scaled by its depth.</figcaption></figure>
     <figure><canvas id="fx6"></canvas><figcaption><b>Motion trail</b> — a tapering wake; the white dot on a body marks disease.</figcaption></figure>
   </div>
+</section>
+
+<!-- ── CLOTH ──────────────────────────────────────────────────────────── -->
+<section>
+  <p class="eyebrow">Render model · Cloth</p>
+  <h3>Images that behave like cloth</h3>
+  <p class="note">Load your own pictures and they need not stay flat. A boid wearing an uploaded image can be drawn as
+  a deforming mesh rather than a sprite: a slow wave travels through the whole picture, both axes at once, so it reads
+  as cloth in water rather than a flag on a pole. Each boid gets its own phase, so a shoal never pulses in unison.
+  Only <em>upright</em> images ripple — a body that rotates with its heading while the wave axis stays fixed reads
+  wrong, so uprightness is the condition rather than a preference.</p>
+  <p class="note">A second wave carries no geometry at all: a <b>shadow rolling over the surface</b>, shading the slope
+  of the wave rather than its height, which is the difference between a curved surface and a gradient sliding across a
+  photo. It only ever darkens — cloth in water is shaded on the far side of a swell, not lit above ambient — and on an
+  LED panel that matters twice over, since brightening pixels is what makes a panel flicker. Three sliders: how far the
+  cloth moves, how dark the shadow gets, and how many crests fit across the picture.</p>
+  <p class="note">This is the one effect in the tank that is genuinely expensive. Every rippling boid needs its own
+  mesh, and meshes cannot be batched the way sprites can — so where the flock costs one draw call for hundreds of
+  bodies, this costs one <em>each</em>. It is built for a handful of image boids, not a crowd, and past a hard ceiling
+  the surplus quietly stop rippling rather than let the tank stall.</p>
+  <div class="chips">
+    <span class="chip">wave runs on the <b>GPU</b> — the mesh itself never changes</span>
+    <span class="chip">shadow follows the <b>slope</b>, not the height</span>
+    <span class="chip">crests across the image <b>0.4–4</b> (the mesh sets the ceiling)</span>
+    <span class="chip">tight ripples: <b>more crests, less movement, more shadow</b></span>
+    <span class="chip">one mesh — and one draw call — <b>per rippling boid</b></span>
+    <span class="chip"><b>ripple 0</b> removes the meshes entirely, not just the motion</span>
+  </div>
+</section>
+
+<!-- ── PANEL ──────────────────────────────────────────────────────────── -->
+<section>
+  <p class="eyebrow">Render model · The panel</p>
+  <h3>Upright, whichever way the panel hangs</h3>
+  <p class="note">The tank's real home is a 192×32 LED panel, and a panel can be hung either way up — portrait or
+  landscape, turned in its own plane like a picture frame. Turn it, and everything drawn upright is suddenly upright
+  only with respect to the canvas, not the room. A single angle fixes that: upright images counter-rotate by however
+  far the panel has turned, so a face stays a face however the frame is mounted.</p>
+  <p class="note">Nothing else moves. The tank keeps its own shape, the boids go on floating exactly as before, and a
+  boid drawn at its heading needs no correction at all — it swims in the tank, and the tank turns with the panel. For
+  now the angle is a slider; the intention is an inclinometer on the panel writing the same number.</p>
 </section>
 
 <!-- ── SONIC VOCABULARY ───────────────────────────────────────────────── -->
