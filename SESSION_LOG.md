@@ -1,3 +1,93 @@
+# Session Log — 2026-08-11 / 2026-08-12
+
+## What we worked on (pics-anim-pi-pixi.html + the two docs)
+
+3 commits, all pushed. One thread: giving the ripple a light wave, and paying for it.
+
+### 1. The light wave — a verdict that did not survive its constraints
+The user remembered deciding, when the ripple was first built, that a *light* ripple would be too
+costly. It was worth re-asking, because the reason had changed. What made it expensive was never
+the light maths — it is that per-boid geometry means one mesh and one draw call per boid, with no
+batching. Under **upright-only and under 40 images that cost is already sunk**: the mesh exists and
+already carries its own draw call. Adding shading to it costs no draw calls, no extra program binds
+(all meshes share one Program), and a handful of uniform writes.
+
+Three properties are deliberate, and each avoids a trap this project has already been bitten by:
+- **Subtractive, never a highlight.** Panel flicker is a PWM-duty problem and a black background
+  helps precisely because most LEDs sit at zero duty, so brightening would work against the fix
+  already in place. It is also the honest reading — cloth in water is shaded on the far slope.
+- **A multiply in the shader, not a tint from JS.** `_drawHex` is where hue already carries
+  brightness and where the offset-then-clamp trap lives; a multiply cannot clamp.
+- **Driven by the slope, not the height.** The shader takes the `cos` of the same argument the
+  geometry takes the `sin` of. That is the difference between a curved surface and a gradient
+  sliding across a photo, and it costs a phase shift.
+
+### 2. Two sliders, and one that was declined
+Shade started derived from `RIPPLE_AMT` — which kept them automatically in step, but meant the only
+way to judge the shading was to change the wave causing it. Decoupled; phase and clock still shared.
+
+Frequency then forced two changes: the constant had to become a **uniform** (baking it would
+recompile the program on every drag), and the mesh had to go from 6 quads to 10, because a wave can
+only be carried by a grid that samples it.
+
+The user then asked for an **OFF position on the frequency slider** to A/B performance. Declined,
+with the reason: `ripple = 0` already does exactly that and does it *better*, because it stops the
+meshes being created at all rather than merely stopping the surface moving. A frequency-off would
+leave all 40 draw calls in place and report that the wave was nearly free — the wrong conclusion
+from a control that looked like the right one.
+
+### 3. The Pi paid for the finer mesh, so the wave moved to the GPU
+Raising the segment count multiplied both the per-frame JS trig loop and the buffer upload by 2.5,
+and the Pi felt it immediately. The fix was not to trim that cost but to delete it: the
+displacement now runs in the **vertex shader**, computed from the rest grid, so the geometry is
+write-once — no JS trig, no buffer traffic, seven uniform writes per rippling boid per frame. All
+meshes now share one geometry, since nothing writes to it. The Pi should run this better than it
+did before the light wave existed.
+
+### 4. Docs
+Neither the design doc nor the field guide mentioned the ripple **at all**, so this documented the
+whole cloth story rather than amending it. Writing it up turned up three stale claims: the bridge
+mirrors status at ~6 Hz (not ~3×, and that rate is the whole argument for the Pi pop-out), Tint L
+defaults to 50 (not 85, in three places across both files — and 50 is the *saturated* end, so the
+old text had the characterisation backwards), and the mixer has 14 faders (not 12; lead and canon
+arrived with the melody and were never written down).
+
+## Key decisions
+- **Re-ask a costed-out decision when its constraints have moved.** "Too costly" was correct for the
+  general case and wrong for this one; nothing about the maths changed, only what had already been
+  paid for.
+- **Flag the measurement, not just the request.** The OFF-slider ask had a correct goal and a
+  control that would have answered it misleadingly. Saying so was worth more than building it.
+- **One commit for the frequency slider and the GPU move**, against the usual one-topic rule: the
+  shader hunks interleave, and any split would leave an intermediate that fails at load (the old
+  baked literal referencing a deleted constant). Better than fabricating a state that never existed.
+
+## Traps worth remembering
+- **`mediump` is genuinely 16-bit on an embedded GPU, and desktop drivers quietly promote it.** An
+  unbounded clock is therefore exact on a Mac and degrades on a Pi — the exact shape of "fine here,
+  bad there". Four minutes in, the wave's phase was stepping by a quarter radian. Wrap clocks to
+  [0,1) on the CPU; whole cycles are a no-op inside sin/cos. Wrap the two clocks **separately** —
+  0.8 of a cycle is not a cycle.
+- **A uniform shared across shader stages must match in precision, not just type.** Raising only the
+  vertex stage to `highp` fails at **link** time, with both sources individually valid — and it
+  surfaces as the images silently not drawing. Nothing in the console points at precision. Checking
+  that every uniform is declared, initialised and written passes this cleanly, because the fault is
+  agreement *between* stages, not within one.
+- **Pixi's colour is premultiplied.** Scaling all four channels fades an image out; shading means
+  multiplying `.rgb` only.
+- **A grid carries N/2 crests at N quads across.** Beyond that a wave collapses into facets, and it
+  looks poor well before the wall — which is what caps the frequency slider, not taste.
+- **Amplitude and frequency fight.** Amplitude is a fraction of image width regardless of crest
+  count, so at high frequency the same amplitude folds the mesh through itself. Real waves get
+  shallower as they get shorter; this one does not unless you do it.
+
+## Files changed
+- `pics-anim-pi-pixi.html` — light wave, shade/waves sliders, GPU deformation, both shader fixes.
+- `pics-anim-pi-design.html` — two new appearance sections, four control rows, three optimisation
+  rows, the Pi pop-out, plus the three staleness corrections.
+- `boid-world-field-guide.html` — two new sections (cloth, panel orientation).
+- `SESSION_LOG.md` — this entry.
+
 # Session Log — 2026-08-09 / 2026-08-10
 
 ## What we worked on (pics-anim-pi-pixi.html only)
