@@ -1978,6 +1978,11 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
 <span class="ctrl-val" id="shadeVal">30%</span>
 </div>
+<div class="ctrl-row flock-only">
+<label title="How many wave crests fit across the image. Low values give one long slow swell; high values give tight ripples running over the surface. Drives the geometric wave and the light wave together, so they stay one surface. The mesh is 10 quads across, which is what sets the top of this range — beyond about 5 crests a grid that coarse cannot carry the wave and it breaks into facets.">waves</label>
+<input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
+<span class="ctrl-val" id="waveVal">1.3</span>
+</div>
 <div class="mini-note">The ↑ rows are <b>unique</b>: one boid wears each at a time, released when its wearer dies and picked up by the next boid to look. They are claimed ahead of ordinary images. Once any ↑ image is loaded, boids with nothing to wear are not drawn at all — so an ↑-only pool shows just these images, while uploading ordinary images alongside clothes everyone again. <b>Ripple</b> waves ↑ images always, and ordinary images too whenever the Upright switch is on — one mesh each, so keep the population small for that.</div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
@@ -2420,6 +2425,7 @@ wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off
 wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
 wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
 wire('shadeSlider','shadeVal',           v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_SHADE=v; });
+wire('waveSlider','waveVal',             v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ RIPPLE_WAVES=v; });
 wire('tiltSlider','tiltVal',             v=>parseInt(v)*Math.PI/180, v=>v+'°', v=>{ PANEL_TILT=v; }); // negate the parse if the panel turns the other way
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
@@ -2814,9 +2820,17 @@ function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 // image, which only worked because ↑ images are unique. Ordinary images are shared by many boids
 // at once, so meshes must be pooled per BOID and carry whatever texture that boid wears — and a
 // dimension-derived geometry would need rebuilding on every reuse. A unit plane never does.
-const _RIPPLE_SEG   = 6;    // 6x6 quads = 7x7 vertices — enough for a smooth wave at these sizes
-const _RIPPLE_WAVES = 1.3;  // wave crests across the image
+// 10x10 quads = 11x11 vertices. This is set by the frequency slider, not by taste: a wave can only
+// be carried by a grid that samples it, and at N quads across, N/2 crests is the hard Nyquist wall
+// where the wave collapses into faceted noise. At the old 6 the ceiling was ~3 crests and looked
+// bad well before that; 10 carries the slider's full range with room to spare. The cost is vertex
+// work only — 242 floats a frame per mesh instead of 98 — which at the intended handful of image
+// boids is nothing, and the geometry is still a unit plane that never needs rebuilding.
+const _RIPPLE_SEG   = 10;
 const _RIPPLE_RATE  = 0.45; // cycles per second
+// Crests across the image. The LIGHT wave has no such ceiling — it is evaluated per fragment, so it
+// stays smooth at any frequency. Only the geometry is bound by _RIPPLE_SEG above.
+let RIPPLE_WAVES = parseFloat(document.getElementById('waveSlider').value);
 // Safety ceiling, not a quality setting. Meshes never batch, so one per boid means one draw call
 // per boid; at a full 624 population that is ruinous on a Pi. Beyond this many, the surplus fall
 // back to plain sprites. It sits far above any sane use of this look — the intended way to run it
@@ -2845,15 +2859,41 @@ let RIPPLE_SHADE = parseInt(document.getElementById('shadeSlider').value)/100*0.
 // Pixi's colour is premultiplied, so scaling all four channels would fade the image out rather
 // than shade it.
 //
-// DRIVEN BY THE SLOPE, NOT THE HEIGHT. The x displacement in _rippleDeform is a sin; its slope is
+// DRIVEN BY THE SLOPE, NOT THE HEIGHT. The x displacement in the vertex shader is a sin; its slope is
 // the cos of the same argument. Shading the slope is what makes the surface read as curved rather
 // than as a gradient sliding across a photo — and it costs a phase shift, nothing more.
 //
 // vTextureCoord is the UNDEFORMED unit position (the deform moves aVertexPosition, never the UVs),
 // so the light wave and the geometry wave are evaluated in the same space, from the same argument.
 //
-// _RIPPLE_WAVES goes in via toFixed(4), not raw: a whole-numbered value would interpolate as "2"
-// and GLSL rejects float * int. The decimal point has to survive the template.
+// The frequency is a UNIFORM, not baked into the source. It used to be a literal, which was fine
+// while it was a constant; the moment it became a slider, baking it would mean recompiling the
+// program on every drag.
+// THE DEFORMATION HAPPENS HERE, not in JS. It used to be a loop that rewrote every vertex and
+// called buf.update() once per mesh per frame — so the Pi paid a JS trig loop AND a GPU buffer
+// upload for every rippling boid, every frame, and both scaled with _RIPPLE_SEG. Raising the mesh
+// from 6 to 10 quads for the frequency slider multiplied that cost by 2.5 and the Pi felt it.
+//
+// Computed from aVertexPosition, the geometry is now WRITE-ONCE: no JS loop, no buffer traffic,
+// and the per-frame cost of a rippling boid is six uniform writes. The vertex shader runs the
+// trig instead, which for 121 vertices is nothing a GPU notices. It also means _RIPPLE_SEG is
+// nearly free to raise, so the Nyquist ceiling on frequency can be bought cheaply.
+// THE CLOCKS ARRIVE PRE-WRAPPED, and this is not a nicety. simClock grows without bound, and
+// mediump is genuinely 16-bit on an embedded GPU while desktop drivers quietly promote it to
+// 32-bit — so a raw clock is exact on the Mac and falls apart on the Pi, which is precisely the
+// shape of "fine here, bad there". At half precision the gap between representable values at
+// t=270 (four and a half minutes in) is already 0.25, which lands as a quarter-radian jump in the
+// wave's phase; by an hour it is worthless. Whole cycles are a no-op inside sin/cos, so wrapping
+// to [0,1) on the CPU costs nothing and the shader never sees a large number. Note the fix is the
+// WRAPPING, not a precision qualifier — mediump is ample for a number in [0,1).
+//
+// The two clocks wrap SEPARATELY. Wrapping one and scaling it by 0.8 in here would not: 0.8 of a
+// cycle is not a cycle, so the y wave would jump every time the x wave came round.
+// BOTH STAGES MUST DECLARE THE SAME PRECISION. uT, uPhase and uWaves are declared in both, and a
+// uniform shared across stages has to match in precision as well as type — mismatch it and the
+// program fails to LINK, which surfaces as the images silently not drawing at all. Raising only
+// the vertex stage to highp is exactly that mistake. With the clocks wrapped above, mediump is
+// ample everywhere, so there is nothing to gain by splitting them.
 const _rippleProgram = PIXI.Program.from(`
 precision mediump float;
 attribute vec2 aVertexPosition;
@@ -2861,9 +2901,20 @@ attribute vec2 aTextureCoord;
 uniform mat3 projectionMatrix;
 uniform mat3 translationMatrix;
 uniform mat3 uTextureMatrix;
+uniform float uAmpX;   // fraction of image width
+uniform float uAmpY;   // re-expressed as a fraction of HEIGHT, so tall images ripple evenly
+uniform float uT;      // wrapped to [0,1)
+uniform float uT2;     // the y wave's own wrapped clock
+uniform float uPhase;
+uniform float uWaves;
 varying vec2 vTextureCoord;
 void main(void){
-  gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);
+  // aVertexPosition is the rest grid and stays that way — read both waves from it, never from the
+  // running total, or the two axes would feed each other.
+  vec2 p = aVertexPosition;
+  p.x += uAmpX * sin(6.2832 * (aVertexPosition.y * uWaves - uT) + uPhase);
+  p.y += uAmpY * sin(6.2832 * (aVertexPosition.x * uWaves - uT2) + uPhase * 1.7);
+  gl_Position = vec4((projectionMatrix * translationMatrix * vec3(p, 1.0)).xy, 0.0, 1.0);
   vTextureCoord = (uTextureMatrix * vec3(aTextureCoord, 1.0)).xy;
 }`, `
 precision mediump float;
@@ -2871,55 +2922,52 @@ varying vec2 vTextureCoord;
 uniform vec4 uColor;
 uniform sampler2D uSampler;
 uniform float uAmt;    // shade depth, 0 = off
-uniform float uT;      // same clock as the geometry wave
+uniform float uT;      // same wrapped clock as the geometry's x wave
 uniform float uPhase;  // per-boid, so a shoal never pulses in unison
+uniform float uWaves;  // crests across the image — same value the geometry uses
 void main(void){
   vec4 c = texture2D(uSampler, vTextureCoord) * uColor;
-  float s = cos(6.2832 * (vTextureCoord.y * ${_RIPPLE_WAVES.toFixed(4)} - uT) + uPhase); // slope of the x wave
+  float s = cos(6.2832 * (vTextureCoord.y * uWaves - uT) + uPhase); // slope of the x wave
   c.rgb *= 1.0 - uAmt * (0.5 - 0.5 * s);   // 1.0 at the crest, 1.0-uAmt in the trough
   gl_FragColor = c;
 }`);
 const _rippleMeshes = [];   // pool, indexed like _bodySprites
-let _rippleUsed = 0, _rippleRest = null;
+let _rippleUsed = 0, _rippleGeom = null;
 function _getRippleMesh(tex){
 if(_rippleUsed>=_RIPPLE_MAX) return null;            // ceiling — caller falls back to a sprite
 if(_rippleUsed>=_rippleMeshes.length){
-  const g=new PIXI.PlaneGeometry(1,1,_RIPPLE_SEG,_RIPPLE_SEG); // positions 0..1, UVs 0..1
+  // ONE geometry for every mesh. Now that nothing writes to it, there is nothing to keep separate:
+  // same unit grid, same rest positions, and Pixi can reuse the VAO across the whole pool.
+  if(!_rippleGeom) _rippleGeom=new PIXI.PlaneGeometry(1,1,_RIPPLE_SEG,_RIPPLE_SEG); // positions 0..1, UVs 0..1
   // Custom program, but still a MeshMaterial: tint, alpha and the texture matrix keep working.
   // Every mesh shares one Program (Pixi caches them by source), so this costs no extra binds —
   // and the meshes each carry their own draw call already, which is the cost this look pays.
-  const m=new PIXI.Mesh(g, new PIXI.MeshMaterial(tex, { program:_rippleProgram, uniforms:{ uAmt:0, uT:0, uPhase:0 } }));
+  const m=new PIXI.Mesh(_rippleGeom, new PIXI.MeshMaterial(tex, { program:_rippleProgram,
+    uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0 } }));
   m.pivot.set(0.5,0.5);                              // matches the sprites' 0.5 anchor
   _gfx.bodySprites.addChild(m);
   _rippleMeshes.push(m);
-  // every mesh rests on the same unit grid, so one shared copy is enough to deform from
-  if(!_rippleRest) _rippleRest=Float32Array.from(g.getBuffer('aVertexPosition').data);
 }
 const m=_rippleMeshes[_rippleUsed++];
 if(m.texture!==tex) m.texture=tex;
 return m;
 }
-// Deform in unit space. Amplitude is a fraction of image WIDTH on both axes (as before), so on the
-// y axis it has to be re-expressed as a fraction of height — otherwise tall images would ripple
-// less across than along.
-function _rippleDeform(m, tex, phase){
-const buf=m.geometry.getBuffer('aVertexPosition'), v=buf.data, rest=_rippleRest;
+// Hand the wave to the shader. Amplitude is a fraction of image WIDTH on both axes (as before), so
+// on the y axis it has to be re-expressed as a fraction of height — otherwise tall images would
+// ripple less across than along. That is per-texture, hence a uniform rather than a constant.
+//
+// Six writes and no buffer traffic: this is the whole per-frame cost of a rippling boid now.
+function _rippleUpdate(m, tex, phase){
 const w=tex.width||1, h=tex.height||1;
-const ampX=RIPPLE_AMT, ampY=RIPPLE_AMT*0.6*(w/h), t=simClock*_RIPPLE_RATE;
-for(let i=0;i<v.length;i+=2){
-  const x0=rest[i], y0=rest[i+1];
-  // two out-of-phase waves, one per axis, so the surface undulates instead of shearing
-  v[i]   = x0 + ampX*Math.sin(6.2832*(y0*_RIPPLE_WAVES - t) + phase);
-  v[i+1] = y0 + ampY*Math.sin(6.2832*(x0*_RIPPLE_WAVES - t*0.8) + phase*1.7);
-}
-buf.update();
-// The light wave: same clock, same phase, same argument as the x displacement above — the shader
-// takes the cos of it to shade the slope. Three uniform writes per mesh per frame is the entire
-// per-frame cost of the effect; the sine itself runs per fragment on the GPU.
+const t=simClock*_RIPPLE_RATE;
 const u=m.shader.uniforms;
+u.uAmpX  = RIPPLE_AMT;
+u.uAmpY  = RIPPLE_AMT*0.6*(w/h);
 u.uAmt   = RIPPLE_SHADE;
-u.uT     = t;
+u.uT     = t % 1;         // see the program above — the shader must never see a large clock
+u.uT2    = (t*0.8) % 1;   // scaled first, THEN wrapped, or its phase would jump
 u.uPhase = phase;
+u.uWaves = RIPPLE_WAVES;
 }
 function _getBodySprite(idx){
 if(idx>=_bodySprites.length){
@@ -4473,7 +4521,7 @@ if(RIPPLE_AMT>0 && _bt && _bt!==_defaultTex && _bt.width>0 && (_forceUpright || 
 const _rip = !!spr;
 if(_rip){
   if(boid._ripplePhase===undefined) boid._ripplePhase=Math.random()*6.2832; // per-boid, so they never pulse in unison
-  _rippleDeform(spr, _bt, boid._ripplePhase);
+  _rippleUpdate(spr, _bt, boid._ripplePhase);
 } else {
   spr=_getBodySprite(_spriteCount++);
   if(spr.texture!==_bt) spr.texture=_bt;
@@ -6168,6 +6216,7 @@ DEPTH_LIGHT       = ${DEPTH_LIGHT};
 DEPTH_HAZE        = ${DEPTH_HAZE};
 RIPPLE_AMT        = ${RIPPLE_AMT};
 RIPPLE_SHADE      = ${RIPPLE_SHADE};
+RIPPLE_WAVES      = ${RIPPLE_WAVES};
 PANEL_TILT        = ${PANEL_TILT}; // radians — the panel's own orientation travels with the export
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 AURA_OPACITY      = ${AURA_OPACITY};
