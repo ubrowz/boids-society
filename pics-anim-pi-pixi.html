@@ -1160,10 +1160,14 @@ canvas#c { display:none; }
   transition:background 0.2s; }
 #playBtn:hover{ background:rgba(0,210,211,0.2); }
 #playBtn.running{ border-color:rgba(255,107,107,0.6); color:var(--bad); background:rgba(255,107,107,0.08); }
-#exportBtn{
+/* export/import pair — one theme, shared so the two can never drift apart. Rounded
+   SQUARE (not the .hbtn circle) and green, marking them as the file in/out group. */
+#exportBtn,#importBtn{
   width:42px; height:42px; border-radius:8px; font-size:16px; cursor:pointer;
-  background:rgba(11,232,129,0.10); border:2px solid rgba(11,232,129,0.45); color:var(--good); }
-#exportBtn:hover{ background:rgba(11,232,129,0.2); }
+  display:flex; align-items:center; justify-content:center; line-height:1;
+  background:rgba(11,232,129,0.10); border:2px solid rgba(11,232,129,0.45); color:var(--good);
+  transition:background 0.2s,border-color 0.2s; }
+#exportBtn:hover,#importBtn:hover{ background:rgba(11,232,129,0.2); border-color:rgba(11,232,129,0.75); }
 #recBtn{
   width:42px; height:42px; border-radius:50%; padding:0; cursor:pointer;
   background:rgba(255,85,85,0.10); border:2px solid rgba(255,85,85,0.5);
@@ -1332,6 +1336,8 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
     <input type="file" id="compLoadInput" accept="application/json,.json" style="display:none">
     <span class="hsep"></span>
     <button id="exportBtn" title="Download a standalone kiosk HTML — auto-starts fullscreen, no dashboard needed (e.g. Raspberry Pi). If a composition is loaded/recorded, the export plays it on loop.">📦</button>
+    <button id="importBtn" title="Rebuild this dashboard from a previously exported HTML — the inverse of 📦. Restores every slider &amp; toggle, ALL image pools, the shared body image and any baked composition. Unlike 📂 (settings only) this replaces your current images, so it asks first.">📥</button>
+    <input type="file" id="importFileInput" accept="text/html,.html,.htm" style="display:none">
     <span id="compStatus" style="font-size:11px;color:#888;align-self:center;margin-left:2px;"></span>
   </div>
 </header>
@@ -6210,7 +6216,14 @@ html = html.replace('<head>', '<head>\n' + exportCSS);
 
 // 2. Boot script at end of body — all inline scripts already done, startSim available
 const bootScript = `<script>
+/*__BOOT__*/
 (function(){
+// Machine-readable copy of the dashboard state, for 📥 Import to read straight back.
+// It costs a few hundred bytes and saves Import from having to infer anything: without
+// it, Import has to scrape slider values out of the value= attributes and read the
+// toggles back off the baked constants below. Exports made before 2026-08 lack this
+// line, which is exactly why that fallback path still exists.
+window.__SETTINGS = ${JSON.stringify(_gatherSettings())};
 MAX_TRAIL         = ${MAX_TRAIL};
 DEPTH_LIGHT       = ${DEPTH_LIGHT};
 DEPTH_HAZE        = ${DEPTH_HAZE};
@@ -6377,6 +6390,129 @@ a.href = url; a.download = 'boids-aquarium.html';
 document.body.appendChild(a); a.click();
 document.body.removeChild(a);
 URL.revokeObjectURL(url);
+});
+
+// ── import: rebuild the dashboard from an exported HTML ───────────────────────
+// The inverse of 📦. An export carries strictly MORE than a settings .json does —
+// 📂 restores controls only, because _gatherSettings deliberately leaves images out
+// (too large), whereas an export bakes the four image pools and the shared body
+// image as data URLs. So this restores a whole session, pictures included, and is
+// the way back when the .json was never saved but the exported HTML survives.
+//
+// The file is read as TEXT and parsed as text/HTML — nothing in it is ever executed.
+// Two readers, newest first:
+//   1. window.__SETTINGS — baked since 2026-08: a plain JSON.parse, nothing inferred.
+//   2. derivation — for older exports: buildStandaloneHTML syncs every range into its
+//      value= attribute before capturing outerHTML, so the sliders are recoverable
+//      exactly; the toggles are read back off the baked constants.
+const _importFileInput=document.getElementById('importFileInput');
+document.getElementById('importBtn').addEventListener('click',()=> _importFileInput.click());
+
+// An export contains buildStandaloneHTML's own source, so the boot block's markers all
+// appear TWICE — once as the template that generated them, once as the real baked line.
+// The boot block is appended last, so the FINAL occurrence is always the real one.
+function _importBoot(html){
+const s=html.lastIndexOf('/*__BOOT__*/'); if(s!==-1) return html.slice(s);
+const i=html.lastIndexOf('MAX_TRAIL');    return i===-1 ? '' : html.slice(i); // pre-sentinel export
+}
+// Scan a bracketed literal from `at` and JSON.parse it. Quote-aware, so a data URL that
+// happens to contain a bracket cannot end the scan early.
+function _importLit(txt, at, open, close){
+if(at<0) return null;
+const i=txt.indexOf(open,at); if(i===-1) return null;
+let d=0,q=null;
+for(let j=i;j<txt.length;j++){
+  const c=txt[j];
+  if(q){ if(c==='\\') j++; else if(c===q) q=null; continue; }
+  if(c==='"'||c==="'"){ q=c; continue; }
+  if(c===open) d++;
+  else if(c===close && --d===0){ try{ return JSON.parse(txt.slice(i,j+1)); }catch(e){ return null; } }
+}
+return null;
+}
+// Read one baked `NAME = value;` assignment back out of the boot block. A complete quoted
+// string is matched BEFORE the loose form, because a data URL contains a semicolon
+// (`data:image/png;base64,…`) and a plain [^;]+ would truncate it at "data:image/pn".
+function _importConst(boot, name){
+const m=new RegExp('(?:^|[\\s;{])'+name+'\\s*=\\s*("(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|[^;\\n]+);').exec(boot);
+if(!m) return undefined;
+const v=m[1].trim();
+if(v==='true') return true;
+if(v==='false') return false;
+if(v==='null') return null;
+if(/^-?\d*\.?\d+(?:e[+-]?\d+)?$/i.test(v)) return parseFloat(v);
+if(v[0]==='"'||v[0]==="'"){ try{ return JSON.parse(v[0]==="'" ? '"'+v.slice(1,-1).replace(/"/g,'\\"')+'"' : v); }catch(e){ return v.slice(1,-1); } }
+return undefined;
+}
+// Fallback for exports predating window.__SETTINGS: rebuild the same shape by hand.
+function _importDerive(html, boot){
+const doc=new DOMParser().parseFromString(html,'text/html'); // parses only — scripts never run
+const inputs={};
+doc.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{
+  const v=el.getAttribute('value'); // the ATTRIBUTE — what the export wrote, not a live value
+  if(el.id && v!==null) inputs[el.id]=v;
+});
+const toggles={};
+const g=(n,k)=>{ const v=_importConst(boot,n); if(v!==undefined) toggles[k||n]=v; };
+g('EVENT_FX'); g('AURA_MODE'); g('DIFF_MODE'); g('SHOW_COLOR'); g('SHOW_DETAILS');
+g('NO_OVERLAP'); g('DIM_INFERTILE'); g('UPRIGHT_SPRITE'); g('immigrationEnabled');
+g('HUNT_MODE'); g('SIM_MODE'); g('HUE_LOCK'); g('_ASTRO_MERGE','ASTRO_MERGE');
+return { app:'boid-world', v:1, inputs, toggles };
+}
+function _importApply(html, fname){
+if(!/window\.__RUNMODE/.test(html)){ _compStatus('import: not a Boid World export'); return; }
+const boot=_importBoot(html);
+if(!boot){ _compStatus('import: no baked settings found'); return; }
+
+let s=_importLit(boot, boot.search(/window\.__SETTINGS\s*=/), '{','}'), how='baked';
+if(!s || !s.inputs){ s=_importDerive(html, boot); how='derived'; }
+if(!s.inputs || !Object.keys(s.inputs).length){ _compStatus('import: could not read settings'); return; }
+
+const pool=n=>_importLit(boot, boot.indexOf('_poolPNG_'+n+'.push'), '[',']') || [];
+const pools={ M:pool('M'), F:pool('F'), MU:pool('MU'), FU:pool('FU') };
+const shared=_importConst(boot,'_customBoidPNG'); // undefined when the export had none
+const comp=_importLit(boot, boot.search(/window\.__COMP\s*=/), '{','}');
+
+const nImg=pools.M.length+pools.F.length+pools.MU.length+pools.FU.length;
+const bits=[Object.keys(s.inputs).length+' controls, '+Object.keys(s.toggles||{}).length+' toggles'];
+if(nImg) bits.push(nImg+' images ('+pools.M.length+'M · '+pools.F.length+'F · '+pools.MU.length+'M↑ · '+pools.FU.length+'F↑)');
+if(shared) bits.push('shared body image');
+if(comp && Array.isArray(comp.events)) bits.push(comp.events.length+' composition events');
+if(!confirm('Import from "'+fname+'":\n\n  · '+bits.join('\n  · ')+
+            '\n\nThis REPLACES the current settings and image pools.')){ _compStatus('import cancelled'); return; }
+
+// Images first, so the pools are stocked before any setting that depends on them.
+const setPool=(sex,up,arr,lbl)=>{
+  clearBodyPool(sex,up);
+  if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyclear',slot:sex,upright:up});
+  for(const d of arr){
+    addBodyPoolPNG(sex,d,up);
+    if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:sex,data:d,upright:up});
+  }
+  const el=document.getElementById(lbl); if(el) el.textContent=arr.length+' imgs';
+};
+setPool('M',false,pools.M ,'bodyImgMName');
+setPool('F',false,pools.F ,'bodyImgFName');
+setPool('M',true ,pools.MU,'bodyImgMUName');
+setPool('F',true ,pools.FU,'bodyImgFUName');
+// Absent means the export genuinely had none — clear it, or Import would not be a true inverse.
+applyBodySharedPNG(shared||null);
+if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:'both',data:shared||null});
+const sn=document.getElementById('bodyImgName'); if(sn) sn.textContent=shared?'imported':'';
+
+_applySettings(s);                       // restores SIM_MODE first, then drives every control
+if(comp && Array.isArray(comp.events)) _composition=comp;
+
+_compStatus('imported '+Object.keys(s.inputs).length+' controls'+(nImg?' · '+nImg+' images':'')+
+            (comp&&comp.events?' · '+comp.events.length+' events':'')+' ('+how+')');
+}
+_importFileInput.addEventListener('change',e=>{
+const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+_compStatus('reading '+f.name+'…');
+const r=new FileReader();
+r.onload=()=>{ try{ _importApply(String(r.result), f.name); }catch(err){ _compStatus('import failed: '+err.message); console.warn('import failed:',err); } };
+r.onerror=()=>_compStatus('import: could not read file');
+r.readAsText(f);
 });
 
 // ── dashboard ⇄ aquarium bridge ───────────────────────────────────────────────
