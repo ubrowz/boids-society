@@ -1938,6 +1938,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label>background</label>
 <input type="color" id="bgColorInput" value="#000000" title="Canvas background colour">
 </div>
+<div class="ctrl-row flock-only" style="gap:8px;">
+<label>bg image</label>
+<input type="file" id="bgImgFile" accept="image/*" style="display:none">
+<button id="bgImgBtn" class="mini-btn" title="Load an image to cover the canvas background instead of the colour (flock mode only). Crop it to the pop-out ratio for a clean fit. The ripple / shade / waves sliders apply to it too.">load</button>
+<button id="bgImgClear" class="mini-btn" title="Remove the background image and return to the colour" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bgImgName" class="mini-note">none</span>
+</div>
+<div class="ctrl-row flock-only">
+<label></label>
+<span id="bgImgTarget" class="mini-note" title="Pop-out canvas / Pi pop-out open at this size (1:6). Crop the background image to match for a clean 'cover' fit.">strip pop-out target: —</span>
+</div>
 </section>
 
 <section class="panel">
@@ -2060,6 +2071,17 @@ const _BOID_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAAC
 let _defaultTex = null;  // embedded teardrop texture
 let _sharedTex  = null;  // shared image — predators + fallback for a sex with an empty pool
 let _predTex    = null;  // predator body texture (follows the shared image)
+// ── alpha masks, for click hit-testing ───────────────────────────────────────
+// A downsampled copy of each image's alpha channel, so a click can tell painted pixels from
+// transparent margin. Built once per texture when it decodes; ~4KB each at 64x64. Held in a
+// WeakMap so a mask dies with its texture. Works offline and in exports because the images are
+// data URLs, which do not taint a canvas — a remote URL would, and getImageData would throw.
+// Declared HERE (not next to _buildAlphaMask below) because _maskWhenReady(_defaultTex) can fire
+// _buildAlphaMask synchronously when the teardrop's data-URI is already decoded (a reopened
+// pop-out with the image cached) — reaching these from 400 lines down would be a dead-zone crash.
+const _MASK_N   = 64; // mask resolution — ample for "is this pixel painted?"
+const _MASK_MIN = 32; // alpha (0-255) at or above which a pixel counts as solid
+const _alphaMasks = new WeakMap(); // PIXI.Texture → Uint8Array(_MASK_N²)
 let _hasUpright = false; // any always-upright image uploaded? suppresses the default-shape stand-in
 const _boidPoolM = [];   // male body textures   — [{tex,data}]; each male picks one at birth
 const _boidPoolF = [];   // female body textures — [{tex,data}]
@@ -2081,6 +2103,12 @@ const _poolPNG_M = [];       // male image data URLs   (baked into exports, brid
 const _poolPNG_F = [];       // female image data URLs
 const _poolPNG_MU = [];      // male   "always upright" image data URLs — ignore the Upright toggle
 const _poolPNG_FU = [];      // female "always upright" image data URLs
+// ── background image (optional wallpaper behind the flock; flock mode only) ────
+// Persisted like body images: baked into exports + bridged to the tank, NOT in _gatherSettings.
+let _bgImagePNG     = null;   // data URL, ≤2048px — the standard baked/bridged form (or null)
+let _bgImagePNGLean = null;   // data URL, ≤1024px — baked into the Pi (lean) pop-out only
+let _bgMesh         = null;   // PIXI.Mesh on _rippleProgram; built after the program, null in dash mode
+let _tankLean       = false;  // does the currently-open tankWin belong to the Pi (lean) pop-out?
 
 
 // ── slider state ──────────────────────────────────────────────────────────────
@@ -2407,6 +2435,88 @@ _wirePool('M', false, 'bodyImgMBtn','bodyImgMFile','bodyImgMClear','bodyImgMName
 _wirePool('F', false, 'bodyImgFBtn','bodyImgFFile','bodyImgFClear','bodyImgFName');
 _wirePool('M', true,  'bodyImgMUBtn','bodyImgMUFile','bodyImgMUClear','bodyImgMUName');
 _wirePool('F', true,  'bodyImgFUBtn','bodyImgFUFile','bodyImgFUClear','bodyImgFUName');
+
+// ── background image ─────────────────────────────────────────────────────────
+// Read a picked file, decode once, produce two JPEG variants (≤2048 for normal
+// surfaces, ≤1024 baked into the lean Pi pop-out). A source already within a cap
+// keeps its original bytes, so a small hand-made PNG with alpha survives untouched.
+function _loadBgImageVariants(file, cb){          // cb({full, lean}) or cb(null) on failure
+  const r = new FileReader();
+  r.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const enc = (maxEdge) => {
+        const long = Math.max(img.width, img.height);
+        const scale = long > maxEdge ? maxEdge / long : 1;
+        if(scale === 1) return ev.target.result;                 // small enough — original bytes
+        const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        return cv.toDataURL('image/jpeg', 0.85);
+      };
+      cb({ full: enc(2048), lean: enc(1024) });
+    };
+    img.onerror = () => cb(null);
+    img.src = ev.target.result;
+  };
+  r.onerror = () => cb(null);
+  r.readAsDataURL(file);
+}
+function applyBgImagePNG(full, lean){
+  _bgImagePNG     = full || null;
+  _bgImagePNGLean = lean || full || null;   // fall back to full when no explicit lean (e.g. import)
+  _rebuildBgTex();
+}
+// Resolve the bg data URL into _bgMesh's texture. Dashboard keeps the URL only.
+function _rebuildBgTex(){
+  if(RUN_MODE === 'dash') return;      // mirrors _recomputeTextures — dash keeps data URLs for export + bridge
+  if(!_bgMesh) return;                 // mesh not built yet (created after _rippleProgram)
+  const old = _bgMesh.texture;
+  if(_bgImagePNG){
+    _loadPlainTex(_bgImagePNG, t => {
+      _bgMesh.texture = t;
+      if(old && old !== PIXI.Texture.EMPTY && old !== t) old.destroy(true); // free the previous GPU upload
+    });
+  } else {
+    _bgMesh.texture = PIXI.Texture.EMPTY;
+    if(old && old !== PIXI.Texture.EMPTY) old.destroy(true);
+  }
+}
+// Like _loadTex but WITHOUT _buildAlphaMask — a background image is never hit-tested.
+function _loadPlainTex(dataURL, assign){
+  const tex = PIXI.Texture.from(dataURL);
+  if(tex.baseTexture.valid) assign(tex);
+  else {
+    tex.baseTexture.on('loaded', () => assign(tex));
+    tex.baseTexture.on('error',  () => console.warn('background image failed to load'));
+  }
+}
+// Show the strip pop-outs' fixed target size so the user can crop to match (same 1:6 as openAquarium).
+function _updateBgTarget(){
+  const el = document.getElementById('bgImgTarget'); if(!el) return;
+  const h = screen.availHeight || window.innerHeight;
+  const w = Math.round(h * 32 / 192);
+  el.textContent = `strip pop-out target: ≈${w} × ${h} (1:6)`;
+}
+_updateBgTarget();
+window.addEventListener('resize', _updateBgTarget);
+document.getElementById('bgImgBtn').addEventListener('click', () => document.getElementById('bgImgFile').click());
+document.getElementById('bgImgFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if(!file) return;
+  _loadBgImageVariants(file, v => {
+    if(!v){ document.getElementById('bgImgName').textContent = 'load failed'; return; }
+    applyBgImagePNG(v.full, v.lean);
+    if(RUN_MODE === 'dash') _tankSend({ boid:1, t:'bgimg', data: _tankLean ? v.lean : v.full });
+    document.getElementById('bgImgName').textContent = file.name.replace(/\.[^.]+$/, '').substring(0, 14);
+  });
+  e.target.value = '';
+});
+document.getElementById('bgImgClear').addEventListener('click', () => {
+  applyBgImagePNG(null, null);
+  if(RUN_MODE === 'dash') _tankSend({ boid:1, t:'bgimg', data:null });
+  document.getElementById('bgImgName').textContent = 'none';
+});
+
 document.getElementById('noseOffsetInput').addEventListener('input', e => {
 const v = parseFloat(e.target.value);
 if(v > 0) _noseOffset = v;
@@ -2835,6 +2945,11 @@ function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 // work only — 242 floats a frame per mesh instead of 98 — which at the intended handful of image
 // boids is nothing, and the geometry is still a unit plane that never needs rebuilding.
 const _RIPPLE_SEG   = 10;
+// The background image rides the same _rippleProgram but on its OWN, much denser grid: a
+// full-screen surface at 10 quads would facet badly once `waves` climbs. Write-once geometry,
+// ~2400 verts, one mesh — the cost is a one-time buffer alloc. (The light/shade wave is
+// per-fragment and stays smooth at any density, so only the geometry needs this.)
+const _BG_RIPPLE_SEG = 48;
 const _RIPPLE_RATE  = 0.45; // cycles per second
 // Crests across the image. The LIGHT wave has no such ceiling — it is evaluated per fragment, so it
 // stays smooth at any frequency. Only the geometry is bound by _RIPPLE_SEG above.
@@ -2977,6 +3092,29 @@ u.uT2    = (t*0.8) % 1;   // scaled first, THEN wrapped, or its phase would jump
 u.uPhase = phase;
 u.uWaves = RIPPLE_WAVES;
 }
+// ── background-image mesh ────────────────────────────────────────────────────
+// One full-screen PIXI.Mesh on the SAME _rippleProgram as the boid images, so ripple/shade/
+// waves act on the wallpaper too. Built here (not in the _gfx block up top) because the program
+// and its helpers are defined further down than that block. A direct app.stage child at index 1
+// — above _gfx.bg (the solid BG_COLOR backing), below _gfx.trails — and NOT in _rippleMeshes,
+// so the _RIPPLE_MAX ceiling, the per-frame pool resets and the bodySprites sort toggle never
+// touch it. Layout + uniforms + visibility are driven every frame by _layoutBgMesh().
+if(app){ // RUN_MODE!=='dash'
+  try {
+    const _bgGeom = new PIXI.PlaneGeometry(1, 1, _BG_RIPPLE_SEG, _BG_RIPPLE_SEG);
+    _bgMesh = new PIXI.Mesh(_bgGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
+      program: _rippleProgram,
+      uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0 }
+    }));
+    _bgMesh.pivot.set(0, 0);          // geometry spans 0..1; position sits at the crop origin
+    _bgMesh.visible = false;
+    app.stage.addChildAt(_bgMesh, 1); // 0 = _gfx.bg; trails/bondLines/birthRings/… shift to 2+
+    _rebuildBgTex();                  // in case an import/bridge set _bgImagePNG before this ran
+  } catch(err){
+    _bgMesh = null;                   // never let a bg-mesh failure take down the sim
+    console.warn('background-image mesh unavailable:', err);
+  }
+}
 function _getBodySprite(idx){
 if(idx>=_bodySprites.length){
   const spr=new PIXI.Sprite(_defaultTex);
@@ -2987,13 +3125,8 @@ if(idx>=_bodySprites.length){
 return _bodySprites[idx];
 }
 // ── alpha masks, for click hit-testing ───────────────────────────────────────
-// A downsampled copy of each image's alpha channel, so a click can tell painted pixels from
-// transparent margin. Built once per texture when it decodes; ~4KB each at 64x64. Held in a
-// WeakMap so a mask dies with its texture. Works offline and in exports because the images are
-// data URLs, which do not taint a canvas — a remote URL would, and getImageData would throw.
-const _MASK_N   = 64; // mask resolution — ample for "is this pixel painted?"
-const _MASK_MIN = 32; // alpha (0-255) at or above which a pixel counts as solid
-const _alphaMasks = new WeakMap(); // PIXI.Texture → Uint8Array(_MASK_N²)
+// _MASK_N / _MASK_MIN / _alphaMasks are declared up by the texture globals (a reopened pop-out
+// can decode the teardrop synchronously and call _buildAlphaMask before this point).
 function _buildAlphaMask(tex){
 if(!tex || _alphaMasks.has(tex)) return;
 const src = tex.baseTexture && tex.baseTexture.resource && tex.baseTexture.resource.source;
@@ -4278,6 +4411,34 @@ for(const p of s.particles){
 function drawBackground(){
 const g=_gfx.bg; g.clear();
 g.beginFill(hexFromCSS(BG_COLOR)); g.drawRect(0,0,canvas.width,canvas.height); g.endFill();
+_layoutBgMesh();
+}
+
+// Fit the background-image mesh over the canvas with "cover" (fill, keep aspect, crop overflow),
+// centred, and push the ripple/shade/waves uniforms. Hidden unless an image is loaded, we're in
+// flock mode, and its texture has decoded — otherwise the solid _gfx.bg rect shows through.
+function _layoutBgMesh(){
+const m=_bgMesh; if(!m) return;
+try {
+const tex=m.texture;
+const ready = !!_bgImagePNG && SIM_MODE!=='astro'
+           && tex && tex.baseTexture && tex.baseTexture.valid && tex.width>0;
+m.visible=ready;
+if(!ready) return;
+const cw=canvas.width, ch=canvas.height, tw=tex.width, th=tex.height;
+const over  = 1 + Math.max(0,RIPPLE_AMT)*1.5;      // overscan so wave-displaced edges never expose past the mesh; 1.0 when ripple is off
+const scale = Math.max(cw/tw, ch/th) * over;       // COVER (+ overscan)
+m.scale.set(tw*scale, th*scale);                   // unit geometry → pixel size
+m.position.set((cw-tw*scale)/2, (ch-th*scale)/2);  // centre the crop
+const u=m.shader.uniforms, t=simClock*_RIPPLE_RATE;
+u.uAmpX  = RIPPLE_AMT;
+u.uAmpY  = RIPPLE_AMT*0.6*(tw/th);                 // width-fraction re-expressed on the y axis, as for boids
+u.uAmt   = RIPPLE_SHADE;
+u.uT     = t % 1;                                  // shader must never see a large clock
+u.uT2    = (t*0.8) % 1;
+u.uPhase = 0;                                      // one surface — nothing to de-sync
+u.uWaves = RIPPLE_WAVES;
+} catch(err){ m.visible=false; if(!_layoutBgMesh._warned){ _layoutBgMesh._warned=true; console.warn('background-image layout failed:', err); } }
 }
 
 function drawBondLines(){
@@ -4824,6 +4985,7 @@ const w=canvas.width, h=canvas.height;
 // background
 const gb=_gfx.bg; gb.clear();
 gb.beginFill(hexFromCSS(BG_COLOR)); gb.drawRect(0,0,w,h); gb.endFill();
+_layoutBgMesh(); // shows the wallpaper on the idle screen too (ripple frozen here — drawIdle is not a loop)
 // scattered dust dots
 const gd=_gfx.boids; gd.clear();
 const seed=42;
@@ -6335,11 +6497,13 @@ BOND_BREED_DIST   = ${BOND_BREED_DIST};
 BOND_DIVORCE_DIST = ${BOND_DIVORCE_DIST};
 BOND_TURN_RAMP    = ${BOND_TURN_RAMP};
 ${_customBoidPNG ? `_customBoidPNG = ${JSON.stringify(_customBoidPNG)};` : '// no shared body image'}
+${(lean ? _bgImagePNGLean : _bgImagePNG) ? `_bgImagePNG = ${JSON.stringify(lean ? _bgImagePNGLean : _bgImagePNG)};` : '// no background image'}
 _poolPNG_M.length=0; _poolPNG_M.push(...${JSON.stringify(_poolPNG_M)});
 _poolPNG_F.length=0; _poolPNG_F.push(...${JSON.stringify(_poolPNG_F)});
 _poolPNG_MU.length=0; _poolPNG_MU.push(...${JSON.stringify(_poolPNG_MU)});
 _poolPNG_FU.length=0; _poolPNG_FU.push(...${JSON.stringify(_poolPNG_FU)});
 _recomputeTextures();
+_rebuildBgTex();
 window.addEventListener('resize', resize);
 resize();
 // Boot in the dashboard's simulation mode (astro params baked alongside)
@@ -6475,12 +6639,14 @@ if(!s.inputs || !Object.keys(s.inputs).length){ _compStatus('import: could not r
 const pool=n=>_importLit(boot, boot.indexOf('_poolPNG_'+n+'.push'), '[',']') || [];
 const pools={ M:pool('M'), F:pool('F'), MU:pool('MU'), FU:pool('FU') };
 const shared=_importConst(boot,'_customBoidPNG'); // undefined when the export had none
+const bgImg=_importConst(boot,'_bgImagePNG');     // undefined when the export had no background image
 const comp=_importLit(boot, boot.search(/window\.__COMP\s*=/), '{','}');
 
 const nImg=pools.M.length+pools.F.length+pools.MU.length+pools.FU.length;
 const bits=[Object.keys(s.inputs).length+' controls, '+Object.keys(s.toggles||{}).length+' toggles'];
 if(nImg) bits.push(nImg+' images ('+pools.M.length+'M · '+pools.F.length+'F · '+pools.MU.length+'M↑ · '+pools.FU.length+'F↑)');
 if(shared) bits.push('shared body image');
+if(bgImg) bits.push('background image');
 if(comp && Array.isArray(comp.events)) bits.push(comp.events.length+' composition events');
 if(!confirm('Import from "'+fname+'":\n\n  · '+bits.join('\n  · ')+
             '\n\nThis REPLACES the current settings and image pools.')){ _compStatus('import cancelled'); return; }
@@ -6503,6 +6669,9 @@ setPool('F',true ,pools.FU,'bodyImgFUName');
 applyBodySharedPNG(shared||null);
 if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:'both',data:shared||null});
 const sn=document.getElementById('bodyImgName'); if(sn) sn.textContent=shared?'imported':'';
+applyBgImagePNG(bgImg||null, null); // no separate lean variant survives an export round-trip
+if(RUN_MODE==='dash') _tankSend({boid:1,t:'bgimg',data:bgImg||null});
+const bn=document.getElementById('bgImgName'); if(bn) bn.textContent=bgImg?'imported':'none';
 
 _applySettings(s);                       // restores SIM_MODE first, then drives every control
 if(comp && Array.isArray(comp.events)) _composition=comp;
@@ -6549,6 +6718,7 @@ if(opts.strip){
 // tankWin reference, so this never opens two tanks for one live dashboard.
 tankWin = window.open('about:blank','boidAquarium_'+Date.now(), features);
 if(!tankWin){ alert('The browser blocked the aquarium pop-up — allow pop-ups for this page and try again.'); return; }
+_tankLean = !!opts.lean; // so a live bg-image change forwards the 1024px variant to a Pi pop-out
 tankWin.document.open();
 tankWin.document.write(html);
 tankWin.document.close();
@@ -7111,6 +7281,8 @@ window.addEventListener('message', e => {
     else applyBodySharedPNG(m.data);
   } else if(m.t==='bodyclear'){
     clearBodyPool(m.slot, m.upright);
+  } else if(m.t==='bgimg'){
+    applyBgImagePNG(m.data, m.data); // data URL, or null to clear
   }
 });
 }
