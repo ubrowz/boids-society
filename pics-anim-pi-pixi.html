@@ -4932,18 +4932,19 @@ const _SND_SCALE=[0,3,5,7,10]; // minor pentatonic degrees
 // boid-size slider steps through in-key pitches (always consonant) instead of a microtonal slide.
 const _SIZE_LADDER=(()=>{ const a=[]; for(let o=38;o<=86;o+=12) for(const d of [0,3,5,7,10]) if(o+d<=86) a.push(o+d); return a; })();
 const _FAM_IDX={red:0,yellow:1,green:2,cyan:3,blue:4,magenta:5}; // hue family → colour-chord voice
-// Colour-chord voices: one distinct instrument per hue family, spread across ~2 octaves of
+// Colour-chord voices: one soft instrument per hue family, spread across ~2 octaves of
 // D-minor pentatonic so a colour shift is heard as a change of instrument AND register, not
 // just which note in a chord is loudest. `cut` is the per-voice lowpass; `lvl` evens perceived
-// loudness (saws/squares carry more energy). Red is raised to F4 (not the lowest voice) so its
-// sine clears the drone band instead of muddying it — that trades away strict low→high order.
+// loudness. Red is raised to F4 (not the lowest voice) so its sine clears the drone band instead
+// of muddying it — that trades away strict low→high order. All voices are sine/triangle: the old
+// square/saw voices (green, cyan, magenta) read as a siren and were hard to listen to.
 const _PAD_VOICES=[
-  {midi:65, wave:'sine',     cut:1200, lvl:1.0 },  // red     — F4, round (raised an octave off F3 to clear the drone)
-  {midi:57, wave:'triangle', cut:1600, lvl:0.95},  // yellow  — A3, soft and hollow
-  {midi:62, wave:'square',   cut:1500, lvl:0.5 },  // green   — D4, reedy and woody
-  {midi:67, wave:'sawtooth', cut:2200, lvl:0.55},  // cyan    — G4, bright and brassy
-  {midi:72, wave:'triangle', cut:3200, lvl:0.72},  // blue    — C5, glassy
-  {midi:77, wave:'sawtooth', cut:3800, lvl:0.4 },  // magenta — F5, piercing top
+  {midi:65, wave:'sine',     cut:900,  lvl:1.0 },  // red     — F4, round and soft
+  {midi:57, wave:'triangle', cut:1100, lvl:0.9 },  // yellow  — A3, hollow
+  {midi:62, wave:'triangle', cut:1400, lvl:0.75},  // green   — D4, mid (was a buzzy square)
+  {midi:67, wave:'triangle', cut:1800, lvl:0.6 },  // cyan    — G4 (was a brassy saw)
+  {midi:72, wave:'sine',     cut:2400, lvl:0.6 },  // blue    — C5, glassy
+  {midi:77, wave:'triangle', cut:2600, lvl:0.32},  // magenta — F5, airy and quiet (was a piercing saw)
 ];
 function _midiHz(m){ return 440*Math.pow(2,(m-69)/12); }
 function _sndInit(){
@@ -4976,20 +4977,17 @@ function _sndInit(){
   // bond warmth: a fifth (A3) + octave (D4), gain follows the bonded fraction (see _sndUpdate)
   const bondG=_ac.createGain(); bondG.gain.value=0; bondG.connect(lp);
   mk('sawtooth',root*1.5,+3,0.55,bondG); mk('sine',root*2,0,0.5,bondG);
-  // ── colour chord: one instrument per hue family (see _PAD_VOICES) ──
-  // Pitches stay on D-minor pentatonic so every combination is consonant by construction,
-  // but each voice has its own waveform, lowpass and register, so a colour shift changes the
-  // instrument you hear, not just the balance of one chord. Each voice's volume is driven each
-  // frame by how many boids wear that colour (see _sndUpdate). Routed straight to the bus
-  // (bypassing the crowding-modulated drone filter) so the chord is independent of the drone.
-  // shared slow chorus drift → subtle life so the pad breathes instead of sitting dead still
-  const colVib=_ac.createOscillator(); colVib.type='sine'; colVib.frequency.value=0.18;
-  const colVibD=_ac.createGain(); colVibD.gain.value=7; colVib.connect(colVibD); colVib.start();
+  // ── colour chord: one soft instrument per hue family (see _PAD_VOICES) ──
+  // Pitches stay on D-minor pentatonic so every combination is consonant by construction;
+  // each voice differs by register and lowpass, so a colour shift moves you to a different
+  // instrument+octave, not just a chord balance. Each voice's volume is driven each frame by
+  // how many boids wear that colour (see _sndUpdate). Routed straight to the bus (bypassing the
+  // crowding-modulated drone filter) so the chord is independent of the drone. No detune LFO —
+  // the old ±7-cent 0.18 Hz warble on every voice was half of what made this layer wail.
   const colorGains=[];
   for(let i=0;i<6;i++){
     const v=_PAD_VOICES[i];
-    const o=_ac.createOscillator(); o.type=v.wave; o.frequency.value=_midiHz(v.midi); o.detune.value=(i%2?5:-5);
-    colVibD.connect(o.detune);                              // slow chorus drift on every voice
+    const o=_ac.createOscillator(); o.type=v.wave; o.frequency.value=_midiHz(v.midi); o.detune.value=(i%2?4:-4); // tiny static detune = gentle chorus width, no modulation
     const f=_ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=v.cut; f.Q.value=0.7;
     const g=_ac.createGain(); g.gain.value=0;
     o.connect(f); f.connect(g); g.connect(bus); o.start();
@@ -5064,14 +5062,18 @@ function _sndInit(){
     auraChorD.connect(o.detune);
     const og=_ac.createGain(); og.gain.value=0.5; o.connect(og); og.connect(auraLp); o.start();
   } }
-  // ── flock spread: three soft voices on D whose INTERVAL opens with the flock's dispersion ──
-  // Tightly clumped → unison (pure); dispersed → they fan out through the D-pentatonic into an open
-  // chord. Frequencies driven in _sndUpdate from a centroid-variance metric folded into the tally loop.
-  const spreadLp=_ac.createBiquadFilter(); spreadLp.type='lowpass'; spreadLp.frequency.value=1600; spreadLp.Q.value=0.6;
-  const spreadGain=_ac.createGain(); spreadGain.gain.value=0;
+  // ── flock spread: three FIXED-pitch voices — D4 root, A4 fifth, D5 octave — whose gains open
+  // with the flock's dispersion ──  Clumped → only the soft D4 root sounds (near-unison, pure);
+  // dispersed → the fifth then the octave fade IN, building a still, open D chord. No pitch glide
+  // and no filter sweep: the old version slid spreadB/C continuously up toward A4/D5 while the
+  // filter opened and the gain swelled — a textbook siren. Gains driven in _sndUpdate from a
+  // centroid-variance metric folded into the tally loop.
+  const spreadLp=_ac.createBiquadFilter(); spreadLp.type='lowpass'; spreadLp.frequency.value=1500; spreadLp.Q.value=0.5;
+  const spreadGain=_ac.createGain(); spreadGain.gain.value=0; // layer presence gate (1 when a flock exists, 0 otherwise)
   spreadLp.connect(spreadGain); spreadGain.connect(bus);
-  const mkS=(det)=>{ const o=_ac.createOscillator(); o.type='triangle'; o.frequency.value=_midiHz(62); o.detune.value=det; o.connect(spreadLp); o.start(); return o; };
-  const spreadA=mkS(-4), spreadB=mkS(0), spreadC=mkS(4); // start in unison D4 (tiny detune = gentle chorus even when clumped)
+  const mkS=(midi,det)=>{ const o=_ac.createOscillator(); o.type='triangle'; o.frequency.value=_midiHz(midi); o.detune.value=det;
+    const og=_ac.createGain(); og.gain.value=0; o.connect(og); og.connect(spreadLp); o.start(); return og; };
+  const spreadAG=mkS(62,-4), spreadBG=mkS(69,+3), spreadCG=mkS(74,-3); // D4 · A4 · D5 — pitches never move; only these gains do
   // ── differentiation hush: while DIFF_MODE is on, the whole society ducks to silence and this serene
   // pad takes over (cells frozen, committing to a fate). Routed straight to MASTER (+ a reverb send),
   // so the bus-duck that silences every normal layer never touches it — but the master fader still does.
@@ -5089,7 +5091,7 @@ function _sndInit(){
     diffVibD.connect(o.detune);
     const og=_ac.createGain(); og.gain.value=dn[1]; o.connect(og); og.connect(diffLp); o.start();
   }
-  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain,spreadA,spreadB,spreadC,spreadLp,spreadGain,diffGain};
+  _snd={master,bus,lp,droneGain,bondG,colorGains,climaxGain,climaxLp,disGain,disLp,disTritone,disSub,disLFO,disLFODepth,sizeOsc,sizeLp,sizeGain,auraGain,spreadAG,spreadBG,spreadCG,spreadLp,spreadGain,diffGain};
 }
 function _sndPluck(midi,vel,dur,type){
   if(_sndVoices>=24) return; _sndVoices++; // voice cap: a mass die-off must not spawn 200 oscillators
@@ -5393,7 +5395,7 @@ function _sndUpdate(){
     const totalC=fam[0]+fam[1]+fam[2]+fam[3]+fam[4]+fam[5];
     for(let i=0;i<6;i++){
       const frac = totalC>0 ? fam[i]/totalC : 0;
-      _snd.colorGains[i].gain.setTargetAtTime(0.13*_PAD_VOICES[i].lvl*Math.sqrt(frac)*_SND_COLOR*2, t, 0.7); // per-voice level trim; slow ramp → swells, not jitter
+      _snd.colorGains[i].gain.setTargetAtTime(0.12*_PAD_VOICES[i].lvl*Math.sqrt(frac)*_SND_COLOR*2, t, 1.4); // per-voice level trim; slow 1.4 s ramp → colour shifts glide in, no pulsing/wailing
     }
   }
   if(_snd.climaxGain){ // climax: bloom a bright shimmer when the population settles near target
@@ -5427,7 +5429,7 @@ function _sndUpdate(){
     const lvl = am===2 ? 0.075 : (am===1 ? 0.05 : 0);
     _snd.auraGain.gain.setTargetAtTime(lvl*_SND_AURA*2, t, 0.9);        // slow attack → glows in/out with the visual aura
   }
-  if(_snd.spreadA){ // flock spread: dispersion (coherence K / sensing R / alignment) heard as an OPENING interval
+  if(_snd.spreadAG){ // flock spread: dispersion (coherence K / sensing R / alignment) heard as an interval that OPENS
     if(living>1){
       const mx=sumX/living, my=sumY/living;
       const varSum=Math.max(0,(sumX2+sumY2)/living-(mx*mx+my*my)); // Var(x)+Var(y), from the folded sums — no pairwise cost
@@ -5435,12 +5437,12 @@ function _sndUpdate(){
       let raw=Math.sqrt(varSum)/(0.22*diag);                       // RMS distance from centroid, normalised to the tank (more sensitive)
       raw=Math.min(1, Math.pow(Math.max(0,raw),0.8));              // gentle curve so mid-range spreads register clearly
       _flockSpread += (raw-_flockSpread)*0.12;                     // smooth the frame-to-frame jitter → the slow trend
-      const s=_flockSpread;
-      _snd.spreadA.frequency.setTargetAtTime(_midiHz(62),      t, 0.5); // root D4 anchor
-      _snd.spreadB.frequency.setTargetAtTime(_midiHz(62+7*s),  t, 0.5); // clumped: unison → dispersed: opens toward the fifth (A4)
-      _snd.spreadC.frequency.setTargetAtTime(_midiHz(62+12*s), t, 0.5); // …and toward the octave (D5) — sweeping the pentatonic
-      _snd.spreadLp.frequency.setTargetAtTime(1000+2800*s, t, 0.6);     // opens much brighter as it disperses
-      _snd.spreadGain.gain.setTargetAtTime((0.05+0.11*s)*_SND_SPREAD*2, t, 0.5); // and SWELLS with dispersion — clumped soft (hides under the drone), dispersed prominent
+      const s=_flockSpread, m=_SND_SPREAD*2;
+      _snd.spreadGain.gain.setTargetAtTime(1, t, 0.5);                    // layer present whenever there's a flock
+      _snd.spreadAG.gain.setTargetAtTime((0.030+0.020*s)*m, t, 0.6);      // D4 root — soft anchor, always there
+      _snd.spreadBG.gain.setTargetAtTime(0.045*s*m,        t, 0.7);       // A4 fifth — fades in as the flock opens
+      _snd.spreadCG.gain.setTargetAtTime(0.042*s*s*m,      t, 0.8);       // D5 octave — only speaks at real dispersion
+      _snd.spreadLp.frequency.setTargetAtTime(1300+700*s,  t, 0.9);       // barely opens — no siren sweep
     } else _snd.spreadGain.gain.setTargetAtTime(0, t, 0.5);         // no flock → silent
   }
 }
