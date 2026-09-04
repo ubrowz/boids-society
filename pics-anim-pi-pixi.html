@@ -1987,22 +1987,51 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <button id="bodyImgFUClear" title="Clear the female always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgFUName" class="mini-note">0 imgs</span>
 </div>
+<div class="mini-note" style="margin-bottom:2px;">— rippling of <b>boid images</b> (upright uploaded images only) —</div>
 <div class="ctrl-row flock-only">
-<label title="A travelling wave through the whole image, like cloth in water — constant rate, with a per-boid phase so they never pulse together. 0 = off. Amplitude is a fraction of image width, so it scales with image size. Applies to any boid wearing an UPLOADED image (never the plain body) that is rendered upright: either its image came from a ↑ row above, or the Upright switch under Appearance is on. Costs one mesh per rippling boid and meshes do not batch, so run this look with a small population — beyond 120 at once the surplus quietly stop rippling to protect the frame rate.">ripple</label>
+<label title="A travelling wave through a BOID's uploaded image, like cloth in water — constant rate, with a per-boid phase so they never pulse together. 0 = off. Amplitude is a fraction of image width. Applies to any boid wearing an UPLOADED image (never the plain body) that is rendered upright: either its image came from a ↑ row above, or the Upright switch under Appearance is on. Costs one mesh per rippling boid and meshes do not batch, so run this look with a small population — beyond 120 at once the surplus quietly stop rippling to protect the frame rate. Independent of the bg-ripple sliders below.">boid ripple</label>
 <input type="range" id="rippleSlider" min="0" max="100" value="40" step="5">
 <span class="ctrl-val" id="rippleVal">40%</span>
 </div>
 <div class="ctrl-row flock-only">
-<label title="How dark the light wave gets — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved rather than flat. It only ever DARKENS: 100% means the trough of the wave falls to near-black, 0% turns the shading off and leaves the geometric wave alone. Needs ripple above 0, since the shading rides on the same mesh.">shade</label>
+<label title="How dark the light wave gets on a BOID image — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved. Only ever DARKENS. Needs boid ripple above 0, since the shading rides on the same mesh.">boid shade</label>
 <input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
 <span class="ctrl-val" id="shadeVal">30%</span>
 </div>
 <div class="ctrl-row flock-only">
-<label title="How many wave crests fit across the image. Low values give one long slow swell; high values give tight ripples running over the surface. Drives the geometric wave and the light wave together, so they stay one surface. The mesh is 10 quads across, which is what sets the top of this range — beyond about 5 crests a grid that coarse cannot carry the wave and it breaks into facets.">waves</label>
+<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 10 quads across — beyond about 5 crests a grid that coarse breaks into facets.">boid waves</label>
 <input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
 <span class="ctrl-val" id="waveVal">1.3</span>
 </div>
-<div class="mini-note">The ↑ rows are <b>unique</b>: one boid wears each at a time, released when its wearer dies and picked up by the next boid to look. They are claimed ahead of ordinary images. Once any ↑ image is loaded, boids with nothing to wear are not drawn at all — so an ↑-only pool shows just these images, while uploading ordinary images alongside clothes everyone again. <b>Ripple</b> waves ↑ images always, and ordinary images too whenever the Upright switch is on — one mesh each, so keep the population small for that.</div>
+<div class="mini-note" style="margin-bottom:2px;">— rippling of the <b>background image</b> —</div>
+<div class="ctrl-row flock-only" style="gap:8px;">
+<label>bg style</label>
+<button id="rippleStyleBtn" title="Cycle the BACKGROUND ripple: cloth (a travelling wave, like a flag in water) → pond (concentric rings spreading from points that appear at random, like rain on water). Boid images always use cloth. The bg ripple / shade / waves sliders below drive it — for pond, waves is the ring spacing." style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="rippleStyleKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="rippleStyleLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">cloth</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Ripple amplitude on the BACKGROUND image only. 0 = off (static wallpaper). Independent of the boid-ripple sliders above. The background mesh is 48 quads across, so it carries the full waves range smoothly.">bg ripple</label>
+<input type="range" id="bgRippleSlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="bgRippleVal">40%</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Rolling-shadow depth on the BACKGROUND image. Only ever DARKENS. Works with bg ripple at 0 too (a moving shadow, no geometry) — unlike the boid version.">bg shade</label>
+<input type="range" id="bgShadeSlider" min="0" max="100" value="30" step="5">
+<span class="ctrl-val" id="bgShadeVal">30%</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="For cloth: wave crests across the BACKGROUND image. For pond: the spacing of the concentric rings. The background mesh is dense enough for the whole range.">bg waves</label>
+<input type="range" id="bgWaveSlider" min="0.4" max="4" value="1.3" step="0.1">
+<span class="ctrl-val" id="bgWaveVal">1.3</span>
+</div>
+<div class="mini-note">The ↑ rows are <b>unique</b>: one boid wears each at a time, released when its wearer dies and picked up by the next boid to look. They are claimed ahead of ordinary images. Once any ↑ image is loaded, boids with nothing to wear are not drawn at all — so an ↑-only pool shows just these images, while uploading ordinary images alongside clothes everyone again. <b>Boid ripple</b> waves ↑ images always, and ordinary images too whenever the Upright switch is on — one mesh each, so keep the population small.</div>
 <div class="ctrl-row">
 <label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
 <input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
@@ -2206,6 +2235,43 @@ auraGradBtn.addEventListener('click',()=>{
   _applyAura();
 });
 
+// ── ripple style toggle (background image: cloth ⇄ pond) ──────────────────────
+// 0 = "cloth" (the travelling wave). 1 = "pond": concentric rings spreading from origins that
+// pop up at random positions over time — two cross-fading drop slots so a fresh ring can rise
+// before the previous has faded. Only RIPPLE_STYLE persists; the positions are per-session.
+// Declared here (not by the other RIPPLE_* globals further down) because _applyRippleStyle()
+// runs at load, just below — a later `let` would be a temporal-dead-zone crash.
+let RIPPLE_STYLE = 0;
+const _POND_LIFE = 3.6;                    // seconds a drop's ring takes to cross the image + clear it
+const _POND_MIN = 1.9, _POND_MAX = 3.8;   // seconds between respawns (random in this range)
+let _pondDrops = null;                     // [{cx,cy,t0},{cx,cy,t0}] in 0..1 mesh space; lazy-seeded
+let _pondSlot  = 0;                        // which slot the next respawn overwrites (the older one)
+let _pondNext  = 0;                        // simClock time of the next respawn
+// JS mirror of the pond shader constants — MUST stay in sync with POND_* in the _rippleProgram
+// strings. Used to sample the pond wavefield on the CPU so boids bob WITH the rings (float in the
+// water, not on top of it): see _pondFieldAt() + drawBoid/drawPredator.
+const _POND_SPEED = 0.7, _POND_SIG = 0.10, _POND_KMUL = 2.0;
+const _POND_BOID_AMP_PX = 14;             // peak boid bob (px) as a ring passes; scales down with bg ripple %
+const _POND_BOID_DEFORM_PX = 140;         // how hard a passing ring FLEXES a boid's image mesh (bigger = more warp)
+let _pondActive = null;                    // [{cx,cy,lt,env}×2] while pond is live on screen; null otherwise
+let _pondMap = null;                       // {sx,sy,scx,scy,asp} bg-mesh screen transform, for screen→UV
+const rippleStyleBtn   = document.getElementById('rippleStyleBtn');
+const rippleStyleKnob  = document.getElementById('rippleStyleKnob');
+const rippleStyleLabel = document.getElementById('rippleStyleLabel');
+function _applyRippleStyle(){
+  const pond = RIPPLE_STYLE===1;
+  rippleStyleBtn.style.background = pond ? '#54a0ff' : '#555';
+  rippleStyleKnob.style.left      = pond ? '25px' : '3px';
+  rippleStyleLabel.textContent    = pond ? 'pond' : 'cloth';
+  rippleStyleLabel.style.color    = pond ? '#54a0ff' : '#555';
+  if(!pond) _pondDrops = null; // drop the ring origins so a re-entry re-seeds fresh
+}
+_applyRippleStyle();
+rippleStyleBtn.addEventListener('click',()=>{
+  RIPPLE_STYLE = (RIPPLE_STYLE + 1) % 2; // cloth ⇄ pond
+  _applyRippleStyle();
+});
+
 // ── cell differentiation toggle ───────────────────────────────────────────────
 const diffBtn=document.getElementById('diffBtn');
 const diffKnob=document.getElementById('diffKnob');
@@ -2254,7 +2320,8 @@ let SHOW_COLOR = true;
 let SPRITE_L = parseInt(document.getElementById('spriteLSlider').value);
 let DEPTH_LIGHT = parseInt(document.getElementById('depthLightSlider').value); // L units added at the front / subtracted at the back
 let DEPTH_HAZE = parseInt(document.getElementById('depthHazeSlider').value)/100; // fraction of saturation lost by the furthest rank
-let RIPPLE_AMT = parseInt(document.getElementById('rippleSlider').value)/100*0.12; // wave amplitude as a fraction of image width
+let RIPPLE_AMT = parseInt(document.getElementById('rippleSlider').value)/100*0.12; // boid-image ripple amplitude (fraction of image width)
+let BG_RIPPLE_AMT = parseInt(document.getElementById('bgRippleSlider').value)/100*0.12; // background-image ripple amplitude — independent of RIPPLE_AMT
 const colorBtn   = document.getElementById('colorBtn');
 const colorKnob  = document.getElementById('colorKnob');
 const colorLabel = document.getElementById('colorLabel');
@@ -2544,6 +2611,9 @@ wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?
 wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
 wire('shadeSlider','shadeVal',           v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_SHADE=v; });
 wire('waveSlider','waveVal',             v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ RIPPLE_WAVES=v; });
+wire('bgRippleSlider','bgRippleVal',     v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ BG_RIPPLE_AMT=v; });
+wire('bgShadeSlider','bgShadeVal',       v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ BG_RIPPLE_SHADE=v; });
+wire('bgWaveSlider','bgWaveVal',         v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ BG_RIPPLE_WAVES=v; });
 wire('tiltSlider','tiltVal',             v=>parseInt(v)*Math.PI/180, v=>v+'°', v=>{ PANEL_TILT=v; }); // negate the parse if the panel turns the other way
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
@@ -2954,6 +3024,7 @@ const _RIPPLE_RATE  = 0.45; // cycles per second
 // Crests across the image. The LIGHT wave has no such ceiling — it is evaluated per fragment, so it
 // stays smooth at any frequency. Only the geometry is bound by _RIPPLE_SEG above.
 let RIPPLE_WAVES = parseFloat(document.getElementById('waveSlider').value);
+let BG_RIPPLE_WAVES = parseFloat(document.getElementById('bgWaveSlider').value); // background-image crest count / pond ring spacing — independent of RIPPLE_WAVES
 // Safety ceiling, not a quality setting. Meshes never batch, so one per boid means one draw call
 // per boid; at a full 624 population that is ruinous on a Pi. Beyond this many, the surplus fall
 // back to plain sprites. It sits far above any sane use of this look — the intended way to run it
@@ -2965,6 +3036,7 @@ const _RIPPLE_MAX   = 120;
 // shading was to change the wave that causes it, which is no way to tune anything. The phase and
 // clock are still shared, so the two remain one surface however this is set.
 let RIPPLE_SHADE = parseInt(document.getElementById('shadeSlider').value)/100*0.95;
+let BG_RIPPLE_SHADE = parseInt(document.getElementById('bgShadeSlider').value)/100*0.95; // background-image shade depth — independent of RIPPLE_SHADE
 
 // ── the light wave ────────────────────────────────────────────────────────────
 // A shadow rolling over the cloth, done in the fragment shader. Three things about this are
@@ -3017,6 +3089,12 @@ let RIPPLE_SHADE = parseInt(document.getElementById('shadeSlider').value)/100*0.
 // program fails to LINK, which surfaces as the images silently not drawing at all. Raising only
 // the vertex stage to highp is exactly that mistake. With the clocks wrapped above, mediump is
 // ample everywhere, so there is nothing to gain by splitting them.
+// uStyle picks the geometry+shade math: 0 = "cloth" (the original travelling wave), 1 = "pond"
+// (concentric rings from up to two cross-fading drop centres — see _layoutBgMesh). The pond
+// uniforms (uCenterA/B, uDropA/B, uAspect) are declared in BOTH stages at matching precision;
+// per the note above, a mismatch fails the LINK and the mesh silently draws nothing. Boid ripple
+// meshes never leave uStyle=0, so the pond path is background-only. uDropX.x is a PER-DROP local
+// clock (bounded by the drop's short life) so — unlike uT/uT2 — it needs no CPU wrap.
 const _rippleProgram = PIXI.Program.from(`
 precision mediump float;
 attribute vec2 aVertexPosition;
@@ -3030,14 +3108,61 @@ uniform float uT;      // wrapped to [0,1)
 uniform float uT2;     // the y wave's own wrapped clock
 uniform float uPhase;
 uniform float uWaves;
+uniform float uStyle;    // 0 = cloth, 1 = pond on this mesh, 2 = pond sampled in BACKGROUND space (boid images)
+uniform float uAspect;   // pond-space aspect (bg mesh W/H) — keeps rings circular on screen
+uniform vec2  uCenterA;  // pond drop centres, in pond-space 0..1
+uniform vec2  uCenterB;
+uniform vec2  uDropA;    // per drop: x = local time (bounded ~0..2), y = envelope 0..1
+uniform vec2  uDropB;
+uniform vec2  uBgOrigin; // style 2: background mesh screen origin (px)
+uniform vec2  uBgScale;  // style 2: background mesh screen size (px) — world<->bgUV mapping
+uniform vec2  uCenterUV; // style 2: this boid's centre in bgUV (for a mean-zero local warp)
 varying vec2 vTextureCoord;
+varying vec2 vWorld;
+// pond: a THIN RING of ripples, born small at the drop point, travelling OUTWARD across the
+// image. Only an annulus at radius R = POND_SPEED*t is disturbed (the Gaussian window win), so
+// the disc between the centre and the moving wavefront stays still and the centre never heaves.
+// Amplitude falls with spread as the ring circumference grows; calm pins d near 0.
+// drop.x = seconds since impact, drop.y = life envelope 0..1. POND_* are the tuning knobs.
+const float POND_SPEED = 0.7;   // wavefront speed (a unit is about half the short side per second)
+const float POND_SIG   = 0.10;  // annular packet half-width — how many crests trail the front
+const float POND_KMUL  = 2.0;   // wavelength scale on the waves slider
+vec2 pondDisp(vec2 pos, vec2 ctr, vec2 drop){
+  vec2  q = (pos - ctr) * vec2(uAspect, 1.0);
+  float d = length(q);
+  float x = d - POND_SPEED * drop.x;                          // signed distance from the wavefront
+  float win  = exp(-(x * x) / (2.0 * POND_SIG * POND_SIG));   // travelling annular window
+  float wave = sin(6.2832 * uWaves * POND_KMUL * x);          // crests within the packet
+  float spread = inversesqrt(1.0 + 4.0 * d);                  // energy spreads over a growing circumference
+  float calm   = smoothstep(0.0, 0.15, d);                    // hold the very centre still
+  vec2  dir = d > 0.0001 ? q / d : vec2(0.0);
+  return dir * (uAmpX * drop.y * win * wave * spread * calm);
+}
 void main(void){
-  // aVertexPosition is the rest grid and stays that way — read both waves from it, never from the
-  // running total, or the two axes would feed each other.
+  // aVertexPosition is the rest grid and stays that way — read the waves from it, never from the
+  // running total, or the axes would feed each other.
   vec2 p = aVertexPosition;
-  p.x += uAmpX * sin(6.2832 * (aVertexPosition.y * uWaves - uT) + uPhase);
-  p.y += uAmpY * sin(6.2832 * (aVertexPosition.x * uWaves - uT2) + uPhase * 1.7);
-  gl_Position = vec4((projectionMatrix * translationMatrix * vec3(p, 1.0)).xy, 0.0, 1.0);
+  vWorld = vec2(0.0);
+  if (uStyle < 0.5) {
+    p.x += uAmpX * sin(6.2832 * (aVertexPosition.y * uWaves - uT) + uPhase);
+    p.y += uAmpY * sin(6.2832 * (aVertexPosition.x * uWaves - uT2) + uPhase * 1.7);
+    gl_Position = vec4((projectionMatrix * translationMatrix * vec3(p, 1.0)).xy, 0.0, 1.0);
+  } else if (uStyle < 1.5) {
+    p += pondDisp(aVertexPosition, uCenterA, uDropA);
+    p += pondDisp(aVertexPosition, uCenterB, uDropB);
+    gl_Position = vec4((projectionMatrix * translationMatrix * vec3(p, 1.0)).xy, 0.0, 1.0);
+  } else {
+    // pond on a BOID image: evaluate the wavefield in the BACKGROUND's world/UV space so the ring
+    // crosses the little image exactly as it crosses the water, and does not rotate/scale with the
+    // boid. Mean-zero (vertex minus centre) — the whole-boid bob is applied in JS.
+    vec2 world = (translationMatrix * vec3(aVertexPosition, 1.0)).xy;
+    vWorld = world;
+    vec2 bgUV = (world - uBgOrigin) / uBgScale;
+    vec2 dUV = (pondDisp(bgUV, uCenterA, uDropA) - pondDisp(uCenterUV, uCenterA, uDropA))
+             + (pondDisp(bgUV, uCenterB, uDropB) - pondDisp(uCenterUV, uCenterB, uDropB));
+    world += dUV * uBgScale;
+    gl_Position = vec4((projectionMatrix * vec3(world, 1.0)).xy, 0.0, 1.0);
+  }
   vTextureCoord = (uTextureMatrix * vec3(aTextureCoord, 1.0)).xy;
 }`, `
 precision mediump float;
@@ -3048,10 +3173,42 @@ uniform float uAmt;    // shade depth, 0 = off
 uniform float uT;      // same wrapped clock as the geometry's x wave
 uniform float uPhase;  // per-boid, so a shoal never pulses in unison
 uniform float uWaves;  // crests across the image — same value the geometry uses
+uniform float uStyle;
+uniform float uAspect;
+uniform vec2  uCenterA;
+uniform vec2  uCenterB;
+uniform vec2  uDropA;
+uniform vec2  uDropB;
+uniform vec2  uBgOrigin;
+uniform vec2  uBgScale;
+varying vec2 vWorld;
+const float POND_SPEED = 0.7;   // must match the vertex stage
+const float POND_SIG   = 0.10;
+const float POND_KMUL  = 2.0;
+float pondDark(vec2 uv, vec2 ctr, vec2 drop){
+  vec2  q = (uv - ctr) * vec2(uAspect, 1.0);
+  float d = length(q);
+  float x = d - POND_SPEED * drop.x;
+  float win = exp(-(x * x) / (2.0 * POND_SIG * POND_SIG));
+  float s   = cos(6.2832 * uWaves * POND_KMUL * x);           // slope of the packet — the rolling shadow
+  float spread = inversesqrt(1.0 + 4.0 * d);
+  float calm   = smoothstep(0.0, 0.15, d);
+  return uAmt * (0.5 - 0.5 * s) * win * spread * calm * drop.y;
+}
 void main(void){
   vec4 c = texture2D(uSampler, vTextureCoord) * uColor;
-  float s = cos(6.2832 * (vTextureCoord.y * uWaves - uT) + uPhase); // slope of the x wave
-  c.rgb *= 1.0 - uAmt * (0.5 - 0.5 * s);   // 1.0 at the crest, 1.0-uAmt in the trough
+  float dark;
+  if (uStyle < 0.5) {
+    float s = cos(6.2832 * (vTextureCoord.y * uWaves - uT) + uPhase); // slope of the x wave
+    dark = uAmt * (0.5 - 0.5 * s);
+  } else if (uStyle < 1.5) {
+    dark = pondDark(vTextureCoord, uCenterA, uDropA)
+         + pondDark(vTextureCoord, uCenterB, uDropB);
+  } else {
+    vec2 bgUV = (vWorld - uBgOrigin) / uBgScale;   // rolling shade as a GRADIENT across the boid image
+    dark = pondDark(bgUV, uCenterA, uDropA) + pondDark(bgUV, uCenterB, uDropB);
+  }
+  c.rgb *= 1.0 - clamp(dark, 0.0, 0.95);   // only ever darkens: 1.0 at the crest, dimmer in the trough
   gl_FragColor = c;
 }`);
 const _rippleMeshes = [];   // pool, indexed like _bodySprites
@@ -3066,7 +3223,11 @@ if(_rippleUsed>=_rippleMeshes.length){
   // Every mesh shares one Program (Pixi caches them by source), so this costs no extra binds —
   // and the meshes each carry their own draw call already, which is the cost this look pays.
   const m=new PIXI.Mesh(_rippleGeom, new PIXI.MeshMaterial(tex, { program:_rippleProgram,
-    uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0 } }));
+    uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
+               uStyle:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+               uDropA:new Float32Array(2), uDropB:new Float32Array(2),
+               uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uCenterUV:new Float32Array([0.5,0.5]) } }));
+               // uStyle 0 = own cloth ripple; flips to 2 (rides the background pond) in _rippleUpdate when a pond is live
   m.pivot.set(0.5,0.5);                              // matches the sprites' 0.5 anchor
   _gfx.bodySprites.addChild(m);
   _rippleMeshes.push(m);
@@ -3080,10 +3241,24 @@ return m;
 // ripple less across than along. That is per-texture, hence a uniform rather than a constant.
 //
 // Six writes and no buffer traffic: this is the whole per-frame cost of a rippling boid now.
-function _rippleUpdate(m, tex, phase){
+function _rippleUpdate(m, tex, phase, bx, by){
+const u=m.shader.uniforms;
+if(_pondActive){                                   // a pond is live on the background → this boid rides the SAME water
+  u.uStyle   = 2;
+  u.uAspect  = _pondMap.asp;
+  u.uWaves   = BG_RIPPLE_WAVES;
+  u.uAmt     = BG_RIPPLE_SHADE;
+  u.uAmpX    = (_POND_BOID_DEFORM_PX / _pondMap.scx) * Math.min(1, BG_RIPPLE_AMT/0.12); // how hard the ring flexes the image (px), eased by bg ripple %
+  u.uBgOrigin = _pondMap.origin;                    // shared arrays, rebuilt every frame in _layoutBgMesh
+  u.uBgScale  = _pondMap.scale;
+  u.uCenterA  = _pondMap.ca; u.uDropA = _pondMap.da;
+  u.uCenterB  = _pondMap.cb; u.uDropB = _pondMap.db;
+  u.uCenterUV = [ (bx-_pondMap.sx)/_pondMap.scx, (by-_pondMap.sy)/_pondMap.scy ]; // this boid's centre in bgUV
+  return;
+}
+u.uStyle = 0;                                       // the boid's own independent cloth ripple
 const w=tex.width||1, h=tex.height||1;
 const t=simClock*_RIPPLE_RATE;
-const u=m.shader.uniforms;
 u.uAmpX  = RIPPLE_AMT;
 u.uAmpY  = RIPPLE_AMT*0.6*(w/h);
 u.uAmt   = RIPPLE_SHADE;
@@ -3104,7 +3279,10 @@ if(app){ // RUN_MODE!=='dash'
     const _bgGeom = new PIXI.PlaneGeometry(1, 1, _BG_RIPPLE_SEG, _BG_RIPPLE_SEG);
     _bgMesh = new PIXI.Mesh(_bgGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
-      uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0 }
+      uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
+                  uStyle:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uDropA:new Float32Array(2), uDropB:new Float32Array(2),
+                  uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
     _bgMesh.pivot.set(0, 0);          // geometry spans 0..1; position sits at the crop origin
     _bgMesh.visible = false;
@@ -4288,7 +4466,8 @@ const cos=Math.cos(pred._drawAngle), sin=Math.sin(pred._drawAngle);
 const px=-sin, py=cos; // perpendicular (left)
 const zs=zScaleOf(pred);      // perspective: near predators bigger, far smaller
 const r=PREDATOR_RADIUS*zs;
-const bx=pred.x, by=pred.y;
+let bx=pred.x, by=pred.y;
+const _pa=_pondAt(bx,by); if(_pa){ bx+=_pa.ox; by+=_pa.oy; } // predators float in the pond too
 
 // ── trail (same style as boid trail, white) ──────────────────────────────
 if(pred.trail.length>=2){
@@ -4329,7 +4508,7 @@ spr.zIndex=_zOrder++; // shares the container with the boids — must carry a de
                       // sorts to an arbitrary layer as soon as a ripple mesh turns sorting on
 spr.x=bx; spr.y=by;
 spr.rotation=UPRIGHT_SPRITE ? PANEL_TILT : pred._drawAngle;
-spr.tint=0xffffff;   // white; PNG grey shading is preserved by multiplication
+spr.tint=(_pa && _pa.dark>0 && BG_RIPPLE_SHADE>0) ? _dim(0xffffff, 1-Math.min(0.95,_pa.dark*BG_RIPPLE_SHADE)) : 0xffffff; // white, or dimmed by a passing pond ring
 spr.alpha=0.92*Math.min(1,0.45+0.55*zs); // dim with depth beyond the midplane
 spr.scale.set(r/_bodyScale); // r already includes the depth scale zs
 
@@ -4420,25 +4599,98 @@ _layoutBgMesh();
 function _layoutBgMesh(){
 const m=_bgMesh; if(!m) return;
 try {
+_pondActive=null;   // cleared every frame; only the pond branch below re-arms it (for the boids)
 const tex=m.texture;
 const ready = !!_bgImagePNG && SIM_MODE!=='astro'
            && tex && tex.baseTexture && tex.baseTexture.valid && tex.width>0;
 m.visible=ready;
 if(!ready) return;
 const cw=canvas.width, ch=canvas.height, tw=tex.width, th=tex.height;
-const over  = 1 + Math.max(0,RIPPLE_AMT)*1.5;      // overscan so wave-displaced edges never expose past the mesh; 1.0 when ripple is off
+const over  = 1 + Math.max(0,BG_RIPPLE_AMT)*1.5;   // overscan so wave-displaced edges never expose past the mesh; 1.0 when bg ripple is off
 const scale = Math.max(cw/tw, ch/th) * over;       // COVER (+ overscan)
 m.scale.set(tw*scale, th*scale);                   // unit geometry → pixel size
 m.position.set((cw-tw*scale)/2, (ch-th*scale)/2);  // centre the crop
 const u=m.shader.uniforms, t=simClock*_RIPPLE_RATE;
-u.uAmpX  = RIPPLE_AMT;
-u.uAmpY  = RIPPLE_AMT*0.6*(tw/th);                 // width-fraction re-expressed on the y axis, as for boids
-u.uAmt   = RIPPLE_SHADE;
+u.uAmpX  = BG_RIPPLE_AMT;                          // the BG-only ripple set, independent of the boid sliders
+u.uAmpY  = BG_RIPPLE_AMT*0.6*(tw/th);             // width-fraction re-expressed on the y axis
+u.uAmt   = BG_RIPPLE_SHADE;
 u.uT     = t % 1;                                  // shader must never see a large clock
 u.uT2    = (t*0.8) % 1;
 u.uPhase = 0;                                      // one surface — nothing to de-sync
-u.uWaves = RIPPLE_WAVES;
+u.uWaves = BG_RIPPLE_WAVES;
+u.uStyle  = RIPPLE_STYLE;
+u.uAspect = m.scale.x / m.scale.y;                 // displayed pixel W/H → pond rings stay circular
+if(RIPPLE_STYLE===1){                              // pond: advance + respawn the two ring-origin drops
+  const now=simClock;
+  if(!_pondDrops){                                 // lazy seed both slots, staggered in age
+    _pondDrops=[];
+    for(let i=0;i<2;i++) _pondDrops.push({cx:Math.random(), cy:Math.random(), t0: now - i*(_POND_LIFE/2)});
+    _pondNext = now + _POND_MIN;
+  }
+  if(now >= _pondNext){                            // overwrite the older slot with a new random origin
+    _pondSlot = _pondSlot ^ 1;
+    _pondDrops[_pondSlot] = {cx:Math.random(), cy:Math.random(), t0:now};
+    _pondNext = now + _POND_MIN + Math.random()*(_POND_MAX-_POND_MIN);
+  }
+  const dr=(i)=>{
+    const d=_pondDrops[i], t=now-d.t0, age=t/_POND_LIFE;
+    // life envelope: 0 at impact (so the centre never pops), quick rise, hold, gentle tail
+    const env = age<=0 ? 0 : age<0.10 ? age/0.10 : age<0.75 ? 1 : Math.max(0, 1-(age-0.75)/0.25);
+    return { c:[d.cx, d.cy], drop:[ t, env ] };   // drop.x = seconds since impact (bounded by the short life)
+  };
+  // reassign fresh arrays (not in-place mutation) so Pixi's uniform sync re-uploads them
+  const a=dr(0), b=dr(1);
+  u.uCenterA=a.c; u.uDropA=a.drop;
+  u.uCenterB=b.c; u.uDropB=b.drop;
+  // hand the same wavefield to the boids so they bob, flex AND darken WITH the rings (float IN the pond)
+  if(BG_RIPPLE_AMT>0 || BG_RIPPLE_SHADE>0){
+    _pondActive=[ {cx:a.c[0], cy:a.c[1], lt:a.drop[0], env:a.drop[1]},
+                  {cx:b.c[0], cy:b.c[1], lt:b.drop[0], env:b.drop[1]} ];
+    _pondMap={ sx:m.position.x, sy:m.position.y, scx:m.scale.x, scy:m.scale.y, asp:m.scale.x/m.scale.y,
+               origin:[m.position.x, m.position.y], scale:[m.scale.x, m.scale.y],   // shared refs for the boid meshes' uBgOrigin/uBgScale
+               ca:a.c, da:a.drop, cb:b.c, db:b.drop };                              // fresh each frame → Pixi re-uploads
+  }
+}
 } catch(err){ m.visible=false; if(!_layoutBgMesh._warned){ _layoutBgMesh._warned=true; console.warn('background-image layout failed:', err); } }
+}
+
+// Sample the pond wavefield at a point in bg-mesh UV space (0..1). Returns {dx,dy} displacement
+// in UV units, or null when no pond is live. Mirrors pondDisp() in the shader so a boid sitting
+// where a ring passes gets pushed the same way the water does. drawBoid/drawPredator map the
+// boid's screen position into UV, call this, and offset the whole boid by the result.
+function _pondFieldAt(ux,uy){
+  if(!_pondActive) return null;
+  const k=6.2832*BG_RIPPLE_WAVES*_POND_KMUL, sig2=2*_POND_SIG*_POND_SIG, asp=_pondMap.asp;
+  let dx=0, dy=0, dark=0;
+  for(let i=0;i<2;i++){
+    const p=_pondActive[i]; if(p.env<=0) continue;
+    const qx=(ux-p.cx)*asp, qy=uy-p.cy;
+    const d=Math.sqrt(qx*qx+qy*qy); if(d<1e-4) continue;
+    const x=d-_POND_SPEED*p.lt;
+    const win=Math.exp(-(x*x)/sig2); if(win<1e-3) continue;   // ring not near this point
+    const spread=1/Math.sqrt(1+4*d);
+    const ct=Math.min(1,Math.max(0,d/0.15)), calm=ct*ct*(3-2*ct);
+    const base=p.env*win*spread*calm;                         // shared shape (0..1), before the sin/cos
+    dx+=(qx/d)*(base*Math.sin(k*x)); dy+=(qy/d)*(base*Math.sin(k*x)); // displacement — matches pondDisp (vertex)
+    dark+=base*(0.5-0.5*Math.cos(k*x));                        // darkening — matches pondDark (fragment)
+  }
+  return (dx||dy||dark) ? {dx,dy,dark} : null;
+}
+// What the live pond wavefield does to a boid/predator at screen (bx,by), or null:
+//   ox,oy = px position bob (fixed budget — a boid bobs, it isn't a stretchy texture; eases off
+//           with bg ripple %). dark = 0..~1 darkening shape (scaled by bg shade at the call site).
+function _pondAt(bx,by){
+  if(!_pondActive) return null;
+  const f=_pondFieldAt((bx-_pondMap.sx)/_pondMap.scx, (by-_pondMap.sy)/_pondMap.scy);
+  if(!f) return null;
+  const px=_POND_BOID_AMP_PX*Math.min(1, BG_RIPPLE_AMT/0.12);
+  return { ox:f.dx*px, oy:f.dy*px, dark:f.dark };
+}
+// Scale a packed 0xRRGGBB by k (0..1) — a uniform darken for the pond shadow rolling over a boid.
+function _dim(hex,k){
+  if(k>=0.999) return hex;
+  const r=(hex>>16)&255, g=(hex>>8)&255, b=hex&255;
+  return (((r*k)|0)<<16)|(((g*k)|0)<<8)|((b*k)|0);
 }
 
 function drawBondLines(){
@@ -4627,7 +4879,11 @@ if(alpha<=0) return;
 // frame-time variance. One filter on the rendered position absorbs all three. Physics keeps using
 // the exact positions; only what you see is smoothed. Everything below — sprite, tail, beak, eyes,
 // aura, disease dot, birth ring — reads bx/by, so the whole boid moves as one piece.
-const bx=boid._drawX!==undefined?boid._drawX:boid.x, by=boid._drawY!==undefined?boid._drawY:boid.y;
+let bx=boid._drawX!==undefined?boid._drawX:boid.x, by=boid._drawY!==undefined?boid._drawY:boid.y;
+// float IN the pond: the wavefield bobs the whole boid, and (below, at the tint) darkens it, the
+// same way it moves and shades the water — so a boid rides the ring instead of sitting on top of it.
+const _pa = _pondAt(bx,by);
+if(_pa){ bx+=_pa.ox; by+=_pa.oy; }
 
 const isBonded = boid.partnerId!==null;
 const fertile = isFertile(boid);
@@ -4685,12 +4941,15 @@ const px=-sin, py=cos; // perpendicular (left)
 // from a ↑ pool, or because the global Upright switch is on. _getRippleMesh returns null at the
 // safety ceiling, in which case the boid simply renders as an ordinary sprite.
 let spr=null;
-if(RIPPLE_AMT>0 && _bt && _bt!==_defaultTex && _bt.width>0 && (_forceUpright || UPRIGHT_SPRITE))
+// mesh (deformable) when: its own cloth ripple is on and it's upright, OR a background pond is live
+// (then any uploaded-image boid gets a mesh so the rings can flex + shade it — see _rippleUpdate).
+if(_bt && _bt!==_defaultTex && _bt.width>0 &&
+   ((RIPPLE_AMT>0 && (_forceUpright || UPRIGHT_SPRITE)) || _pondActive))
   spr=_getRippleMesh(_bt);
 const _rip = !!spr;
 if(_rip){
   if(boid._ripplePhase===undefined) boid._ripplePhase=Math.random()*6.2832; // per-boid, so they never pulse in unison
-  _rippleUpdate(spr, _bt, boid._ripplePhase);
+  _rippleUpdate(spr, _bt, boid._ripplePhase, bx, by);
 } else {
   spr=_getBodySprite(_spriteCount++);
   if(spr.texture!==_bt) spr.texture=_bt;
@@ -4699,6 +4958,7 @@ spr.visible=true;
 spr.x=bx; spr.y=by;
 spr.rotation=(_forceUpright || UPRIGHT_SPRITE) ? PANEL_TILT : boid._drawAngle; // upright means upright IN THE ROOM, so it follows the panel's tilt
 spr.tint=_drawHex(boid, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // greyscale: anchored so the FRONT lands on white — see _depthL
+if(_pa && !_rip && _pa.dark>0 && BG_RIPPLE_SHADE>0) spr.tint=_dim(spr.tint, 1-Math.min(0.95, _pa.dark*BG_RIPPLE_SHADE)); // non-mesh boids: uniform pond dim (mesh boids get a proper gradient in-shader)
 spr.alpha=baseAlpha;
 // _bodyScale calibration × user image-scale slider (eased so size changes glide). A sprite scales
 // its own texture; a mesh is a UNIT square, so the texture's size has to go into its scale too.
@@ -5662,7 +5922,7 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 return { app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE, HUE_LOCK } };
+  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE, HUE_LOCK, RIPPLE_STYLE } };
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
@@ -5693,6 +5953,7 @@ if(t.HUE_LOCK!==undefined)          clickTo(!!HUE_LOCK         !== !!t.HUE_LOCK,
 if(t.ASTRO_MERGE!==undefined)       clickTo(!!_ASTRO_MERGE         !== !!t.ASTRO_MERGE,   'astroMergeBtn');
 if(t.EVENT_FX!==undefined){ let n=((EVENT_FX-t.EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); } // bondLinesBtn cycles BACKWARD (EVENT_FX = (x+2)%3), so click count = (current − target) mod 3
 if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
+if(t.RIPPLE_STYLE!==undefined){ let n=((t.RIPPLE_STYLE-RIPPLE_STYLE)%2+2)%2; for(let i=0;i<n;i++) document.getElementById('rippleStyleBtn').click(); }
 if(t.DIFF_MODE!==undefined)         clickTo(!!DIFF_MODE        !== !!t.DIFF_MODE,         'diffBtn');
 }
 document.getElementById('saveBtn').addEventListener('click',()=>{
@@ -6396,6 +6657,11 @@ DEPTH_HAZE        = ${DEPTH_HAZE};
 RIPPLE_AMT        = ${RIPPLE_AMT};
 RIPPLE_SHADE      = ${RIPPLE_SHADE};
 RIPPLE_WAVES      = ${RIPPLE_WAVES};
+BG_RIPPLE_AMT     = ${BG_RIPPLE_AMT};
+BG_RIPPLE_SHADE   = ${BG_RIPPLE_SHADE};
+BG_RIPPLE_WAVES   = ${BG_RIPPLE_WAVES};
+RIPPLE_STYLE      = ${RIPPLE_STYLE};
+_applyRippleStyle(); // sync the ripple-style button visual to the exported style
 PANEL_TILT        = ${PANEL_TILT}; // radians — the panel's own orientation travels with the export
 TRAIL_OPACITY     = ${TRAIL_OPACITY};
 AURA_OPACITY      = ${AURA_OPACITY};
@@ -6624,7 +6890,7 @@ const toggles={};
 const g=(n,k)=>{ const v=_importConst(boot,n); if(v!==undefined) toggles[k||n]=v; };
 g('EVENT_FX'); g('AURA_MODE'); g('DIFF_MODE'); g('SHOW_COLOR'); g('SHOW_DETAILS');
 g('NO_OVERLAP'); g('DIM_INFERTILE'); g('UPRIGHT_SPRITE'); g('immigrationEnabled');
-g('HUNT_MODE'); g('SIM_MODE'); g('HUE_LOCK'); g('_ASTRO_MERGE','ASTRO_MERGE');
+g('HUNT_MODE'); g('SIM_MODE'); g('HUE_LOCK'); g('_ASTRO_MERGE','ASTRO_MERGE'); g('RIPPLE_STYLE');
 return { app:'boid-world', v:1, inputs, toggles };
 }
 function _importApply(html, fname){
@@ -6743,7 +7009,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','soundBtn','hueLockBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','soundBtn','hueLockBtn','rippleStyleBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
