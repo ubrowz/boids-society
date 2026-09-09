@@ -1945,9 +1945,31 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <button id="bgImgClear" class="mini-btn" title="Remove the background image and return to the colour" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bgImgName" class="mini-note">none</span>
 </div>
+<div class="ctrl-row flock-only" style="gap:8px;">
+<label>overlay img</label>
+<input type="file" id="bgOverlayFile" accept="image/*" style="display:none">
+<button id="bgOverlayBtn" class="mini-btn" title="A second layer ABOVE the background and BELOW the boids. Unlike the background it is NOT stretched to the window — it scales uniformly with window height, aspect always kept. Author it as a transparent PNG (props only). It ripples and shades with the background pond.">load</button>
+<button id="bgOverlayClear" class="mini-btn" title="Remove the overlay image" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bgOverlayName" class="mini-note">none</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Shift the overlay layer left/right, as a percentage of the window width. 0 = centred. Stays put when the window is resized.">overlay x</label>
+<input type="range" id="overlayXSlider" min="-50" max="50" value="0" step="1">
+<span class="ctrl-val" id="overlayXVal">0%</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="Shift the overlay layer up/down, as a percentage of the window height. 0 = centred.">overlay y</label>
+<input type="range" id="overlayYSlider" min="-50" max="50" value="0" step="1">
+<span class="ctrl-val" id="overlayYVal">0%</span>
+</div>
+<div class="ctrl-row flock-only">
+<label title="How deep into the tank the overlay sits. 50% = halfway: boids DEEPER than the overlay pass behind it (partly or fully hidden), nearer boids swim in front. 0% = at the very front (over every boid), 100% = at the very back (behind every boid). Needs the depth slider above 0.">overlay depth</label>
+<input type="range" id="overlayDepthSlider" min="0" max="100" value="50" step="1">
+<span class="ctrl-val" id="overlayDepthVal">50%</span>
+</div>
 <div class="ctrl-row flock-only">
 <label></label>
-<span id="bgImgTarget" class="mini-note" title="Pop-out canvas / Pi pop-out open at this size (1:6). Crop the background image to match for a clean 'cover' fit.">strip pop-out target: —</span>
+<span id="bgImgTarget" class="mini-note" title="Pop-out canvas / Pi pop-out open at this size (1:6). Crop the background image to match for a clean 'cover' fit; author the overlay PNG at the same size.">strip pop-out target: —</span>
 </div>
 </section>
 
@@ -2118,6 +2140,7 @@ const _bodySprites = []; // reusable Sprite pool — one per visible boid per fr
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
 // predators share the boid body pool (_bodySprites) so they interleave by depth
 const _drawList = []; // reused each frame: boids + live predators, depth-sorted
+let _ovZsmooth, _ovZcommit; // smoothed + hysteresis-committed depth cut for the overlay image
 let _maxVisR = 0;      // largest boid rendered half-extent this frame (for the depth-layering neighbour query);
                        // placeholder value — RADIUS is defined later, and this is reset every draw frame anyway
 const _gfx = {}; // named Graphics layers, populated after app is created
@@ -2138,6 +2161,12 @@ let _bgImagePNG     = null;   // data URL, ≤2048px — the standard baked/brid
 let _bgImagePNGLean = null;   // data URL, ≤1024px — baked into the Pi (lean) pop-out only
 let _bgMesh         = null;   // PIXI.Mesh on _rippleProgram; built after the program, null in dash mode
 let _tankLean       = false;  // does the currently-open tankWin belong to the Pi (lean) pop-out?
+// ── overlay image: a second layer ABOVE the background, below the boids. Scales UNIFORMLY with
+// window height (aspect always kept — never stretched to width) while the background cover-fills.
+// Rides the pond ripple/shade in world space (shader uStyle 3). Same persist path as the bg image.
+let _bgOverlayPNG     = null;
+let _bgOverlayPNGLean = null;
+let _bgOverlayMesh    = null;
 
 
 // ── slider state ──────────────────────────────────────────────────────────────
@@ -2507,7 +2536,7 @@ _wirePool('F', true,  'bodyImgFUBtn','bodyImgFUFile','bodyImgFUClear','bodyImgFU
 // Read a picked file, decode once, produce two JPEG variants (≤2048 for normal
 // surfaces, ≤1024 baked into the lean Pi pop-out). A source already within a cap
 // keeps its original bytes, so a small hand-made PNG with alpha survives untouched.
-function _loadBgImageVariants(file, cb){          // cb({full, lean}) or cb(null) on failure
+function _loadBgImageVariants(file, cb, keepAlpha){ // cb({full, lean}) or cb(null); keepAlpha → re-encode as PNG (overlay), else JPEG (opaque wallpaper)
   const r = new FileReader();
   r.onload = ev => {
     const img = new Image();
@@ -2515,11 +2544,11 @@ function _loadBgImageVariants(file, cb){          // cb({full, lean}) or cb(null
       const enc = (maxEdge) => {
         const long = Math.max(img.width, img.height);
         const scale = long > maxEdge ? maxEdge / long : 1;
-        if(scale === 1) return ev.target.result;                 // small enough — original bytes
+        if(scale === 1) return ev.target.result;                 // small enough — original bytes (alpha intact)
         const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
         cv.getContext('2d').drawImage(img, 0, 0, w, h);
-        return cv.toDataURL('image/jpeg', 0.85);
+        return keepAlpha ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.85);
       };
       cb({ full: enc(2048), lean: enc(1024) });
     };
@@ -2584,6 +2613,43 @@ document.getElementById('bgImgClear').addEventListener('click', () => {
   document.getElementById('bgImgName').textContent = 'none';
 });
 
+// ── overlay image — same plumbing as the background, different mesh + fit ──────
+function applyBgOverlayPNG(full, lean){
+  _bgOverlayPNG     = full || null;
+  _bgOverlayPNGLean = lean || full || null;
+  _rebuildBgOverlayTex();
+}
+function _rebuildBgOverlayTex(){
+  if(RUN_MODE === 'dash') return;
+  if(!_bgOverlayMesh) return;
+  const old = _bgOverlayMesh.texture;
+  if(_bgOverlayPNG){
+    _loadPlainTex(_bgOverlayPNG, t => {
+      _bgOverlayMesh.texture = t;
+      if(old && old !== PIXI.Texture.EMPTY && old !== t) old.destroy(true);
+    });
+  } else {
+    _bgOverlayMesh.texture = PIXI.Texture.EMPTY;
+    if(old && old !== PIXI.Texture.EMPTY) old.destroy(true);
+  }
+}
+document.getElementById('bgOverlayBtn').addEventListener('click', () => document.getElementById('bgOverlayFile').click());
+document.getElementById('bgOverlayFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if(!file) return;
+  _loadBgImageVariants(file, v => {
+    if(!v){ document.getElementById('bgOverlayName').textContent = 'load failed'; return; }
+    applyBgOverlayPNG(v.full, v.lean);
+    if(RUN_MODE === 'dash') _tankSend({ boid:1, t:'bgoverlay', data: _tankLean ? v.lean : v.full });
+    document.getElementById('bgOverlayName').textContent = file.name.replace(/\.[^.]+$/, '').substring(0, 14);
+  }, true); // keepAlpha — overlay stays PNG through any downscale
+  e.target.value = '';
+});
+document.getElementById('bgOverlayClear').addEventListener('click', () => {
+  applyBgOverlayPNG(null, null);
+  if(RUN_MODE === 'dash') _tankSend({ boid:1, t:'bgoverlay', data:null });
+  document.getElementById('bgOverlayName').textContent = 'none';
+});
+
 document.getElementById('noseOffsetInput').addEventListener('input', e => {
 const v = parseFloat(e.target.value);
 if(v > 0) _noseOffset = v;
@@ -2614,6 +2680,9 @@ wire('waveSlider','waveVal',             v=>parseFloat(v), v=>parseFloat(v).toFi
 wire('bgRippleSlider','bgRippleVal',     v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ BG_RIPPLE_AMT=v; });
 wire('bgShadeSlider','bgShadeVal',       v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ BG_RIPPLE_SHADE=v; });
 wire('bgWaveSlider','bgWaveVal',         v=>parseFloat(v), v=>parseFloat(v).toFixed(1), v=>{ BG_RIPPLE_WAVES=v; });
+wire('overlayXSlider','overlayXVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ BG_OVERLAY_X=v; });
+wire('overlayYSlider','overlayYVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ BG_OVERLAY_Y=v; });
+wire('overlayDepthSlider','overlayDepthVal', v=>parseInt(v)/100, v=>v+'%', v=>{ BG_OVERLAY_DEPTH=v; });
 wire('tiltSlider','tiltVal',             v=>parseInt(v)*Math.PI/180, v=>v+'°', v=>{ PANEL_TILT=v; }); // negate the parse if the panel turns the other way
 wire('emigReturnSlider', 'emigReturnVal',  v=>parseInt(v),   v=>(parseInt(v)/10).toFixed(1),    v=>{ EMIG_RETURN=v/10; });
 wire('bondSlider', 'bondVal', v=>parseInt(v), v=>v+' hits', v=>{ BOND_THRESHOLD=v; updateViability(); });
@@ -2842,7 +2911,7 @@ const BOND_DIST = 90;
 // need retuning when depth changes. Predators ignore z entirely in v1.
 let DEPTH = parseInt(document.getElementById('depthSlider').value);
 const Z_FOCAL = 600;        // perspective focal length: scale = Z_FOCAL/(Z_FOCAL+z-DEPTH/2)
-const Z_SPEED_FRAC = 0.35;  // max |vz| as fraction of SPEED — depth drift slower than planar flight
+const Z_SPEED_FRAC = 0.6;   // max |vz| as fraction of SPEED — depth drift still calmer than planar flight, but no longer nearly-frozen
 const Z_MARGIN = 60;        // soft-repulsion band at the near/far depth walls
 // denominator stays ≥ Z_FOCAL-DEPTH/2 = 300 at the slider max of 600 — never 0
 function zScaleOf(o){ return DEPTH>0 ? Z_FOCAL/(Z_FOCAL+(o.z||0)-DEPTH/2) : 1; }
@@ -3037,6 +3106,9 @@ const _RIPPLE_MAX   = 120;
 // clock are still shared, so the two remain one surface however this is set.
 let RIPPLE_SHADE = parseInt(document.getElementById('shadeSlider').value)/100*0.95;
 let BG_RIPPLE_SHADE = parseInt(document.getElementById('bgShadeSlider').value)/100*0.95; // background-image shade depth — independent of RIPPLE_SHADE
+let BG_OVERLAY_X = parseInt(document.getElementById('overlayXSlider').value)/100; // overlay shift, fraction of canvas width  (0 = centred)
+let BG_OVERLAY_Y = parseInt(document.getElementById('overlayYSlider').value)/100; // overlay shift, fraction of canvas height
+let BG_OVERLAY_DEPTH = parseInt(document.getElementById('overlayDepthSlider').value)/100; // overlay's place in the tank depth (0.5 = halfway → deeper boids pass behind it)
 
 // ── the light wave ────────────────────────────────────────────────────────────
 // A shadow rolling over the cloth, done in the fragment shader. Three things about this are
@@ -3114,8 +3186,9 @@ uniform vec2  uCenterA;  // pond drop centres, in pond-space 0..1
 uniform vec2  uCenterB;
 uniform vec2  uDropA;    // per drop: x = local time (bounded ~0..2), y = envelope 0..1
 uniform vec2  uDropB;
-uniform vec2  uBgOrigin; // style 2: background mesh screen origin (px)
-uniform vec2  uBgScale;  // style 2: background mesh screen size (px) — world<->bgUV mapping
+uniform vec2  uBgOrigin; // style 2/3: background mesh CENTRE in screen px
+uniform vec2  uBgScale;  // style 2/3: background mesh screen size (px) — world<->bgUV mapping
+uniform vec2  uBgRot;    // style 2/3: (cos, sin) of the panel tilt — the scene is rotated about its centre
 uniform vec2  uCenterUV; // style 2: this boid's centre in bgUV (for a mean-zero local warp)
 varying vec2 vTextureCoord;
 varying vec2 vWorld;
@@ -3127,6 +3200,11 @@ varying vec2 vWorld;
 const float POND_SPEED = 0.7;   // wavefront speed (a unit is about half the short side per second)
 const float POND_SIG   = 0.10;  // annular packet half-width — how many crests trail the front
 const float POND_KMUL  = 2.0;   // wavelength scale on the waves slider
+// screen px -> background UV (0..1), undoing the panel-tilt rotation about the bg centre
+vec2 toBgUV(vec2 world){
+  vec2 r = world - uBgOrigin;
+  return vec2(r.x*uBgRot.x + r.y*uBgRot.y, -r.x*uBgRot.y + r.y*uBgRot.x) / uBgScale + 0.5;
+}
 vec2 pondDisp(vec2 pos, vec2 ctr, vec2 drop){
   vec2  q = (pos - ctr) * vec2(uAspect, 1.0);
   float d = length(q);
@@ -3151,15 +3229,25 @@ void main(void){
     p += pondDisp(aVertexPosition, uCenterA, uDropA);
     p += pondDisp(aVertexPosition, uCenterB, uDropB);
     gl_Position = vec4((projectionMatrix * translationMatrix * vec3(p, 1.0)).xy, 0.0, 1.0);
-  } else {
+  } else if (uStyle < 2.5) {
     // pond on a BOID image: evaluate the wavefield in the BACKGROUND's world/UV space so the ring
     // crosses the little image exactly as it crosses the water, and does not rotate/scale with the
     // boid. Mean-zero (vertex minus centre) — the whole-boid bob is applied in JS.
     vec2 world = (translationMatrix * vec3(aVertexPosition, 1.0)).xy;
     vWorld = world;
-    vec2 bgUV = (world - uBgOrigin) / uBgScale;
+    vec2 bgUV = toBgUV(world);
     vec2 dUV = (pondDisp(bgUV, uCenterA, uDropA) - pondDisp(uCenterUV, uCenterA, uDropA))
              + (pondDisp(bgUV, uCenterB, uDropB) - pondDisp(uCenterUV, uCenterB, uDropB));
+    world += dUV * uBgScale;
+    gl_Position = vec4((projectionMatrix * vec3(world, 1.0)).xy, 0.0, 1.0);
+  } else {
+    // pond on the OVERLAY layer: same world/UV sampling as a boid, but the FULL displacement
+    // (translate + warp), because the overlay is a large surface like the wallpaper — it should
+    // heave with the ring, not just flex around a fixed centre.
+    vec2 world = (translationMatrix * vec3(aVertexPosition, 1.0)).xy;
+    vWorld = world;
+    vec2 bgUV = toBgUV(world);
+    vec2 dUV = pondDisp(bgUV, uCenterA, uDropA) + pondDisp(bgUV, uCenterB, uDropB);
     world += dUV * uBgScale;
     gl_Position = vec4((projectionMatrix * vec3(world, 1.0)).xy, 0.0, 1.0);
   }
@@ -3181,8 +3269,13 @@ uniform vec2  uDropA;
 uniform vec2  uDropB;
 uniform vec2  uBgOrigin;
 uniform vec2  uBgScale;
+uniform vec2  uBgRot;
 varying vec2 vWorld;
 const float POND_SPEED = 0.7;   // must match the vertex stage
+vec2 toBgUV(vec2 world){
+  vec2 r = world - uBgOrigin;
+  return vec2(r.x*uBgRot.x + r.y*uBgRot.y, -r.x*uBgRot.y + r.y*uBgRot.x) / uBgScale + 0.5;
+}
 const float POND_SIG   = 0.10;
 const float POND_KMUL  = 2.0;
 float pondDark(vec2 uv, vec2 ctr, vec2 drop){
@@ -3205,7 +3298,7 @@ void main(void){
     dark = pondDark(vTextureCoord, uCenterA, uDropA)
          + pondDark(vTextureCoord, uCenterB, uDropB);
   } else {
-    vec2 bgUV = (vWorld - uBgOrigin) / uBgScale;   // rolling shade as a GRADIENT across the boid image
+    vec2 bgUV = toBgUV(vWorld);   // rolling shade as a GRADIENT across the image
     dark = pondDark(bgUV, uCenterA, uDropA) + pondDark(bgUV, uCenterB, uDropB);
   }
   c.rgb *= 1.0 - clamp(dark, 0.0, 0.95);   // only ever darkens: 1.0 at the crest, dimmer in the trough
@@ -3226,7 +3319,7 @@ if(_rippleUsed>=_rippleMeshes.length){
     uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
                uStyle:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                uDropA:new Float32Array(2), uDropB:new Float32Array(2),
-               uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uCenterUV:new Float32Array([0.5,0.5]) } }));
+               uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) } }));
                // uStyle 0 = own cloth ripple; flips to 2 (rides the background pond) in _rippleUpdate when a pond is live
   m.pivot.set(0.5,0.5);                              // matches the sprites' 0.5 anchor
   _gfx.bodySprites.addChild(m);
@@ -3251,9 +3344,11 @@ if(_pondActive){                                   // a pond is live on the back
   u.uAmpX    = (_POND_BOID_DEFORM_PX / _pondMap.scx) * Math.min(1, BG_RIPPLE_AMT/0.12); // how hard the ring flexes the image (px), eased by bg ripple %
   u.uBgOrigin = _pondMap.origin;                    // shared arrays, rebuilt every frame in _layoutBgMesh
   u.uBgScale  = _pondMap.scale;
+  u.uBgRot    = _pondMap.rot;
   u.uCenterA  = _pondMap.ca; u.uDropA = _pondMap.da;
   u.uCenterB  = _pondMap.cb; u.uDropB = _pondMap.db;
-  u.uCenterUV = [ (bx-_pondMap.sx)/_pondMap.scx, (by-_pondMap.sy)/_pondMap.scy ]; // this boid's centre in bgUV
+  { const rx=bx-_pondMap.sx, ry=by-_pondMap.sy, c=_pondMap.cos, sn=_pondMap.sin;   // this boid's centre in bgUV (undo the tilt)
+    u.uCenterUV = [ (rx*c + ry*sn)/_pondMap.scx + 0.5, (-rx*sn + ry*c)/_pondMap.scy + 0.5 ]; }
   return;
 }
 u.uStyle = 0;                                       // the boid's own independent cloth ripple
@@ -3282,14 +3377,30 @@ if(app){ // RUN_MODE!=='dash'
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
                   uStyle:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
-                  uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uCenterUV:new Float32Array([0.5,0.5]) }
+                  uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
-    _bgMesh.pivot.set(0, 0);          // geometry spans 0..1; position sits at the crop origin
+    _bgMesh.pivot.set(0.5, 0.5);      // rotate/scale about the mesh centre (panel tilt)
     _bgMesh.visible = false;
     app.stage.addChildAt(_bgMesh, 1); // 0 = _gfx.bg; trails/bondLines/birthRings/… shift to 2+
     _rebuildBgTex();                  // in case an import/bridge set _bgImagePNG before this ran
+    // overlay mesh — same program + dense grid. It lives INSIDE _gfx.bodySprites (the depth-sorted
+    // body container) so boids farther than BG_OVERLAY_DEPTH·DEPTH render behind it and nearer ones
+    // in front. Its zIndex is set each frame from the depth crossing (see the flock draw loop).
+    const _ovGeom = new PIXI.PlaneGeometry(1, 1, _BG_RIPPLE_SEG, _BG_RIPPLE_SEG);
+    _bgOverlayMesh = new PIXI.Mesh(_ovGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
+      program: _rippleProgram,
+      uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
+                  uStyle:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uDropA:new Float32Array(2), uDropB:new Float32Array(2),
+                  uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
+    }));
+    _bgOverlayMesh.pivot.set(0.5, 0.5);
+    _bgOverlayMesh.visible = false;
+    _bgOverlayMesh.zIndex = -0.5;     // reset each frame from the depth crossing
+    _gfx.bodySprites.addChild(_bgOverlayMesh);
+    _rebuildBgOverlayTex();
   } catch(err){
-    _bgMesh = null;                   // never let a bg-mesh failure take down the sim
+    _bgMesh = null; _bgOverlayMesh = null;   // never let a mesh failure take down the sim
     console.warn('background-image mesh unavailable:', err);
   }
 }
@@ -3712,7 +3823,7 @@ if(boid._front>0){
   return;
 }
 const vmax=SPEED*Z_SPEED_FRAC;
-boid.vz+=(Math.random()-0.5)*vmax*0.25;
+boid.vz+=(Math.random()-0.5)*vmax*0.45;   // random-walk kick — bigger = more restless depth wandering
 if(boid.partnerId!==null){
   const p=boidMap.get(boid.partnerId);
   if(p&&p.alive) boid.vz+=(p.z-boid.z)*0.01;
@@ -4591,6 +4702,7 @@ function drawBackground(){
 const g=_gfx.bg; g.clear();
 g.beginFill(hexFromCSS(BG_COLOR)); g.drawRect(0,0,canvas.width,canvas.height); g.endFill();
 _layoutBgMesh();
+_layoutBgOverlayMesh();
 }
 
 // Fit the background-image mesh over the canvas with "cover" (fill, keep aspect, crop overflow),
@@ -4607,9 +4719,13 @@ m.visible=ready;
 if(!ready) return;
 const cw=canvas.width, ch=canvas.height, tw=tex.width, th=tex.height;
 const over  = 1 + Math.max(0,BG_RIPPLE_AMT)*1.5;   // overscan so wave-displaced edges never expose past the mesh; 1.0 when bg ripple is off
-const scale = Math.max(cw/tw, ch/th) * over;       // COVER (+ overscan)
+const tc=Math.cos(PANEL_TILT), ts=Math.sin(PANEL_TILT);
+const rgrow = Math.abs(tc)+Math.abs(ts);           // rotated rect needs a bigger cover so no corner gaps under tilt (1.0 at tilt 0)
+const scale = Math.max(cw/tw, ch/th) * over * rgrow; // COVER (+ overscan + tilt growth)
+m.pivot.set(0.5, 0.5);
 m.scale.set(tw*scale, th*scale);                   // unit geometry → pixel size
-m.position.set((cw-tw*scale)/2, (ch-th*scale)/2);  // centre the crop
+m.rotation = PANEL_TILT;                           // the painted scene turns with the panel
+m.position.set(cw/2, ch/2);                        // pivot 0.5 → centre lands on the canvas centre
 const u=m.shader.uniforms, t=simClock*_RIPPLE_RATE;
 u.uAmpX  = BG_RIPPLE_AMT;                          // the BG-only ripple set, independent of the boid sliders
 u.uAmpY  = BG_RIPPLE_AMT*0.6*(tw/th);             // width-fraction re-expressed on the y axis
@@ -4647,11 +4763,49 @@ if(RIPPLE_STYLE===1){                              // pond: advance + respawn th
     _pondActive=[ {cx:a.c[0], cy:a.c[1], lt:a.drop[0], env:a.drop[1]},
                   {cx:b.c[0], cy:b.c[1], lt:b.drop[0], env:b.drop[1]} ];
     _pondMap={ sx:m.position.x, sy:m.position.y, scx:m.scale.x, scy:m.scale.y, asp:m.scale.x/m.scale.y,
-               origin:[m.position.x, m.position.y], scale:[m.scale.x, m.scale.y],   // shared refs for the boid meshes' uBgOrigin/uBgScale
+               cos:tc, sin:ts,                                                    // panel tilt — world<->bgUV must undo it
+               origin:[m.position.x, m.position.y], scale:[m.scale.x, m.scale.y], rot:[tc, ts], // shared refs → boid/overlay uBgOrigin/uBgScale/uBgRot
                ca:a.c, da:a.drop, cb:b.c, db:b.drop };                              // fresh each frame → Pixi re-uploads
   }
 }
 } catch(err){ m.visible=false; if(!_layoutBgMesh._warned){ _layoutBgMesh._warned=true; console.warn('background-image layout failed:', err); } }
+}
+
+// The overlay layer: scaled UNIFORMLY by window height (aspect always kept — never stretched to
+// width), centred, above the background and below the boids. Rides the pond in world space
+// (uStyle 3 = full displacement, like the wallpaper) so a ring crosses it continuously with the
+// water; falls back to its own cloth wobble when the style is cloth. Must run AFTER _layoutBgMesh
+// so _pondActive / _pondMap are fresh.
+function _layoutBgOverlayMesh(){
+const m=_bgOverlayMesh; if(!m) return;
+try {
+const tex=m.texture;
+const ready = !!_bgOverlayPNG && SIM_MODE!=='astro'
+           && tex && tex.baseTexture && tex.baseTexture.valid && tex.width>0;
+m.visible=ready;
+if(!ready) return;
+const cw=canvas.width, ch=canvas.height, tw=tex.width, th=tex.height;
+const over = 1 + Math.max(0,BG_RIPPLE_AMT)*1.5;
+const s = (ch/th) * over;                          // UNIFORM scale by height — width follows aspect, never stretched
+m.pivot.set(0.5, 0.5);
+m.scale.set(tw*s, th*s);
+m.rotation = PANEL_TILT;                           // turns with the panel, like the background
+m.position.set(cw/2 + BG_OVERLAY_X*cw, ch/2 + BG_OVERLAY_Y*ch); // pivot 0.5 → centre + user shift
+const u=m.shader.uniforms, t=simClock*_RIPPLE_RATE;
+u.uWaves=BG_RIPPLE_WAVES;
+u.uAmt  =BG_RIPPLE_SHADE;
+if(RIPPLE_STYLE===1 && _pondActive){               // ride the same pond as the wallpaper (world space, full displacement)
+  u.uStyle   =3;
+  u.uAspect  =_pondMap.asp;
+  u.uAmpX    =BG_RIPPLE_AMT;
+  u.uBgOrigin=_pondMap.origin; u.uBgScale=_pondMap.scale; u.uBgRot=_pondMap.rot;
+  u.uCenterA =_pondMap.ca; u.uDropA=_pondMap.da; u.uCenterB=_pondMap.cb; u.uDropB=_pondMap.db;
+} else {                                            // cloth (or pond off) — its own gentle wobble
+  u.uStyle=0;
+  u.uAmpX =BG_RIPPLE_AMT; u.uAmpY=BG_RIPPLE_AMT*0.6*(tw/th);
+  u.uT=t%1; u.uT2=(t*0.8)%1; u.uPhase=0;
+}
+} catch(err){ m.visible=false; if(!_layoutBgOverlayMesh._warned){ _layoutBgOverlayMesh._warned=true; console.warn('overlay-image layout failed:', err); } }
 }
 
 // Sample the pond wavefield at a point in bg-mesh UV space (0..1). Returns {dx,dy} displacement
@@ -4681,10 +4835,15 @@ function _pondFieldAt(ux,uy){
 //           with bg ripple %). dark = 0..~1 darkening shape (scaled by bg shade at the call site).
 function _pondAt(bx,by){
   if(!_pondActive) return null;
-  const f=_pondFieldAt((bx-_pondMap.sx)/_pondMap.scx, (by-_pondMap.sy)/_pondMap.scy);
+  const c=_pondMap.cos, sn=_pondMap.sin;
+  const rx=bx-_pondMap.sx, ry=by-_pondMap.sy;
+  const ux=( rx*c + ry*sn)/_pondMap.scx + 0.5;      // screen px → bgUV, undoing the panel tilt
+  const uy=(-rx*sn + ry*c)/_pondMap.scy + 0.5;
+  const f=_pondFieldAt(ux,uy);
   if(!f) return null;
   const px=_POND_BOID_AMP_PX*Math.min(1, BG_RIPPLE_AMT/0.12);
-  return { ox:f.dx*px, oy:f.dy*px, dark:f.dark };
+  const ox=f.dx*px, oy=f.dy*px;
+  return { ox: ox*c - oy*sn, oy: ox*sn + oy*c, dark:f.dark }; // rotate the bob back into screen space
 }
 // Scale a packed 0xRRGGBB by k (0..1) — a uniform darken for the pond shadow rolling over a boid.
 function _dim(hex,k){
@@ -5246,6 +5405,7 @@ const w=canvas.width, h=canvas.height;
 const gb=_gfx.bg; gb.clear();
 gb.beginFill(hexFromCSS(BG_COLOR)); gb.drawRect(0,0,w,h); gb.endFill();
 _layoutBgMesh(); // shows the wallpaper on the idle screen too (ripple frozen here — drawIdle is not a loop)
+_layoutBgOverlayMesh();
 // scattered dust dots
 const gd=_gfx.boids; gd.clear();
 const seed=42;
@@ -6594,11 +6754,25 @@ const _predSeen = !_photoTank(); // photo tank → the predator hunts unseen; on
 if(_predSeen) for(const p of predators) if(p.alive) _drawList.push(p);
 _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order always matches size (far first)
 for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
+// overlay image sits at a mid-depth (BG_OVERLAY_DEPTH·DEPTH). _drawList is far→first, and each drawn
+// body took zIndex = its position in that order, so count the bodies farther than the overlay and
+// slot it in between. DEPTH<=0 → no meaningful z, put it behind every body.
+// The raw count jitters ±1 when a boid hovers right on the cut plane (z wobbles across it every
+// frame → the boid pops in/out). So smooth the count and only COMMIT a new integer cut when the
+// smoothed value clears a hysteresis band — a decisive pass still flips it once, a jitter doesn't.
+if(_bgOverlayMesh && _bgOverlayMesh.visible){
+  const _ovD = DEPTH>0 ? DEPTH*BG_OVERLAY_DEPTH : Infinity;
+  let _ovTarget=0; for(const it of _drawList){ if(it.z>=_ovD) _ovTarget++; else break; }
+  if(_ovZcommit===undefined){ _ovZsmooth=_ovTarget; _ovZcommit=_ovTarget; }
+  _ovZsmooth += (_ovTarget-_ovZsmooth)*0.12;
+  if(_ovZsmooth > _ovZcommit+0.7) _ovZcommit++;
+  else if(_ovZsmooth < _ovZcommit-0.7) _ovZcommit--;
+  _bgOverlayMesh.zIndex = _ovZcommit - 0.5;
+} else { _ovZcommit=undefined; }
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
-// no sorting is needed. Ripple meshes are created whenever an image first appears and sit wherever
-// they landed in the child list, which would put them on top of everything. Turn on zIndex sorting
-// only while one is actually visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren=_rippleUsed>0;
+// no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
+// zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
@@ -6660,6 +6834,9 @@ RIPPLE_WAVES      = ${RIPPLE_WAVES};
 BG_RIPPLE_AMT     = ${BG_RIPPLE_AMT};
 BG_RIPPLE_SHADE   = ${BG_RIPPLE_SHADE};
 BG_RIPPLE_WAVES   = ${BG_RIPPLE_WAVES};
+BG_OVERLAY_X      = ${BG_OVERLAY_X};
+BG_OVERLAY_Y      = ${BG_OVERLAY_Y};
+BG_OVERLAY_DEPTH  = ${BG_OVERLAY_DEPTH};
 RIPPLE_STYLE      = ${RIPPLE_STYLE};
 _applyRippleStyle(); // sync the ripple-style button visual to the exported style
 PANEL_TILT        = ${PANEL_TILT}; // radians — the panel's own orientation travels with the export
@@ -6764,12 +6941,14 @@ BOND_DIVORCE_DIST = ${BOND_DIVORCE_DIST};
 BOND_TURN_RAMP    = ${BOND_TURN_RAMP};
 ${_customBoidPNG ? `_customBoidPNG = ${JSON.stringify(_customBoidPNG)};` : '// no shared body image'}
 ${(lean ? _bgImagePNGLean : _bgImagePNG) ? `_bgImagePNG = ${JSON.stringify(lean ? _bgImagePNGLean : _bgImagePNG)};` : '// no background image'}
+${(lean ? _bgOverlayPNGLean : _bgOverlayPNG) ? `_bgOverlayPNG = ${JSON.stringify(lean ? _bgOverlayPNGLean : _bgOverlayPNG)};` : '// no overlay image'}
 _poolPNG_M.length=0; _poolPNG_M.push(...${JSON.stringify(_poolPNG_M)});
 _poolPNG_F.length=0; _poolPNG_F.push(...${JSON.stringify(_poolPNG_F)});
 _poolPNG_MU.length=0; _poolPNG_MU.push(...${JSON.stringify(_poolPNG_MU)});
 _poolPNG_FU.length=0; _poolPNG_FU.push(...${JSON.stringify(_poolPNG_FU)});
 _recomputeTextures();
 _rebuildBgTex();
+_rebuildBgOverlayTex();
 window.addEventListener('resize', resize);
 resize();
 // Boot in the dashboard's simulation mode (astro params baked alongside)
@@ -6906,6 +7085,7 @@ const pool=n=>_importLit(boot, boot.indexOf('_poolPNG_'+n+'.push'), '[',']') || 
 const pools={ M:pool('M'), F:pool('F'), MU:pool('MU'), FU:pool('FU') };
 const shared=_importConst(boot,'_customBoidPNG'); // undefined when the export had none
 const bgImg=_importConst(boot,'_bgImagePNG');     // undefined when the export had no background image
+const bgOv =_importConst(boot,'_bgOverlayPNG');
 const comp=_importLit(boot, boot.search(/window\.__COMP\s*=/), '{','}');
 
 const nImg=pools.M.length+pools.F.length+pools.MU.length+pools.FU.length;
@@ -6913,6 +7093,7 @@ const bits=[Object.keys(s.inputs).length+' controls, '+Object.keys(s.toggles||{}
 if(nImg) bits.push(nImg+' images ('+pools.M.length+'M · '+pools.F.length+'F · '+pools.MU.length+'M↑ · '+pools.FU.length+'F↑)');
 if(shared) bits.push('shared body image');
 if(bgImg) bits.push('background image');
+if(bgOv) bits.push('overlay image');
 if(comp && Array.isArray(comp.events)) bits.push(comp.events.length+' composition events');
 if(!confirm('Import from "'+fname+'":\n\n  · '+bits.join('\n  · ')+
             '\n\nThis REPLACES the current settings and image pools.')){ _compStatus('import cancelled'); return; }
@@ -6938,6 +7119,9 @@ const sn=document.getElementById('bodyImgName'); if(sn) sn.textContent=shared?'i
 applyBgImagePNG(bgImg||null, null); // no separate lean variant survives an export round-trip
 if(RUN_MODE==='dash') _tankSend({boid:1,t:'bgimg',data:bgImg||null});
 const bn=document.getElementById('bgImgName'); if(bn) bn.textContent=bgImg?'imported':'none';
+applyBgOverlayPNG(bgOv||null, null);
+if(RUN_MODE==='dash') _tankSend({boid:1,t:'bgoverlay',data:bgOv||null});
+const on=document.getElementById('bgOverlayName'); if(on) on.textContent=bgOv?'imported':'none';
 
 _applySettings(s);                       // restores SIM_MODE first, then drives every control
 if(comp && Array.isArray(comp.events)) _composition=comp;
@@ -7549,6 +7733,8 @@ window.addEventListener('message', e => {
     clearBodyPool(m.slot, m.upright);
   } else if(m.t==='bgimg'){
     applyBgImagePNG(m.data, m.data); // data URL, or null to clear
+  } else if(m.t==='bgoverlay'){
+    applyBgOverlayPNG(m.data, m.data);
   }
 });
 }
