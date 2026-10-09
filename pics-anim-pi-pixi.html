@@ -1719,9 +1719,9 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="astroSettleVal">0.020</span>
 </div>
 <div class="ctrl-row">
-<label title="Integration substeps per frame — higher advances sim time faster / more accurately.">sim speed</label>
-<input type="range" id="astroStepSlider" min="1" max="8" value="1" step="1">
-<span class="ctrl-val" id="astroStepVal">1</span>
+<label title="How fast simulated time runs, as a multiple of the old 'speed 1' (log scale: 0.06× up to 12×). Slow it right down to watch clouds collapse and bodies accrete over minutes instead of seconds.">sim speed</label>
+<input type="range" id="astroRateSlider" min="0" max="36" value="20" step="1">
+<span class="ctrl-val" id="astroRateVal">×1.0</span>
 </div>
 <div class="ctrl-row">
 <label title="Collisions stick only below this fraction of the mutual escape speed; harder hits bounce inelastically. 1.0 = the physical criterion, lower = slower accretion, 0 = nothing ever sticks (bouncing gravel).">stickiness</label>
@@ -2140,7 +2140,8 @@ const _bodySprites = []; // reusable Sprite pool — one per visible boid per fr
 let _spriteCount = 0;    // sprites used this frame; reset at start of each frame
 // predators share the boid body pool (_bodySprites) so they interleave by depth
 const _drawList = []; // reused each frame: boids + live predators, depth-sorted
-let _ovZsmooth, _ovZcommit; // smoothed + hysteresis-committed depth cut for the overlay image
+let _ovBox = null; // bounding box of the overlay's non-transparent pixels, in 0..1 UV (null = use the whole image)
+let _ovRect = {on:false, x:0, y:0, hw:0, hh:0, c:1, s:0, ox:0, oy:0}; // the overlay image's footprint on screen (centre, half-size, tilt cos/sin) — set by _layoutBgOverlayMesh, read by _ovGuardZ
 let _maxVisR = 0;      // largest boid rendered half-extent this frame (for the depth-layering neighbour query);
                        // placeholder value — RADIUS is defined later, and this is reset every draw frame anyway
 const _gfx = {}; // named Graphics layers, populated after app is created
@@ -2220,7 +2221,8 @@ let _ASTRO_G        = parseInt(document.getElementById('astroGSlider').value);
 let _ASTRO_INERTIA  = parseInt(document.getElementById('astroInertiaSlider').value) / 100;
 let _ASTRO_SOFT     = parseInt(document.getElementById('astroSoftSlider').value);
 let _ASTRO_SPIN     = parseInt(document.getElementById('astroSpinSlider').value) / 100;
-let _ASTRO_SUBSTEPS = parseInt(document.getElementById('astroStepSlider').value);
+const _astroRateOf = v => Math.pow(2, (v-20)/5);   // slider 0..36 → 0.0625×..12×, 20 = 1× (the old fixed speed)
+let _ASTRO_RATE = _astroRateOf(parseInt(document.getElementById('astroRateSlider').value)); // simulated time per frame
 let _ASTRO_SETTLE   = parseInt(document.getElementById('astroSettleSlider').value) / 1000;
 let _ASTRO_STICK    = parseInt(document.getElementById('astroStickSlider').value) / 100;
 let _ASTRO_GROW     = parseInt(document.getElementById('astroGrowSlider').value) / 100;
@@ -2619,11 +2621,29 @@ function applyBgOverlayPNG(full, lean){
   _bgOverlayPNGLean = lean || full || null;
   _rebuildBgOverlayTex();
 }
+// Bounding box of the pixels that are actually visible (alpha > 16) — what the depth guard treats
+// as the overlay's footprint, so transparent margins don't block boids from crossing.
+function _measureOverlayBox(src){
+  const img=new Image();
+  img.onload=()=>{ try{
+    const W=Math.min(256,img.naturalWidth), H=Math.max(1,Math.round(img.naturalHeight*W/img.naturalWidth));
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0,W,H);
+    const d=g.getImageData(0,0,W,H).data;
+    let x0=W,y0=H,x1=-1,y1=-1;
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(d[(y*W+x)*4+3]>16){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    if(src!==_bgOverlayPNG) return;                       // a newer image was loaded meanwhile
+    _ovBox = x1<0 ? null : {u0:x0/W, v0:y0/H, u1:(x1+1)/W, v1:(y1+1)/H}; // fully transparent → null → whole image
+  }catch(e){ _ovBox=null; } };
+  img.src=src;
+}
 function _rebuildBgOverlayTex(){
   if(RUN_MODE === 'dash') return;
   if(!_bgOverlayMesh) return;
   const old = _bgOverlayMesh.texture;
+  _ovBox = null;
   if(_bgOverlayPNG){
+    _measureOverlayBox(_bgOverlayPNG);
     _loadPlainTex(_bgOverlayPNG, t => {
       _bgOverlayMesh.texture = t;
       if(old && old !== PIXI.Texture.EMPTY && old !== t) old.destroy(true);
@@ -2725,7 +2745,7 @@ wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v
 wire('astroInertiaSlider', 'astroInertiaVal', v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_INERTIA=v; });
 wire('astroSoftSlider',    'astroSoftVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SOFT=v; });
 wire('astroSpinSlider',    'astroSpinVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_SPIN=v; });
-wire('astroStepSlider',    'astroStepVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SUBSTEPS=v; });
+wire('astroRateSlider',    'astroRateVal',    v=>_astroRateOf(parseInt(v)), v=>{ const r=_astroRateOf(parseInt(v)); return '×'+(r>=10?r.toFixed(0):r>=1?r.toFixed(1):r.toFixed(2)); }, v=>{ _ASTRO_RATE=v; });
 wire('astroSettleSlider',  'astroSettleVal',  v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3),  v=>{ _ASTRO_SETTLE=v; });
 wire('astroStickSlider',   'astroStickVal',   v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_STICK=v; });
 wire('astroGrowSlider',    'astroGrowVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_GROW=v; });
@@ -3837,6 +3857,24 @@ if(boid.z<0){ boid.z=0; boid.vz=Math.abs(boid.vz); }
 if(boid.z>DEPTH){ boid.z=DEPTH; boid.vz=-Math.abs(boid.vz); }
 }
 
+// ── overlay depth guard ──────────────────────────────────────────────────────
+// The overlay image sits on a depth plane (BG_OVERLAY_DEPTH·DEPTH). A body may only change sides
+// of that plane while it is clear of the image on screen — i.e. its extent lies fully left/right
+// OR fully above/below the image footprint (tested in the image's own, tilt-rotated frame).
+// While it overlaps the footprint it is held on whichever side it was on: z is clamped at the
+// plane and vz bounced, so nothing ever visibly passes THROUGH the overlay.
+function _ovGuardZ(o, rad){
+if(!_ovRect.on || DEPTH<=0){ o._ovBack=undefined; return; }
+const ovD=DEPTH*BG_OVERLAY_DEPTH;
+const dx=o.x-_ovRect.x, dy=o.y-_ovRect.y;
+const lx= dx*_ovRect.c + dy*_ovRect.s - _ovRect.ox, ly=-dx*_ovRect.s + dy*_ovRect.c - _ovRect.oy; // into the overlay's frame, relative to its visible-pixel box
+const pad=rad+SPEED*2;                                                    // + a frame or two of travel, so the clamp is in place before it overlaps
+if(Math.abs(lx)>_ovRect.hw+pad || Math.abs(ly)>_ovRect.hh+pad){ o._ovBack = o.z>=ovD; return; } // clear → free to cross
+if(o._ovBack===undefined) o._ovBack = o.z>=ovD;
+if(o._ovBack){ if(o.z<ovD){ o.z=ovD; if(o.vz<0) o.vz=-o.vz*0.5; } }
+else if(o.z>=ovD-0.001){ o.z=ovD-0.001; if(o.vz>0) o.vz=-o.vz*0.5; }
+}
+
 function nearnessBehavior(boid){
 const thresholdScale = 1.0+(BOND_THRESHOLD-1)*0.24;
 
@@ -4519,6 +4557,7 @@ if(DEPTH>0){
   pred.z+=pred.vz;
   if(pred.z<0){ pred.z=0; pred.vz=Math.abs(pred.vz); }
   if(pred.z>DEPTH){ pred.z=DEPTH; pred.vz=-Math.abs(pred.vz); }
+  _ovGuardZ(pred, PREDATOR_RADIUS*zScaleOf(pred));
 } else { pred.z=0; pred.vz=0; }
 // hard bounce at edges — snap drawAngle (same as clampToBounds for boids)
 if(pred.x<PREDATOR_RADIUS){ pred.x=PREDATOR_RADIUS; pred.vx=Math.abs(pred.vx); pred.wanderAngle=Math.atan2(pred.vy,pred.vx); pred._drawAngle=pred.wanderAngle; }
@@ -4783,6 +4822,7 @@ const tex=m.texture;
 const ready = !!_bgOverlayPNG && SIM_MODE!=='astro'
            && tex && tex.baseTexture && tex.baseTexture.valid && tex.width>0;
 m.visible=ready;
+_ovRect.on=false;
 if(!ready) return;
 const cw=canvas.width, ch=canvas.height, tw=tex.width, th=tex.height;
 const over = 1 + Math.max(0,BG_RIPPLE_AMT)*1.5;
@@ -4791,6 +4831,10 @@ m.pivot.set(0.5, 0.5);
 m.scale.set(tw*s, th*s);
 m.rotation = PANEL_TILT;                           // turns with the panel, like the background
 m.position.set(cw/2 + BG_OVERLAY_X*cw, ch/2 + BG_OVERLAY_Y*ch); // pivot 0.5 → centre + user shift
+_ovRect.on=true; _ovRect.x=m.position.x; _ovRect.y=m.position.y; const _b=_ovBox||{u0:0,v0:0,u1:1,v1:1};            // visible-pixel box, in the mesh's own (unrotated) frame
+_ovRect.hw=(_b.u1-_b.u0)*tw*s/2; _ovRect.hh=(_b.v1-_b.v0)*th*s/2;
+_ovRect.ox=((_b.u0+_b.u1)/2-0.5)*tw*s; _ovRect.oy=((_b.v0+_b.v1)/2-0.5)*th*s;
+_ovRect.c=Math.cos(PANEL_TILT); _ovRect.s=Math.sin(PANEL_TILT);
 const u=m.shader.uniforms, t=simClock*_RIPPLE_RATE;
 u.uWaves=BG_RIPPLE_WAVES;
 u.uAmt  =BG_RIPPLE_SHADE;
@@ -6348,7 +6392,7 @@ function astroStep(h){
   }
   // semi-implicit Euler (symplectic-ish, stable with softening). inertia<1 adds drag →
   // overdamped collapse like the flock; inertia=1 keeps full momentum → orbits persist.
-  const dragK=(1-_ASTRO_INERTIA)*0.5;
+  const dragK=(1-_ASTRO_INERTIA)*0.5*h; // per unit sim time, so slowing the clock doesn't add drag
   // Gas settling: dissipate VERTICAL motion only. A collisionless (stellar) system conserves
   // energy, so z-oscillations never die and no disk forms — physically correct but pancake-free.
   // Gas collides and radiates that energy away while angular momentum keeps the in-plane
@@ -6389,7 +6433,7 @@ function astroMerge(){
       const dvx=bj.vx-bi.vx, dvy=bj.vy-bi.vy, dvz=bj.vz-bi.vz;
       // gentle (sub-escape) hits coalesce with probability _ASTRO_GROW per frame — a touching
       // bound pair keeps bouncing softly until it fuses, stretching the accretion timeline
-      if(dvx*dvx+dvy*dvy+dvz*dvz <= (2*G*m/mr)*s2 && Math.random()<_ASTRO_GROW){
+      if(dvx*dvx+dvy*dvy+dvz*dvz <= (2*G*m/mr)*s2 && Math.random()<_ASTRO_GROW*Math.min(1,_ASTRO_RATE)){ // coalescence per unit sim time: slow-mo must not accrete faster relative to the dynamics
         // stick: inelastic merge — conserve mass & momentum
         bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m; bi.z=(bi.z*bi.m+bj.z*bj.m)/m;
         bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m; bi.vz=(bi.vz*bi.m+bj.vz*bj.m)/m;
@@ -6491,8 +6535,10 @@ function astroTrails(){ // orbital paths — what makes spin / inertia / gravity
 
 function astroFrame(dt){
   if(_fpsEl) _fpsEl.innerHTML = '☄ ASTRO · '+boids.length+' bodies'+_sndHint();
-  const h=1.0;
-  for(let s=0;s<_ASTRO_SUBSTEPS;s++){
+  // Simulated time per frame = _ASTRO_RATE. Below 1 it is ONE shorter step; above, round(rate) steps
+  // of rate/n each (so rate 1,2,3… reproduces the old integer substeps exactly).
+  const nSteps=Math.max(1,Math.round(_ASTRO_RATE)), h=_ASTRO_RATE/nSteps;
+  for(let s=0;s<nSteps;s++){
     // adaptive substepping: keep the fastest body's motion under ~half the softening length per
     // integration, else close encounters inject spurious energy ("numerical heating") and the
     // structure boils into fast noise. Capped ×4 to bound the O(N²) cost per frame.
@@ -6662,7 +6708,7 @@ if(!boid.dying){
 // frame (velocity, cohesion, separation, wander, walls) can be damped toward it —
 // real tissue is near-stationary, but this is a constant-speed engine, so pin the cells.
 const _mx0=boid.x, _my0=boid.y;
-avoidWalls(boid); wander(boid); updateZ(boid); nearnessBehavior(boid); bondAttraction(boid);
+avoidWalls(boid); wander(boid); updateZ(boid); _ovGuardZ(boid,(boid.isSingle?RADIUS*0.7:RADIUS)*zScaleOf(boid)*_imgScaleShown); nearnessBehavior(boid); bondAttraction(boid);
 if(DIFF_MODE) updateDifferentiation(boid,dt);
 if(NO_OVERLAP || DEPTH>0) separateBoid(boid); // 3D → non-interpenetration is intrinsic; 2D → only when "no overlap" is on
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
@@ -6757,18 +6803,14 @@ for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); }
 // overlay image sits at a mid-depth (BG_OVERLAY_DEPTH·DEPTH). _drawList is far→first, and each drawn
 // body took zIndex = its position in that order, so count the bodies farther than the overlay and
 // slot it in between. DEPTH<=0 → no meaningful z, put it behind every body.
-// The raw count jitters ±1 when a boid hovers right on the cut plane (z wobbles across it every
-// frame → the boid pops in/out). So smooth the count and only COMMIT a new integer cut when the
-// smoothed value clears a hysteresis band — a decisive pass still flips it once, a jitter doesn't.
+// The cut is the RAW count: _ovGuardZ keeps any body that overlaps the image on its side of the
+// plane, so the only bodies that can flip the count are clear of the image and the flip is invisible.
+// (The old smoothing/hysteresis lagged the zIndex behind the real sides — the very pop-through.)
 if(_bgOverlayMesh && _bgOverlayMesh.visible){
   const _ovD = DEPTH>0 ? DEPTH*BG_OVERLAY_DEPTH : Infinity;
   let _ovTarget=0; for(const it of _drawList){ if(it.z>=_ovD) _ovTarget++; else break; }
-  if(_ovZcommit===undefined){ _ovZsmooth=_ovTarget; _ovZcommit=_ovTarget; }
-  _ovZsmooth += (_ovTarget-_ovZsmooth)*0.12;
-  if(_ovZsmooth > _ovZcommit+0.7) _ovZcommit++;
-  else if(_ovZsmooth < _ovZcommit-0.7) _ovZcommit--;
-  _bgOverlayMesh.zIndex = _ovZcommit - 0.5;
-} else { _ovZcommit=undefined; }
+  _bgOverlayMesh.zIndex = _ovTarget - 0.5;
+}
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
@@ -6957,7 +6999,7 @@ _ASTRO_G        = ${_ASTRO_G};
 _ASTRO_INERTIA  = ${_ASTRO_INERTIA};
 _ASTRO_SOFT     = ${_ASTRO_SOFT};
 _ASTRO_SPIN     = ${_ASTRO_SPIN};
-_ASTRO_SUBSTEPS = ${_ASTRO_SUBSTEPS};
+_ASTRO_RATE = ${_ASTRO_RATE};
 _ASTRO_SETTLE   = ${_ASTRO_SETTLE};
 _ASTRO_STICK    = ${_ASTRO_STICK};
 _ASTRO_GROW     = ${_ASTRO_GROW};
