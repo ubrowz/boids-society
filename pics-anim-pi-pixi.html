@@ -1314,6 +1314,8 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 #ui.astro-mode #dbHead{box-shadow:inset 0 -2px 0 #5b4bd6;}
 #astroMergeBtn{padding:3px 10px;border-radius:6px;border:1px solid #444;background:#333;color:#aaa;cursor:pointer;font:700 11px ui-monospace,Menlo,monospace;}
 #astroMergeBtn.on{background:#124a33;color:#bfead4;border-color:#2a7d55;}
+#astroZoomBtn{padding:3px 10px;border-radius:6px;border:1px solid #444;background:#333;color:#aaa;cursor:pointer;font:700 11px ui-monospace,Menlo,monospace;}
+#astroZoomBtn.on{background:#124a33;color:#bfead4;border-color:#2a7d55;}
 </style>
 <div id="ui">
 <header id="dbHead">
@@ -1736,6 +1738,10 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <div class="ctrl-row" style="gap:8px;">
 <label>accretion</label>
 <button id="astroMergeBtn" class="on" title="Merge bodies that collide (conserving mass & momentum) so they grow — planets/stars by accretion.">accretion: on</button>
+</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>auto-zoom</label>
+<button id="astroZoomBtn" class="on" title="The camera keeps the cluster framed by zooming in and out as it collapses or spreads. Off = the zoom freezes where it is (the view still follows the centre of mass).">auto-zoom: on</button>
 </div>
 </section>
 
@@ -2227,6 +2233,7 @@ let _ASTRO_SETTLE   = parseInt(document.getElementById('astroSettleSlider').valu
 let _ASTRO_STICK    = parseInt(document.getElementById('astroStickSlider').value) / 100;
 let _ASTRO_GROW     = parseInt(document.getElementById('astroGrowSlider').value) / 100;
 let _ASTRO_MERGE    = true;
+let _ASTRO_AUTOZOOM = true;   // false → astroView stops adjusting the zoom
 let pyramidRefreshInterval = 3;
 let lastPyramidUpdate = -Infinity;
 
@@ -2783,6 +2790,7 @@ document.getElementById('astroModeBtn').addEventListener('click',()=>{
   if(RUN_MODE==='dash'){ if(_tankAlive()) _tankSend({boid:1,t:'mode',mode:SIM_MODE}); }
   else { if(SIM_MODE==='astro') astroSeed(); else startSim(); }
 });
+document.getElementById('astroZoomBtn').addEventListener('click',function(){ _ASTRO_AUTOZOOM=!_ASTRO_AUTOZOOM; this.textContent='auto-zoom: '+(_ASTRO_AUTOZOOM?'on':'off'); this.classList.toggle('on',_ASTRO_AUTOZOOM); });
 document.getElementById('astroMergeBtn').addEventListener('click',function(){ _ASTRO_MERGE=!_ASTRO_MERGE; this.textContent='accretion: '+(_ASTRO_MERGE?'on':'off'); this.classList.toggle('on',_ASTRO_MERGE); });
 _applySimMode();
 wire('depthSlider', 'depthVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ DEPTH=v; });
@@ -6126,7 +6134,7 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 return { app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE, HUE_LOCK, RIPPLE_STYLE } };
+  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE, ASTRO_AUTOZOOM:_ASTRO_AUTOZOOM, HUE_LOCK, RIPPLE_STYLE } };
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
@@ -6155,6 +6163,7 @@ if(t.immigrationEnabled!==undefined)clickTo(!!immigrationEnabled!== !!t.immigrat
 if(t.HUNT_MODE!==undefined)         clickTo(t.HUNT_MODE!==HUNT_MODE,'huntModeBtn');
 if(t.HUE_LOCK!==undefined)          clickTo(!!HUE_LOCK         !== !!t.HUE_LOCK,          'hueLockBtn');
 if(t.ASTRO_MERGE!==undefined)       clickTo(!!_ASTRO_MERGE         !== !!t.ASTRO_MERGE,   'astroMergeBtn');
+if(t.ASTRO_AUTOZOOM!==undefined)    clickTo(!!_ASTRO_AUTOZOOM     !== !!t.ASTRO_AUTOZOOM, 'astroZoomBtn');
 if(t.EVENT_FX!==undefined){ let n=((EVENT_FX-t.EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); } // bondLinesBtn cycles BACKWARD (EVENT_FX = (x+2)%3), so click count = (current − target) mod 3
 if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
 if(t.RIPPLE_STYLE!==undefined){ let n=((t.RIPPLE_STYLE-RIPPLE_STYLE)%2+2)%2; for(let i=0;i<n;i++) document.getElementById('rippleStyleBtn').click(); }
@@ -6480,12 +6489,13 @@ function astroView(){ // auto-framing: track CoM + frame the HALF-MASS core, so 
   // pump nervously in and out; the envelope settles on the widest recent extent instead.
   _astroFrameR = _astroSnap ? needR : Math.max(needR, _astroFrameR*0.996);
   const tZoom=Math.max(0.05, Math.min(4, 0.40*Math.min(canvas.width,canvas.height)/_astroFrameR));
-  if(_astroSnap){ _astroCx=cx; _astroCy=cy; _astroZoom=tZoom; _astroSnap=false; }
-  else { _astroCx+=(cx-_astroCx)*0.10; _astroCy+=(cy-_astroCy)*0.10; _astroZoom+=(tZoom-_astroZoom)*0.05; }
+  if(_astroSnap){ _astroCx=cx; _astroCy=cy; _astroZoom=tZoom; _astroSnap=false; } // (a fresh seed always frames itself, even with auto-zoom off)
+  else { _astroCx+=(cx-_astroCx)*0.10; _astroCy+=(cy-_astroCy)*0.10; if(_ASTRO_AUTOZOOM) _astroZoom+=(tZoom-_astroZoom)*0.05; }
 }
 
 function astroDraw(){
   const g=_gfx.boids, cw=canvas.width/2, ch=canvas.height/2, Z=_astroZoom;
+  const tc=Math.cos(PANEL_TILT), ts=Math.sin(PANEL_TILT); // panel tilt turns the whole field about the canvas centre (same sense as the flock's background)
   // Positions use the true zoom Z; SIZES use √Z — the cartographer's compromise. Bodies stay
   // visible when the camera pulls far out and don't balloon when it dives in; distances remain
   // faithful while rendered dot size is semi-symbolic (like star markers in astronomy software).
@@ -6494,7 +6504,8 @@ function astroDraw(){
   const list = DEPTH>0 ? [...boids].sort((a,b)=>b.z-a.z) : boids;
   for(const b of list){
     const zsp=_astroPersp(b); // CoM-relative, clamped; 1 at depth 0
-    const sx=cw+(b.x-_astroCx)*Z, sy=ch+(b.y-_astroCy)*Z;
+    const px=(b.x-_astroCx)*Z, py=(b.y-_astroCy)*Z;
+    const sx=cw+px*tc-py*ts, sy=ch+px*ts+py*tc;
     let scale=(RADIUS/_bodyScale*IMG_SCALE)*Math.cbrt(b.m)*Zs*zsp;
     // Astro ignores the per-sex pools (bodies have no meaningful sex; the pool rows are hidden
     // in this mode, and fish loaded for the flock shouldn't leak in). User-LOADED shared image
@@ -6504,7 +6515,7 @@ function astroDraw(){
     const spr=_getBodySprite(_spriteCount++);
     if(spr.texture!==bt) spr.texture=bt;
     spr.visible=true; spr.x=sx; spr.y=sy;
-    spr.rotation=UPRIGHT_SPRITE?PANEL_TILT:Math.atan2(b.vy,b.vx);
+    spr.rotation=UPRIGHT_SPRITE?PANEL_TILT:Math.atan2(b.vy,b.vx)+PANEL_TILT;
     spr.tint=_drawHex(b, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // as in the flock branch
     spr.alpha=1;
     spr.scale.set(scale);
@@ -6520,14 +6531,16 @@ function astroTrails(){ // orbital paths — what makes spin / inertia / gravity
   const g=_gfx.trails; g.clear();
   if(!SHOW_DETAILS) return;
   const cw=canvas.width/2, ch=canvas.height/2, Z=_astroZoom, Zs=Math.sqrt(Z);
+  const tc=Math.cos(PANEL_TILT), ts=Math.sin(PANEL_TILT);
   for(const b of boids){
     const n=b.trail.length; if(n<2) continue;
     const col=_drawHex(b,50), zsb=_astroPersp(b); // trail width follows the body's depth (1 at depth 0)
     for(let i=1;i<n;i++){
       const t=Math.pow(i/(n-1),0.5);
       g.lineStyle(Math.max((t*2.4+0.5)*Zs*zsb,0.7), col, t*0.85*TRAIL_OPACITY); // width uses √Z like body size, with a visibility floor
-      g.moveTo(cw+(b.trail[i-1].x-_astroCx)*Z, ch+(b.trail[i-1].y-_astroCy)*Z);
-      g.lineTo(cw+(b.trail[i].x-_astroCx)*Z,   ch+(b.trail[i].y-_astroCy)*Z);
+      const ax=(b.trail[i-1].x-_astroCx)*Z, ay=(b.trail[i-1].y-_astroCy)*Z, bx=(b.trail[i].x-_astroCx)*Z, by=(b.trail[i].y-_astroCy)*Z;
+      g.moveTo(cw+ax*tc-ay*ts, ch+ax*ts+ay*tc);
+      g.lineTo(cw+bx*tc-by*ts, ch+bx*ts+by*tc);
     }
   }
   g.lineStyle(0);
@@ -7004,6 +7017,7 @@ _ASTRO_SETTLE   = ${_ASTRO_SETTLE};
 _ASTRO_STICK    = ${_ASTRO_STICK};
 _ASTRO_GROW     = ${_ASTRO_GROW};
 _ASTRO_MERGE    = ${_ASTRO_MERGE};
+_ASTRO_AUTOZOOM = ${_ASTRO_AUTOZOOM};
 _applySimMode();
 SOUND_ON        = ${SOUND_ON};
 _SND_DRONE      = ${_SND_DRONE};
@@ -7111,7 +7125,7 @@ const toggles={};
 const g=(n,k)=>{ const v=_importConst(boot,n); if(v!==undefined) toggles[k||n]=v; };
 g('EVENT_FX'); g('AURA_MODE'); g('DIFF_MODE'); g('SHOW_COLOR'); g('SHOW_DETAILS');
 g('NO_OVERLAP'); g('DIM_INFERTILE'); g('UPRIGHT_SPRITE'); g('immigrationEnabled');
-g('HUNT_MODE'); g('SIM_MODE'); g('HUE_LOCK'); g('_ASTRO_MERGE','ASTRO_MERGE'); g('RIPPLE_STYLE');
+g('HUNT_MODE'); g('SIM_MODE'); g('HUE_LOCK'); g('_ASTRO_MERGE','ASTRO_MERGE'); g('_ASTRO_AUTOZOOM','ASTRO_AUTOZOOM'); g('RIPPLE_STYLE');
 return { app:'boid-world', v:1, inputs, toggles };
 }
 function _importApply(html, fname){
@@ -7235,7 +7249,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','soundBtn','hueLockBtn','rippleStyleBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','astroZoomBtn','soundBtn','hueLockBtn','rippleStyleBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
