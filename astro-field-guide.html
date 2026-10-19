@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A field guide to the aquarium’s second universe: gravitational N-body physics — collapse, orbits, disk formation, accretion — grown out of a flocking simulation.">
+<meta name="description" content="A field guide to Astro, a gravitational N-body sandbox: collapse, orbits, disk formation, accretion — a standalone app that grew out of a flocking simulation.">
 <link rel="canonical" href="https://ubrowz.github.io/boids-society/astro-field-guide.html">
 <!-- Three boids on one heading; palette shared with threeline and 42. -->
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -15,7 +15,7 @@
 <meta property="og:site_name" content="Boids Aquarium">
 <meta property="og:url" content="https://ubrowz.github.io/boids-society/astro-field-guide.html">
 <meta property="og:title" content="Astro World — Field Guide">
-<meta property="og:description" content="A field guide to the aquarium’s second universe: gravitational N-body physics — collapse, orbits, disk formation, accretion — grown out of a flocking simulation.">
+<meta property="og:description" content="A field guide to Astro, a gravitational N-body sandbox: collapse, orbits, disk formation, accretion — a standalone app that grew out of a flocking simulation.">
 <meta property="og:image" content="https://ubrowz.github.io/boids-society/og-preview.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -159,9 +159,9 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
 <header class="hero">
   <canvas id="space" aria-label="Live miniature gravitational simulation: a tilted rotating cloud of coloured bodies flattening into a disk"></canvas>
   <div class="hero-text"><div class="hero-inner">
-    <p class="eyebrow">pics-anim-pi-pixi.html · a field guide · volume two</p>
+    <p class="eyebrow">astro.html · a field guide · volume two</p>
     <h1>The Astro World</h1>
-    <p class="lede">The same tank, a different universe. Press <b>✦ Astro</b> and the society is replaced by
+    <p class="lede">A separate app with its own dashboard. Open <b>astro.html</b> and a cloud of bodies obeys
     softened Newtonian gravity: a spinning cloud that collapses, orbits, flattens into a disk and accretes
     into planets. This page maps the physics and the knobs.</p>
   </div></div>
@@ -183,7 +183,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
     <span class="chip">force <b>G·m / (r² + ε²)</b> — softened Newton, all pairs O(N²)</span>
     <span class="chip">integration <b>semi-implicit</b>, real momentum</span>
     <span class="chip">inertia &lt; 1 adds drag → <b>orbital decay</b>, the bridge back to flock motion</span>
-    <span class="chip">society systems <b>off</b> — ☄ overlay counts bodies, never up</span>
+    <span class="chip">no breeding or disease — the body count only ever <b>falls</b></span>
   </div>
 </section>
 
@@ -205,7 +205,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
   <div class="chips">
     <span class="chip">adiabatic G: <b>v × √(G′/G)</b> on every live change</span>
     <span class="chip">adaptive substeps <b>≤ ×4</b>, step ≤ ½ ε</span>
-    <span class="chip">sim speed = base substeps per frame</span>
+    <span class="chip">sim speed = simulated time per frame</span>
   </div>
 </section>
 
@@ -282,7 +282,7 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
 <section>
   <p class="eyebrow">Watching · Recipes</p>
   <h3>Five experiments</h3>
-  <p class="note">Enter ✦ Astro and the defaults already give the pancake. From there, one knob at a time:</p>
+  <p class="note">The default scenario already gives the pancake. From there, one knob at a time:</p>
   <div class="rec">
     <div class="r"><b>The pancake (default).</b> <span class="mono2">depth 400 · spin 0.8 · settle 0.02 · inertia 1.0</span> —
     a 3D cloud collapses, wobbles, and thins into a rotating inclined band with long orbit trails on black.</div>
@@ -301,17 +301,17 @@ footer .mono2{font:400 12px 'IBM Plex Mono',monospace}
     <span class="chip">softening <b>1–40</b> · violence of close encounters</span>
     <span class="chip">spin <b>0–1.5</b> · at seed</span>
     <span class="chip">settle <b>0–0.10</b> · stars ↔ gas</span>
-    <span class="chip">sim speed <b>1–8</b> · substeps</span>
-    <span class="chip">initial spread — reused <b>speed</b> slider · seed dispersion</span>
+    <span class="chip">sim speed <b>×0.06–×12</b> · log time scale</span>
+    <span class="chip">initial spread · seed dispersion</span>
   </div>
 </section>
 
 </main>
 
 <footer>
-  <span class="mono2">Astro World · volume two of the field guide · the simulation lives in pics-anim-pi-pixi.html</span><br><br>
+  <span class="mono2">Astro World · volume two of the field guide · the simulation lives in astro.html</span><br><br>
   <a href="boid-world-field-guide.html">← Volume one: The Boid World</a> ·
-  <a href="pics-anim-pi-pixi.html">Open the dashboard</a> ·
+  <a href="astro.html">Open Astro</a> ·
   <a href="index.html">Home</a>
 </footer>
 
