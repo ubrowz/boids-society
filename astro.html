@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Astro — a gravitational sandbox</title>
+<meta name="description" content="Hundreds of bodies, one rule: gravity. Watch a dust cloud collapse, spin into a disk and accrete into planets and stars. Self-contained, runs offline.">
+<meta name="theme-color" content="#030810">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#030810; --panel:#0a0d1c; --panel2:#10142b; --line:#2a2350; --ink:#e6e9fb; --muted:#8f96c0;
+  --accent:#8a7bff; --accent2:#5b4bd6; --good:#2a7d55; --goodbg:#124a33;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
+  font:13px/1.35 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+#stage{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+#hud{position:fixed;left:12px;top:10px;font:12px ui-monospace,Menlo,monospace;color:#9aa1d6;pointer-events:none;
+  text-shadow:0 1px 3px #000;white-space:pre-line}
+#idle{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:var(--muted);pointer-events:none}
+#ui{position:fixed;top:0;right:0;bottom:0;width:320px;max-width:92vw;background:linear-gradient(180deg,var(--panel),#070913);
+  border-left:1px solid var(--line);display:flex;flex-direction:column;transition:transform .22s ease;z-index:5}
+#ui.hidden{transform:translateX(100%)}
+#tab{position:fixed;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);
+  background:rgba(10,13,28,.85);color:var(--ink);font-size:18px;cursor:pointer;display:none}
+#ui.hidden ~ #tab{display:block}
+header{padding:12px 14px 10px;border-bottom:1px solid var(--line);box-shadow:inset 0 -2px 0 var(--accent2)}
+header h1{margin:0;font-size:16px;letter-spacing:.3px}
+header h1 b{color:var(--accent)}
+header .sub{color:var(--muted);font-size:11px;margin-top:2px}
+#actions{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line)}
+button,select{font:inherit}
+.btn{padding:5px 10px;border-radius:7px;border:1px solid #3a3d63;background:#1a1d38;color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent);color:#fff}
+.btn.on{background:var(--goodbg);border-color:var(--good);color:#bfead4}
+.btn.primary{background:var(--accent2);border-color:var(--accent);color:#fff}
+#scroll{flex:1;overflow:auto;padding:4px 0 24px;-webkit-overflow-scrolling:touch}
+section{padding:6px 14px 4px;border-bottom:1px solid #161a33}
+section h2{margin:8px 0 6px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);font-weight:700}
+.row{display:grid;grid-template-columns:104px 1fr 54px;align-items:center;gap:8px;margin:5px 0}
+.row label{color:#c3c8ea;cursor:help}
+.row .val{text-align:right;font:11px ui-monospace,Menlo,monospace;color:var(--muted)}
+.row.wide{grid-template-columns:104px 1fr}
+.row input[type=range]{width:100%;accent-color:var(--accent)}
+.row input[type=color]{width:36px;height:24px;border:1px solid #3a3d63;background:none;padding:0;border-radius:5px}
+.row select{background:#1a1d38;color:var(--ink);border:1px solid #3a3d63;border-radius:6px;padding:3px 6px;width:100%}
+.note{color:var(--muted);font-size:11px;margin:4px 0 8px}
+.flex{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.reseed::after{content:" ↻";color:#6b6fa3;font-size:10px}
+kbd{background:#1a1d38;border:1px solid #3a3d63;border-radius:4px;padding:0 5px;font:11px ui-monospace,Menlo,monospace}
+a{color:var(--accent)}
+@media (max-width:640px){#ui{width:86vw}}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="hud"></div>
+<div id="idle">Press ↻ to start</div>
+
+<aside id="ui">
+  <header>
+    <h1><b>✦ Astro</b> — gravitational sandbox</h1>
+    <div class="sub">N-body gravity · accretion · self-contained &amp; offline</div>
+  </header>
+  <div id="actions">
+    <button class="btn primary" id="playBtn" title="Pause / resume  [space]">❚❚</button>
+    <button class="btn" id="seedBtn" title="Re-seed the cloud with the current settings  [R]">↻ restart</button>
+    <button class="btn" id="soundBtn" title="Sound on / off">🔇</button>
+    <button class="btn" id="saveBtn" title="Save all settings to a file">💾</button>
+    <button class="btn" id="loadBtn" title="Load settings from a file">📂</button>
+    <button class="btn" id="fsBtn" title="Fullscreen  [F]">⛶</button>
+    <button class="btn" id="hideBtn" title="Hide this panel  [H]">✕</button>
+    <input type="file" id="loadFile" accept="application/json,.json" style="display:none">
+  </div>
+  <div id="scroll"></div>
+</aside>
+<button id="tab" title="Show the dashboard  [H]">☰</button>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// ENGINE — DOM-free. World units are CSS pixels. Everything the engine needs
+// comes in through the P (parameters) and T (toggles) objects.
+// ════════════════════════════════════════════════════════════════════════════
+// ===ENGINE===
+const RADIUS = 20, BODY_SCALE = 13, Z_FOCAL = 600, MAX_TRAIL = 300;
+
+const P = {            // numeric parameters (slider values; derived values via the helpers below)
+  pop:700, spread:9, G:100, inertia:100, soft:8, spin:80, settle:20, rate:12,
+  stick:100, grow:10, depth:400, tilt:0, size:0.1,
+  trailLen:150, trailOp:40, tintL:50, depthLight:30, depthHaze:60,
+  bgAlpha:100, volume:60, mixDrone:60, mixChime:70, mixThud:50
+};
+const T = { merge:true, autozoom:true, color:true, details:true, trails:true };
+let PALETTE = 'rainbow';
+
+const G_EFF   = () => P.G * 0.03;
+const RATE    = () => Math.pow(2, (P.rate - 20) / 5);   // slider 0..36 → ×0.06 .. ×12, 20 = ×1
+const SOFT    = () => P.soft;
+const DEPTH   = () => P.depth;
+
+const W = { w:800, h:600 };                              // world/canvas size in CSS px (set by the shell)
+const state = {
+  bodies:[], zoom:1, cx:0, cy:0, cz:0, rh:30, frameR:0, snap:true,
+  axis:{x:0,y:0,z:1}, simTime:0, mergesTotal:0,
+  events:[]                                              // {k:'merge',m} | {k:'bounce',v} — drained by the sound module
+};
+
+function gauss(mu, sd){ let u=0, v=0; while(u===0) u=Math.random(); while(v===0) v=Math.random();
+  return mu + sd * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v); }
+
+function pickColour(){
+  const r = Math.random();
+  switch(PALETTE){
+    case 'stars':  return { hue: r < .5 ? 20 + r*60 : (r < .8 ? 200 + r*40 : 45 + r*20), sat: .55 + Math.random()*.35 };
+    case 'ocean':  return { hue: 170 + r*80, sat: .55 + Math.random()*.35 };
+    case 'ember':  return { hue: 0 + r*50,   sat: .65 + Math.random()*.3 };
+    case 'mono':   return { hue: 235,        sat: .12 + Math.random()*.1 };
+    default:       return { hue: r*360,      sat: .60 + Math.random()*.30 };
+  }
+}
+
+// physical (merge) radius = the DRAWN ball's world radius, so what visibly touches is what merges
+function radiusPx(b){ return 36 * (RADIUS / BODY_SCALE) * P.size * Math.cbrt(b.m); }
+
+function newBody(x, y){
+  const c = pickColour();
+  return { x, y, z:0, vx:0, vy:0, vz:0, ax:0, ay:0, az:0, m:1, hue:c.hue, sat:c.sat,
+           tx:new Float32Array(MAX_TRAIL), ty:new Float32Array(MAX_TRAIL), th:0, tn:0 };
+}
+function trailPush(b){ b.tx[b.th] = b.x; b.ty[b.th] = b.y; b.th = (b.th + 1) % MAX_TRAIL; if(b.tn < MAX_TRAIL) b.tn++; }
+
+function seed(){
+  const bodies = [];
+  const cx = W.w/2, cy = W.h/2;
+  const R = Math.min(W.w, W.h) * 0.30;
+  const N = Math.max(2, P.pop|0);
+  const baseV = Math.sqrt(G_EFF() * N / Math.max(R, 1));   // ≈ circular speed at the cloud edge
+  const disp  = P.spread * 0.0675;                         // random velocity dispersion
+  const D = DEPTH();
+  // A disk whose spin axis points at the viewer forms face-on — invisible. With depth on, tilt the
+  // axis 65° from the line of sight so the collapse reads as a thin band.
+  const tilt = D > 0 ? 65 * Math.PI / 180 : 0;
+  state.axis = { x:0, y:Math.sin(tilt), z:Math.cos(tilt) };
+  const zHalf = D > 0 ? Math.min(R, D/2) : 0;
+  const spin = P.spin / 100;
+  for(let i=0;i<N;i++){
+    let px, py, pz;
+    do{ px=Math.random()*2-1; py=Math.random()*2-1; pz=Math.random()*2-1; }while(px*px+py*py+pz*pz>1);
+    px*=R; py*=R; pz*=zHalf;
+    const b = newBody(cx+px, cy+py);
+    b.z = D/2 + pz;
+    const nx=state.axis.x, ny=state.axis.y, nz=state.axis.z;
+    let tx=ny*pz-nz*py, ty=nz*px-nx*pz, tz=nx*py-ny*px;           // tangent = n × p
+    const tl = Math.hypot(tx,ty,tz) || 1; tx/=tl; ty/=tl; tz/=tl;
+    b.vx = tx*baseV*spin + gauss(0,disp);
+    b.vy = ty*baseV*spin + gauss(0,disp);
+    b.vz = D > 0 ? (tz*baseV*spin + gauss(0,disp)) : 0;
+    bodies.push(b);
+  }
+  let M=0, mx=0, my=0, mz=0;                                      // zero net momentum — no drift off-frame
+  for(const b of bodies){ M+=b.m; mx+=b.m*b.vx; my+=b.m*b.vy; mz+=b.m*b.vz; }
+  if(M>0) for(const b of bodies){ b.vx-=mx/M; b.vy-=my/M; b.vz-=mz/M; }
+  state.bodies = bodies; state.snap = true; state.simTime = 0; state.mergesTotal = 0; state.events.length = 0;
+  state.frameR = 0;
+}
+
+function step(h){
+  const bs = state.bodies, n = bs.length, G = G_EFF(), e2 = SOFT()*SOFT();
+  for(let i=0;i<n;i++){ const b=bs[i]; b.ax=0; b.ay=0; b.az=0; }
+  for(let i=0;i<n;i++){ const bi=bs[i];
+    for(let j=i+1;j<n;j++){ const bj=bs[j];
+      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z;
+      const r2=dx*dx+dy*dy+dz*dz+e2, s=G/(r2*Math.sqrt(r2));       // softened 1/r²
+      bi.ax+=s*bj.m*dx; bi.ay+=s*bj.m*dy; bi.az+=s*bj.m*dz;
+      bj.ax-=s*bi.m*dx; bj.ay-=s*bi.m*dy; bj.az-=s*bi.m*dz;
+    }
+  }
+  // inertia<1 adds drag (overdamped collapse); inertia=1 keeps full momentum so orbits persist.
+  const dragK = (1 - P.inertia/100) * 0.5 * h;                      // per unit sim time
+  // gas settling: damp velocity along the spin axis only → in-plane rotation survives, the cloud flattens
+  const settleK = DEPTH() > 0 ? (P.settle/1000) * h : 0;
+  const ax_ = state.axis;
+  for(let i=0;i<n;i++){ const b=bs[i];
+    b.vx+=b.ax*h; b.vy+=b.ay*h; b.vz+=b.az*h;
+    if(dragK>0){ b.vx-=b.vx*dragK; b.vy-=b.vy*dragK; b.vz-=b.vz*dragK; }
+    if(settleK>0){ const vn=b.vx*ax_.x+b.vy*ax_.y+b.vz*ax_.z;
+      b.vx-=vn*settleK*ax_.x; b.vy-=vn*settleK*ax_.y; b.vz-=vn*settleK*ax_.z; }
+    b.x+=b.vx*h; b.y+=b.vy*h; b.z+=b.vz*h;
+  }
+}
+
+function merge(){
+  const bs = state.bodies, n = bs.length; if(n<2) return;
+  // Velocity-gated sticking: merge only below stick × mutual escape speed √(2Gm/r); harder hits bounce
+  // inelastically (e = 0.4). Hot early disks resist clumping; each bounce cools them; heavy bodies
+  // capture more readily.
+  const G = G_EFF(), s2 = (P.stick/100)*(P.stick/100), grow = (P.grow/100) * Math.min(1, RATE());
+  // compact grains: small bodies collide at a fraction of their drawn radius, growing back to full for giants
+  const mrOf = b => { const f = Math.min(1, 0.35 + 0.22*(Math.cbrt(b.m)-1)); return radiusPx(b) * f; };
+  const dead = new Uint8Array(n); let any = false;
+  for(let i=0;i<n;i++){ if(dead[i]) continue; const bi=bs[i];
+    for(let j=i+1;j<n;j++){ if(dead[j]) continue; const bj=bs[j];
+      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z, mr=mrOf(bi)+mrOf(bj);
+      const d2=dx*dx+dy*dy+dz*dz;
+      if(d2 >= mr*mr) continue;
+      const m = bi.m + bj.m;
+      const dvx=bj.vx-bi.vx, dvy=bj.vy-bi.vy, dvz=bj.vz-bi.vz;
+      const v2 = dvx*dvx+dvy*dvy+dvz*dvz;
+      if(v2 <= (2*G*m/mr)*s2 && Math.random() < grow){
+        // stick — conserve mass and momentum; the heavier body keeps its colour
+        const keep = bi.m >= bj.m ? bi : bj;
+        bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m; bi.z=(bi.z*bi.m+bj.z*bj.m)/m;
+        bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m; bi.vz=(bi.vz*bi.m+bj.vz*bj.m)/m;
+        bi.hue = keep.hue; bi.sat = keep.sat;
+        bi.m = m; dead[j] = 1; any = true; state.mergesTotal++;
+        if(state.events.length < 24) state.events.push({k:'merge', m});
+      } else {
+        // bounce — separate along the line of centres, reflect the closing speed with restitution 0.4
+        const d=Math.sqrt(d2)||1e-6, nx=dx/d, ny=dy/d, nz=dz/d, ov=mr-d;
+        bi.x-=nx*ov*(bj.m/m); bi.y-=ny*ov*(bj.m/m); bi.z-=nz*ov*(bj.m/m);
+        bj.x+=nx*ov*(bi.m/m); bj.y+=ny*ov*(bi.m/m); bj.z+=nz*ov*(bi.m/m);
+        const vn = dvx*nx+dvy*ny+dvz*nz;
+        if(vn<0){
+          const Pj = -(1+0.4)*vn/(1/bi.m+1/bj.m);
+          bi.vx-=Pj*nx/bi.m; bi.vy-=Pj*ny/bi.m; bi.vz-=Pj*nz/bi.m;
+          bj.vx+=Pj*nx/bj.m; bj.vy+=Pj*ny/bj.m; bj.vz+=Pj*nz/bj.m;
+          if(state.events.length < 24) state.events.push({k:'bounce', v:-vn});
+        }
+      }
+    }
+  }
+  if(any) state.bodies = bs.filter((b,i)=>!dead[i]);
+}
+
+// auto-framing: track the centre of mass and frame the HALF-MASS core so ejected escapers can't drag the camera out
+function view(){
+  const bs = state.bodies;
+  let M=0, cx=0, cy=0, cz=0; for(const b of bs){ M+=b.m; cx+=b.m*b.x; cy+=b.m*b.y; cz+=b.m*b.z; }
+  if(M<=0) return; cx/=M; cy/=M; cz/=M; state.cz = cz;
+  let Rh = 30;
+  if(bs.length>1){
+    const ds = bs.map(b=>({d:Math.hypot(b.x-cx,b.y-cy,b.z-cz), m:b.m})).sort((a,b)=>a.d-b.d);
+    let acc=0; for(const e of ds){ acc+=e.m; if(acc>=M/2){ Rh=Math.max(e.d,30); break; } }
+  }
+  state.rh = Rh;
+  let needR = Rh * 2.5;
+  if(bs.length <= 12){                                  // endgame: include every survivor
+    let dmax=30; for(const b of bs){ const d=Math.hypot(b.x-cx,b.y-cy,b.z-cz); if(d>dmax) dmax=d; }
+    needR = Math.max(needR, dmax*1.15);
+  }
+  // envelope follower: widens instantly, contracts ~0.4%/frame — stops zoom pumping on eccentric orbits
+  state.frameR = state.snap ? needR : Math.max(needR, state.frameR*0.996);
+  const tZoom = Math.max(0.05, Math.min(4, 0.40*Math.min(W.w,W.h)/state.frameR));
+  if(state.snap){ state.cx=cx; state.cy=cy; state.zoom=tZoom; state.snap=false; }
+  else { state.cx+=(cx-state.cx)*0.10; state.cy+=(cy-state.cy)*0.10; if(T.autozoom) state.zoom+=(tZoom-state.zoom)*0.05; }
+}
+
+// escapers beyond 12× the half-mass radius never come back — they only waste O(N²) force work
+function cull(){
+  const bs = state.bodies;
+  if(bs.length > 16){
+    const lim = 12*state.rh;
+    state.bodies = bs.filter(b=>Math.hypot(b.x-state.cx,b.y-state.cy,b.z-state.cz) < lim);
+  } else if(bs.length > 2){                              // small N: remove only provably unbound, receding, far bodies
+    const G = G_EFF(); let M=0; for(const b of bs) M+=b.m;
+    state.bodies = bs.filter(b=>{
+      const dx=b.x-state.cx, dy=b.y-state.cy, dz=b.z-state.cz;
+      const r=Math.hypot(dx,dy,dz); if(r < Math.max(6*state.rh, 600)) return true;
+      const receding = dx*b.vx+dy*b.vy+dz*b.vz > 0;
+      const unbound = 0.5*(b.vx*b.vx+b.vy*b.vy+b.vz*b.vz) > G*(M-b.m)/r;
+      return !(receding && unbound);
+    });
+  }
+}
+
+// one simulation frame (the unit that "sim speed" scales)
+function simFrame(){
+  const rate = RATE();
+  const nSteps = Math.max(1, Math.round(rate)), h = rate / nSteps;
+  const soft = SOFT();
+  for(let s=0;s<nSteps;s++){
+    // adaptive substepping: keep the fastest body under ~½ softening length per integration or close
+    // encounters inject spurious energy ("numerical heating"). Capped ×4 to bound the O(N²) cost.
+    let v2=0; for(const b of state.bodies){ const q=b.vx*b.vx+b.vy*b.vy; if(q>v2) v2=q; }
+    const k = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(v2)*h/(soft*0.5))));
+    for(let i=0;i<k;i++) step(h/k);
+  }
+  if(T.merge) merge();
+  view();
+  cull();
+  for(const b of state.bodies) trailPush(b);
+  state.simTime += rate;
+}
+
+// CoM-relative, clamped perspective (astro has no z-walls, so the raw focal formula blows up)
+function persp(b){
+  if(DEPTH() <= 0) return 1;
+  const s = Z_FOCAL / (Z_FOCAL + (b.z - state.cz));
+  return (s <= 0 || s > 2.2) ? 2.2 : Math.max(0.25, s);
+}
+
+// adiabatic G change: rescale velocities by √(G'/G) so live sweeps preserve virial balance
+function rescaleForG(oldG, newG){
+  if(oldG > 0 && newG > 0){ const f = Math.sqrt(newG/oldG); for(const b of state.bodies){ b.vx*=f; b.vy*=f; b.vz*=f; } }
+}
+// ===/ENGINE===
+
+if(typeof module !== 'undefined') module.exports = { P, T, W, state, seed, simFrame, step, merge, view, RATE, setPalette:p=>{PALETTE=p;} };
+
+// ════════════════════════════════════════════════════════════════════════════
+// SHELL — canvas drawing, dashboard, sound, persistence (browser only)
+// ════════════════════════════════════════════════════════════════════════════
+if(typeof document !== 'undefined'){
+(function(){
+const $ = id => document.getElementById(id);
+const cv = $('stage'), ctx = cv.getContext('2d');
+let dpr = 1, running = true;
+let bodyImg = null, bgImg = null, bgColor = '#000000';
+
+function resize(){
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  W.w = window.innerWidth; W.h = window.innerHeight;
+  cv.width = Math.round(W.w*dpr); cv.height = Math.round(W.h*dpr);
+}
+window.addEventListener('resize', resize); resize();
+
+// ── colour helpers ────────────────────────────────────────────────────────────
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+function depthT(b){ const D=P.depth; return D>0 ? clamp(b.z/D, 0, 1) : 0; }       // 0 = nearest … 1 = furthest
+function lightOf(b){ return clamp(P.tintL + (P.depth>0 ? P.depthLight*(1-2*depthT(b)) : 0), 4, 96); }
+function satOf(b){ return T.color ? b.sat*100*(P.depth>0 ? 1 - (P.depthHaze/100)*depthT(b) : 1) : 0; }
+const hsl = (h,s,l) => 'hsl('+h.toFixed(0)+','+s.toFixed(0)+'%,'+l.toFixed(0)+'%)';
+
+// ── drawing ──────────────────────────────────────────────────────────────────
+function drawBackground(c, s, tcos, tsin){
+  ctx.fillStyle = bgColor; ctx.fillRect(0, 0, W.w, W.h);
+  if(bgImg && P.bgAlpha > 0){
+    const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight; if(!iw) return;
+    const grow = Math.abs(tcos) + Math.abs(tsin);                                   // cover under rotation
+    const sc = Math.max(W.w/iw, W.h/ih) * grow;
+    ctx.save(); ctx.globalAlpha = P.bgAlpha/100;
+    ctx.translate(W.w/2, W.h/2); ctx.rotate(P.tilt*Math.PI/180); ctx.scale(sc, sc);
+    ctx.drawImage(bgImg, -iw/2, -ih/2); ctx.restore();
+  }
+}
+
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const tilt = P.tilt*Math.PI/180, tc = Math.cos(tilt), ts = Math.sin(tilt);
+  drawBackground(null, null, tc, ts);
+  const bs = state.bodies; if(!bs.length) return;
+  const cw = W.w/2, ch = W.h/2, Z = state.zoom, Zs = Math.sqrt(Z);
+  const sizeK = (RADIUS/BODY_SCALE) * P.size * 36;                                  // world radius of a unit-mass ball
+  const list = P.depth>0 ? bs.slice().sort((a,b)=>b.z-a.z) : bs;                    // painter's order, far first
+
+  // trails — chunked into a few alpha/width tiers so a thousand trails stay cheap
+  if(T.trails && P.trailLen>0 && P.trailOp>0){
+    const L = Math.min(P.trailLen, MAX_TRAIL), baseA = P.trailOp/100;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for(const b of list){
+      const n = Math.min(b.tn, L); if(n<2) continue;
+      const zsb = persp(b);
+      const col = (h,a) => 'hsla('+h.toFixed(0)+','+satOf(b).toFixed(0)+'%,'+clamp(lightOf(b)+4,10,90).toFixed(0)+'%,'+a.toFixed(3)+')';
+      const first = (b.th - n + MAX_TRAIL*2) % MAX_TRAIL;
+      const CH = Math.min(4, n-1);
+      for(let c=0;c<CH;c++){
+        const i0 = Math.floor(c*(n-1)/CH), i1 = Math.floor((c+1)*(n-1)/CH);
+        const t = Math.pow(((i0+i1)/2)/(n-1), 0.5);
+        ctx.strokeStyle = col(b.hue, t*0.85*baseA);
+        ctx.lineWidth = Math.max((t*2.4+0.5)*Zs*zsb, 0.7);
+        ctx.beginPath();
+        for(let i=i0;i<=i1;i++){
+          const k = (first+i) % MAX_TRAIL;
+          const px=(b.tx[k]-state.cx)*Z, py=(b.ty[k]-state.cy)*Z;
+          const sx=cw+px*tc-py*ts, sy=ch+px*ts+py*tc;
+          if(i===i0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+
+  // glows around accreted "stars" — additive
+  if(T.details){
+    ctx.globalCompositeOperation = 'lighter';
+    for(const b of list){
+      if(b.m <= 3) continue;
+      const zsp = persp(b), px=(b.x-state.cx)*Z, py=(b.y-state.cy)*Z;
+      const sx=cw+px*tc-py*ts, sy=ch+px*ts+py*tc;
+      const gr = radiusPx(b) * 2.4 * Zs * zsp;
+      const g = ctx.createRadialGradient(sx,sy,0, sx,sy,gr);
+      const L = lightOf(b), S = satOf(b);
+      g.addColorStop(0, hsl(b.hue,S,clamp(L+10,0,90)).replace('hsl','hsla').replace(')',',0.38)'));
+      g.addColorStop(0.35, hsl(b.hue,S,L).replace('hsl','hsla').replace(')',',0.12)'));
+      g.addColorStop(1, hsl(b.hue,S,L).replace('hsl','hsla').replace(')',',0)'));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx,sy,gr,0,6.2832); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // bodies
+  for(const b of list){
+    const zsp = persp(b), px=(b.x-state.cx)*Z, py=(b.y-state.cy)*Z;
+    const sx=cw+px*tc-py*ts, sy=ch+px*ts+py*tc;
+    const r = Math.max(sizeK*Math.cbrt(b.m)*Zs*zsp, 3);                             // never below ~6 px across
+    if(sx<-r || sy<-r || sx>W.w+r || sy>W.h+r) continue;
+    if(bodyImg){
+      const ar = bodyImg.naturalWidth/Math.max(1,bodyImg.naturalHeight);
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(Math.atan2(b.vy,b.vx)+tilt);
+      ctx.globalAlpha = P.depth>0 ? clamp(0.45+0.55*zsp,0,1) : 1;
+      ctx.drawImage(bodyImg, -r*ar, -r, 2*r*ar, 2*r); ctx.restore(); ctx.globalAlpha = 1;
+      continue;
+    }
+    const L = lightOf(b), S = satOf(b);
+    if(r < 6){ ctx.fillStyle = hsl(b.hue,S,L); ctx.beginPath(); ctx.arc(sx,sy,r,0,6.2832); ctx.fill(); }
+    else {
+      const g = ctx.createRadialGradient(sx-0.32*r, sy-0.32*r, 0, sx, sy, r);        // lit sphere, highlight upper-left
+      g.addColorStop(0, hsl(b.hue,S*0.8,clamp(L+28,0,96)));
+      g.addColorStop(0.55, hsl(b.hue,S,L));
+      g.addColorStop(1, hsl(b.hue,S,clamp(L-26,4,90)));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx,sy,r,0,6.2832); ctx.fill();
+    }
+  }
+}
+
+// ── sound: drone + merge chimes + bounce thuds ──────────────────────────────
+const Snd = {
+  on:false, ctx:null, master:null, droneG:null, filt:null, osc:[], fifthG:null, lastChime:0, lastThud:0, n0:700, v0:0,
+  init(){
+    if(this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+    const a = this.ctx = new AC();
+    this.master = a.createGain(); this.master.gain.value = 0;
+    const comp = a.createDynamicsCompressor(); comp.threshold.value=-18; comp.ratio.value=4;
+    // cheap space: a short noise-burst impulse through a convolver, mixed under the dry signal
+    const len = a.sampleRate*2.2, ir = a.createBuffer(2, len, a.sampleRate);
+    for(let c=0;c<2;c++){ const d=ir.getChannelData(c); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3); }
+    const rev = a.createConvolver(); rev.buffer = ir; const revG = a.createGain(); revG.gain.value = 0.30;
+    this.bus = a.createGain(); this.bus.connect(this.master); this.bus.connect(rev); rev.connect(revG); revG.connect(this.master);
+    this.master.connect(comp); comp.connect(a.destination);
+    // drone: two detuned saws + a sub sine through a lowpass whose cutoff follows the cloud's "temperature"
+    this.filt = a.createBiquadFilter(); this.filt.type='lowpass'; this.filt.frequency.value=300; this.filt.Q.value=2;
+    this.droneG = a.createGain(); this.droneG.gain.value = 0;
+    this.filt.connect(this.droneG); this.droneG.connect(this.bus);
+    const mk = (type, mult, det) => { const o=a.createOscillator(); o.type=type; o.detune.value=det; o.frequency.value=55*mult; o.connect(this.filt); o.start(); this.osc.push({o,mult}); };
+    mk('sawtooth',1,-6); mk('sawtooth',1,7); mk('sine',0.5,0);
+    this.fifthG = a.createGain(); this.fifthG.gain.value = 0;                      // a fifth that fades in as a giant forms
+    const fo = a.createOscillator(); fo.type='triangle'; fo.frequency.value=55*1.5; fo.connect(this.fifthG); this.fifthG.connect(this.bus); fo.start();
+    this.osc.push({o:fo, mult:1.5});
+  },
+  start(){ this.init(); if(!this.ctx) return; this.ctx.resume(); this.on=true; this.setVolume(); this.n0=Math.max(2,state.bodies.length); },
+  stop(){ this.on=false; if(this.master) this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1); },
+  setVolume(){ if(this.master && this.on) this.master.gain.setTargetAtTime(P.volume/100*0.9, this.ctx.currentTime, 0.08); },
+  update(){
+    if(!this.on || !this.ctx) return;
+    const t = this.ctx.currentTime, bs = state.bodies, n = bs.length; if(!n) return;
+    let ke=0, M=0, big=0; for(const b of bs){ ke += b.m*(b.vx*b.vx+b.vy*b.vy+b.vz*b.vz); M += b.m; if(b.m>big) big=b.m; }
+    const vrms = Math.sqrt(ke/M);
+    if(!this.v0 && vrms > 0) this.v0 = vrms;
+    // pitch rises as the swarm consolidates; brightness follows the speed of the swarm
+    const prog = 1 - Math.log(Math.max(1,n))/Math.log(Math.max(2,this.n0));
+    const f = 55 * Math.pow(2, 1.6*clamp(prog,0,1));
+    for(const v of this.osc) v.o.frequency.setTargetAtTime(f*v.mult, t, 0.25);
+    this.filt.frequency.setTargetAtTime(140 + 1900*clamp(vrms/((this.v0||1)*1.4),0,1), t, 0.2);
+    this.droneG.gain.setTargetAtTime(0.16 * P.mixDrone/100, t, 0.3);
+    this.fifthG.gain.setTargetAtTime(0.14 * P.mixDrone/100 * clamp(big/M*2,0,1), t, 0.4);
+  },
+  chime(m){
+    if(!this.on || !this.ctx) return; const t=this.ctx.currentTime; if(t-this.lastChime<0.07) return; this.lastChime=t;
+    const pent=[0,2,4,7,9]; let idx = clamp(Math.round(11 - 2.4*Math.log2(Math.max(1,m))), 0, 14);
+    const semis = pent[idx%5] + 12*Math.floor(idx/5), freq = 220*Math.pow(2, semis/12);
+    const o=this.ctx.createOscillator(), g=this.ctx.createGain(); o.type='triangle'; o.frequency.value=freq;
+    const peak = 0.10*P.mixChime/100*clamp(0.5+Math.log2(m)*0.25,0.4,1.4);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+1.5);
+    o.connect(g); g.connect(this.bus); o.start(t); o.stop(t+1.6);
+  },
+  thud(v){
+    if(!this.on || !this.ctx) return; const t=this.ctx.currentTime; if(t-this.lastThud<0.09) return; this.lastThud=t;
+    const o=this.ctx.createOscillator(), g=this.ctx.createGain(); o.type='sine';
+    o.frequency.setValueAtTime(110,t); o.frequency.exponentialRampToValueAtTime(42,t+0.16);
+    const peak = 0.20*P.mixThud/100*clamp(v/((this.v0||1)*1.2),0.1,1);
+    g.gain.setValueAtTime(peak,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+    o.connect(g); g.connect(this.bus); o.start(t); o.stop(t+0.22);
+  },
+  reset(){ this.v0 = 0; this.n0 = Math.max(2, state.bodies.length); },
+  drain(){ for(const e of state.events.splice(0)) { if(e.k==='merge') this.chime(e.m); else this.thud(e.v); } }
+};
+
+// ── dashboard ────────────────────────────────────────────────────────────────
+const fmtX = v => '×'+(v>=10?v.toFixed(0):v>=1?v.toFixed(1):v.toFixed(2));
+const REG = [];   // {id, kind, ...} — drives build, save/load, presets
+function R(id, label, min, max, step, fmt, tip, opt){ REG.push(Object.assign({id,kind:'range',label,min,max,step,fmt,tip}, opt||{})); }
+const SECTIONS = [
+ {title:'Scenario', items:[
+   {kind:'presets'},
+   {kind:'note', text:'Controls marked ↻ take effect at the next restart; everything else is live.'} ]},
+ {title:'Cloud', items:[
+   ['pop','bodies',2,1500,1,v=>v,'How many bodies the cloud is seeded with.',{reseed:1}],
+   ['spread','initial spread',0,20,1,v=>v,'Random velocity dispersion of the seeded bodies — how "hot" the cloud starts.',{reseed:1}],
+   ['spin','spin',0,150,5,v=>(v/100).toFixed(2),'Rotation of the cloud as a fraction of circular speed. 0 = cold collapse; ~1 = a disk straight away.',{reseed:1}],
+   ['depth','depth',0,600,25,v=>v===0?'2D':v,'Third dimension. 0 = flat; otherwise the cloud has real depth, perspective and shading.'] ]},
+ {title:'Gravity', items:[
+   ['G','gravity',0,400,5,v=>v,'Strength of gravity. Changing it live rescales velocities so the structure stays in balance.'],
+   ['soft','softening',1,40,1,v=>v,'Softening length: the distance below which gravity stops growing. Larger = calmer close encounters.'],
+   ['inertia','inertia',0,100,1,v=>(v/100).toFixed(2),'1 = pure momentum (orbits persist). Lower adds drag so the cloud sinks together like a gas.'],
+   ['settle','settle (gas)',0,100,1,v=>(v/1000).toFixed(3),'Damps motion along the spin axis only, so the cloud flattens into a disk while keeping its rotation.'] ]},
+ {title:'Accretion', items:[
+   ['stick','stickiness',0,200,5,v=>(v/100).toFixed(2),'Collisions stick only below this fraction of the mutual escape speed; harder hits bounce. 0 = nothing sticks.'],
+   ['grow','growth',1,100,1,v=>(v/100).toFixed(2),'Chance per frame that a touching, bound pair actually fuses. Lower = slower growth, longer-lived disks.'],
+   {kind:'toggle', id:'merge', label:'accretion', tip:'Merge bodies that collide (conserving mass and momentum).'} ]},
+ {title:'Time & camera', items:[
+   ['rate','sim speed',0,36,1,v=>fmtX(Math.pow(2,(v-20)/5)),'How fast simulated time runs. Log scale ×0.06 … ×12; slow it right down to watch accretion over minutes.'],
+   {kind:'toggle', id:'autozoom', label:'auto-zoom', tip:'Camera keeps the cluster framed. Off = the zoom freezes (scroll wheel zooms by hand); the view still follows the centre of mass.'},
+   ['tilt','tilt',0,180,1,v=>v+'°','Rotates the whole field about the centre.'] ]},
+ {title:'Look', items:[
+   ['size','body size',0.05,3,0.05,v=>v.toFixed(2)+'×','Size of the bodies. Also sets the physical collision radius, so bigger bodies merge sooner.'],
+   {kind:'select', id:'palette', label:'palette', opts:['rainbow','stars','ember','ocean','mono'], tip:'Colour family for newly seeded bodies.'},
+   {kind:'toggle', id:'color', label:'colour', tip:'Off = greyscale.'},
+   {kind:'toggle', id:'details', label:'glows', tip:'A soft glow around accreted giants.'},
+   {kind:'toggle', id:'trails', label:'trails', tip:'Orbital paths — what makes spin, inertia and gravity legible.'},
+   ['trailLen','trail length',0,300,5,v=>v,'How many frames of path to keep.'],
+   ['trailOp','trail opacity',0,100,5,v=>v+'%','Trail brightness.'],
+   ['tintL','brightness',30,100,1,v=>v,'Base lightness of the bodies.'],
+   ['depthLight','depth light',0,50,1,v=>v===0?'off':'±'+v,'Near bodies lighter, far bodies darker (only with depth on).'],
+   ['depthHaze','depth haze',0,100,5,v=>v===0?'off':v+'%','Distant bodies lose colour.'],
+   {kind:'color', id:'bgColor', label:'background', tip:'Canvas background colour.'} ]},
+ {title:'Images', items:[
+   {kind:'file', id:'bodyImg', label:'body image', tip:'Use your own picture for the bodies instead of the shaded ball. It points along each body’s motion.'},
+   {kind:'file', id:'bgImg',   label:'background', tip:'A picture behind the field. It rotates with the tilt.'},
+   ['bgAlpha','bg opacity',0,100,5,v=>v+'%','How strongly the background image shows over the background colour.'],
+   {kind:'note', text:'Images are not saved with settings (they can be large) — pick them again after a reload.'} ]},
+ {title:'Sound', items:[
+   ['volume','volume',0,100,1,v=>v+'%','Master volume. Press the 🔇 button to switch sound on (browsers need a click).'],
+   ['mixDrone','drone',0,100,1,v=>v+'%','A low drone that rises in pitch as the swarm consolidates and brightens with how fast it moves.'],
+   ['mixChime','chimes',0,100,1,v=>v+'%','A bell on every merger — bigger bodies ring lower.'],
+   ['mixThud','thuds',0,100,1,v=>v+'%','A soft thud on every bounce.'] ]},
+ {title:'Keys', items:[ {kind:'note', html:'<kbd>space</kbd> pause · <kbd>R</kbd> restart · <kbd>H</kbd> panel · <kbd>F</kbd> fullscreen · wheel = zoom<br><a href="astro-field-guide.html">Read the Astro field guide →</a>'} ]}
+];
+
+const PRESETS = {
+  'Dust cloud':        { pop:700, spread:9, spin:80, G:100, inertia:100, settle:20, stick:100, grow:10, depth:400, size:0.1 },
+  'Cold collapse':     { pop:600, spread:0, spin:0,  G:100, inertia:100, settle:0,  stick:100, grow:10, depth:400, size:0.1 },
+  'Protoplanetary disk':{ pop:900, spread:4, spin:105, G:100, inertia:100, settle:70, stick:80, grow:6,  depth:400, size:0.09 },
+  'Gas giant nursery': { pop:700, spread:6, spin:70, G:100, inertia:70,  settle:30, stick:130, grow:18, depth:400, size:0.1 },
+  'A few big bodies':  { pop:14,  spread:3, spin:90, G:100, inertia:100, settle:0,  stick:100, grow:30, depth:200, size:0.7, soft:14 },
+  'Flat 2D swirl':     { pop:500, spread:6, spin:90, G:100, inertia:100, settle:0,  stick:100, grow:10, depth:0,   size:0.12 }
+};
+
+function setP(id, v, silent){
+  const old = P[id]; P[id] = v;
+  if(id==='G') rescaleForG(old*0.03, v*0.03);
+  if(id==='depth' && v<=0) for(const b of state.bodies){ b.z=0; b.vz=0; }
+  if(id==='volume') Snd.setVolume();
+}
+function syncRange(def){ const el=$('c_'+def.id); if(!el) return; el.value=P[def.id]; $('v_'+def.id).textContent=def.fmt(P[def.id]); }
+function buildUI(){
+  const host = $('scroll');
+  for(const sec of SECTIONS){
+    const s = document.createElement('section'); s.innerHTML = '<h2>'+sec.title+'</h2>'; host.appendChild(s);
+    for(const it of sec.items){
+      if(Array.isArray(it)){
+        const [id,label,min,max,step,fmt,tip,opt] = it; const def = {id,kind:'range',label,min,max,step,fmt,tip}; REG.push(def);
+        const row = document.createElement('div'); row.className='row';
+        row.innerHTML = '<label title="'+tip.replace(/"/g,'&quot;')+'"'+(opt&&opt.reseed?' class="reseed"':'')+'>'+label+'</label>'
+          +'<input type="range" id="c_'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+P[id]+'"><span class="val" id="v_'+id+'"></span>';
+        s.appendChild(row);
+        const el = row.querySelector('input'), val = row.querySelector('.val'); val.textContent = fmt(P[id]);
+        el.addEventListener('input', ()=>{ setP(id, parseFloat(el.value)); val.textContent = fmt(P[id]); persist(); });
+      } else if(it.kind==='toggle'){
+        REG.push({id:it.id, kind:'toggle'});
+        const row = document.createElement('div'); row.className='row wide';
+        row.innerHTML = '<label title="'+it.tip+'">'+it.label+'</label><div><button class="btn" id="t_'+it.id+'"></button></div>';
+        s.appendChild(row); const b = row.querySelector('button');
+        const paint = ()=>{ b.textContent = T[it.id]?'on':'off'; b.classList.toggle('on', T[it.id]); };
+        b.addEventListener('click', ()=>{ T[it.id]=!T[it.id]; paint(); persist(); }); paint(); it.paint = paint; it.btn = b;
+      } else if(it.kind==='select'){
+        REG.push({id:it.id, kind:'select'});
+        const row = document.createElement('div'); row.className='row wide';
+        row.innerHTML = '<label title="'+it.tip+'">'+it.label+'</label><select id="s_'+it.id+'">'+it.opts.map(o=>'<option>'+o+'</option>').join('')+'</select>';
+        s.appendChild(row); const sel=row.querySelector('select'); sel.value=PALETTE;
+        sel.addEventListener('change', ()=>{ PALETTE = sel.value; persist(); });
+      } else if(it.kind==='color'){
+        REG.push({id:it.id, kind:'color'});
+        const row = document.createElement('div'); row.className='row wide';
+        row.innerHTML = '<label title="'+it.tip+'">'+it.label+'</label><div><input type="color" id="k_'+it.id+'" value="'+bgColor+'"></div>';
+        s.appendChild(row); row.querySelector('input').addEventListener('input', e=>{ bgColor=e.target.value; persist(); });
+      } else if(it.kind==='file'){
+        const row = document.createElement('div'); row.className='row wide';
+        row.innerHTML = '<label title="'+it.tip+'">'+it.label+'</label><div class="flex"><button class="btn" id="fb_'+it.id+'">choose…</button><button class="btn" id="fc_'+it.id+'" title="Remove">✕</button><span class="note" id="fn_'+it.id+'" style="margin:0">none</span></div><input type="file" id="ff_'+it.id+'" accept="image/*" style="display:none">';
+        s.appendChild(row);
+        const fi = row.querySelector('input[type=file]'), nm = row.querySelector('#fn_'+it.id);
+        row.querySelector('#fb_'+it.id).addEventListener('click', ()=>fi.click());
+        row.querySelector('#fc_'+it.id).addEventListener('click', ()=>{ if(it.id==='bodyImg') bodyImg=null; else bgImg=null; nm.textContent='none'; fi.value=''; });
+        fi.addEventListener('change', ()=>{ const f=fi.files[0]; if(!f) return; const url=URL.createObjectURL(f), im=new Image();
+          im.onload=()=>{ if(it.id==='bodyImg') bodyImg=im; else bgImg=im; nm.textContent=f.name.replace(/\.[^.]+$/,'').slice(0,12); }; im.src=url; });
+      } else if(it.kind==='presets'){
+        const row = document.createElement('div'); row.className='flex'; row.style.margin='4px 0 8px';
+        for(const name of Object.keys(PRESETS)){ const b=document.createElement('button'); b.className='btn'; b.textContent=name;
+          b.addEventListener('click', ()=>{ applyPreset(PRESETS[name]); }); row.appendChild(b); }
+        s.appendChild(row);
+      } else if(it.kind==='note'){
+        const d = document.createElement('div'); d.className='note'; if(it.html) d.innerHTML=it.html; else d.textContent=it.text; s.appendChild(d);
+      }
+    }
+  }
+}
+function applyPreset(p){
+  for(const k of Object.keys(p)){ P[k]=p[k]; }
+  syncAll(); doSeed(); persist();
+}
+function syncAll(){
+  for(const sec of SECTIONS) for(const it of sec.items){
+    if(Array.isArray(it)){ const id=it[0], el=$('c_'+id); if(el){ el.value=P[id]; $('v_'+id).textContent=it[5](P[id]); } }
+    else if(it.kind==='toggle' && it.paint) it.paint();
+    else if(it.kind==='select'){ const s=$('s_'+it.id); if(s) s.value=PALETTE; }
+    else if(it.kind==='color'){ const c=$('k_'+it.id); if(c) c.value=bgColor; }
+  }
+}
+
+// ── persistence ──────────────────────────────────────────────────────────────
+const KEY = 'astro-settings-v1';
+function snapshot(){ return { app:'astro', v:1, P:Object.assign({},P), T:Object.assign({},T), palette:PALETTE, bgColor }; }
+function restore(s){
+  if(!s || s.app!=='astro') return false;
+  for(const k of Object.keys(s.P||{})) if(k in P && typeof s.P[k]==='number') P[k]=s.P[k];
+  for(const k of Object.keys(s.T||{})) if(k in T) T[k]=!!s.T[k];
+  if(typeof s.palette==='string') PALETTE=s.palette; if(typeof s.bgColor==='string') bgColor=s.bgColor;
+  return true;
+}
+let persistTimer=0;
+function persist(){ clearTimeout(persistTimer); persistTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY, JSON.stringify(snapshot())); }catch(e){} }, 300); }
+
+// ── run loop ─────────────────────────────────────────────────────────────────
+let acc=0, last=0, hudT=0;
+const FRAME = 1/60;
+function doSeed(){ seed(); Snd.reset(); acc=0; $('idle').style.display='none'; }
+function loop(ts){
+  requestAnimationFrame(loop);
+  const dt = last ? Math.min(0.1, (ts-last)/1000) : 0; last = ts;
+  if(running && state.bodies.length){
+    acc += dt; let n=0;                                  // fixed 60 Hz sim step → same speed on any display
+    while(acc>=FRAME && n<3){ simFrame(); acc-=FRAME; n++; }
+    if(n===3) acc=0;
+    Snd.drain();
+  }
+  draw();
+  hudT += dt;
+  if(hudT>0.25){ hudT=0;
+    let big=0; for(const b of state.bodies) if(b.m>big) big=b.m;
+    $('hud').textContent = '☄ '+state.bodies.length+' bodies'+(state.bodies.length?'  ·  largest ×'+big.toFixed(big<10?1:0):'')
+      +'\n'+state.mergesTotal+' mergers'+(running?'':'  ·  paused');
+    Snd.update();
+  }
+}
+
+// ── wiring ───────────────────────────────────────────────────────────────────
+buildUI();
+try{ const s = JSON.parse(localStorage.getItem(KEY)||'null'); if(s && restore(s)) syncAll(); }catch(e){}
+$('playBtn').addEventListener('click', ()=>{ running=!running; $('playBtn').textContent = running?'❚❚':'▶'; });
+$('seedBtn').addEventListener('click', doSeed);
+$('soundBtn').addEventListener('click', ()=>{ if(Snd.on){ Snd.stop(); $('soundBtn').textContent='🔇'; } else { Snd.start(); $('soundBtn').textContent='🔊'; } });
+$('fsBtn').addEventListener('click', ()=>{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); });
+const togglePanel = ()=>$('ui').classList.toggle('hidden');
+$('hideBtn').addEventListener('click', togglePanel); $('tab').addEventListener('click', togglePanel);
+$('saveBtn').addEventListener('click', ()=>{
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(snapshot(),null,1)],{type:'application/json'}));
+  a.download='astro-settings.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); });
+$('loadBtn').addEventListener('click', ()=>$('loadFile').click());
+$('loadFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ try{ if(restore(JSON.parse(rd.result))){ syncAll(); doSeed(); persist(); } else alert('Not an Astro settings file.'); }catch(err){ alert('Could not read that file.'); } };
+  rd.readAsText(f); e.target.value=''; });
+window.addEventListener('keydown', e=>{
+  if(e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName) && e.target.type!=='range') return;
+  if(e.code==='Space'){ e.preventDefault(); $('playBtn').click(); }
+  else if(e.key==='r'||e.key==='R') doSeed();
+  else if(e.key==='h'||e.key==='H') togglePanel();
+  else if(e.key==='f'||e.key==='F') $('fsBtn').click();
+});
+cv.addEventListener('wheel', e=>{ e.preventDefault();
+  if(T.autozoom){ T.autozoom=false; for(const sec of SECTIONS) for(const it of sec.items) if(it.id==='autozoom'&&it.paint) it.paint(); }
+  state.zoom = clamp(state.zoom*Math.exp(-e.deltaY*0.0015), 0.02, 8); }, {passive:false});
+
+doSeed();
+requestAnimationFrame(loop);
+})();
+}
+</script>
+</body>
+</html>

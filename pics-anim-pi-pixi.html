@@ -1305,24 +1305,12 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <div id="fpsDisplay" style="position:fixed;top:6px;left:8px;font:bold 13px monospace;color:#e0ecff;background:rgba(0,0,0,0.55);padding:2px 7px;border-radius:4px;pointer-events:none;z-index:9999;letter-spacing:0.5px;">-- boids · --</div>
 
 <style>
-/* Astro / Active-Matter mode switch — hide the mode-specific control groups */
-#ui.astro-mode .flock-only{display:none!important;}
-#ui:not(.astro-mode) .astro-only{display:none!important;}
-#astroModeBtn{background:#2a2350;border:1px solid #5b4bd6;color:#cfc8ff;font-weight:700;}
-#astroModeBtn:hover{border-color:#8a7bff;color:#fff;}
-#ui.astro-mode #astroModeBtn{background:#0b3a4a;border-color:#1fb6c9;color:#bdf3ff;}
-#ui.astro-mode #dbHead{box-shadow:inset 0 -2px 0 #5b4bd6;}
-#astroMergeBtn{padding:3px 10px;border-radius:6px;border:1px solid #444;background:#333;color:#aaa;cursor:pointer;font:700 11px ui-monospace,Menlo,monospace;}
-#astroMergeBtn.on{background:#124a33;color:#bfead4;border-color:#2a7d55;}
-#astroZoomBtn{padding:3px 10px;border-radius:6px;border:1px solid #444;background:#333;color:#aaa;cursor:pointer;font:700 11px ui-monospace,Menlo,monospace;}
-#astroZoomBtn.on{background:#124a33;color:#bfead4;border-color:#2a7d55;}
 </style>
 <div id="ui">
 <header id="dbHead">
   <div id="dbTitle"><h1>Boids Aquarium</h1><span id="dbSub">population laboratory</span></div>
   <div id="dbLink"><span id="linkDot">●</span><span id="linkLabel">no aquarium open</span></div>
   <div id="dbActions">
-    <button id="astroModeBtn" title="Switch between Active Matter (flocking) and Astro (gravitational N-body)">✦ Astro</button>
     <button id="aquariumBtn" title="Open the live aquarium in a new tab. Click any boid in the tank to bring it to the front for a couple of seconds, then it drifts back.">open aquarium ↗</button>
     <button id="popoutBtn" title="Open the live tank as a tall canvas-only strip filling the screen height. Click any boid in the tank to bring it to the front for a couple of seconds, then it drifts back.">pop-out canvas ↗</button>
     <button id="piPopoutBtn" title="Same tall strip, but with everything the Pi does not need: no status mirroring back to this dashboard, no population pyramid. The sliders still steer it live — only the telemetry coming BACK is gone. Use this one on the Pi; use pop-out canvas on a machine with CPU to spare.">Pi pop-out ↗</button>
@@ -1348,7 +1336,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 
 <div id="dbGrid">
 
-<section class="panel flock-only" id="statusPanel">
+<section class="panel" id="statusPanel">
 <h2>Live status <button id="statusResetBtn" class="mini-btn" title="Reset the WHOLE dashboard (every slider + toggle) to its starting values and clear the live readouts. The readouts also reset automatically when the aquarium is closed." style="vertical-align:middle;margin-left:8px;">reset all</button></h2>
 <div id="statusGrid">
   <div class="stat-block">
@@ -1529,7 +1517,7 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 
 <section class="panel">
 <h2>Population</h2>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label>target pop</label>
 <input type="range" id="targetSlider" min="2" max="1500" value="624">
 <span class="ctrl-val" id="targetVal">624</span>
@@ -1539,12 +1527,12 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--accent); outl
 <input type="range" id="initPopSlider" min="2" max="1000" value="445">
 <span class="ctrl-val" id="initPopVal">445</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label>pop ceiling</label>
 <input type="range" id="popCeilSlider" min="0" max="1000" value="0">
 <span class="ctrl-val" id="popCeilVal">off</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>immigration</label>
 <button id="immigrationBtn" title="Toggle immigration" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1556,14 +1544,14 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="immigrationLabel" style="color:#c0392b;font-weight:700;">off</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label>emigr. return</label>
 <input type="range" id="emigReturnSlider" min="0" max="10" value="4" step="1">
 <span class="ctrl-val" id="emigReturnVal">0.4</span>
 </div>
 </section>
 
-<section class="panel flock-only">
+<section class="panel">
 <h2>Life &amp; breeding</h2>
 <div class="ctrl-row">
 <label>bond after</label>
@@ -1607,7 +1595,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </section>
 
-<section class="panel flock-only">
+<section class="panel">
 <h2>Society &amp; genetics</h2>
 <div class="ctrl-row">
 <label>singles</label>
@@ -1654,22 +1642,22 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="speedSlider" min="1" max="10" value="9" step="1">
 <span class="ctrl-val" id="speedVal">9</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label>sensing r</label>
 <input type="range" id="sensingSlider" min="30" max="300" value="40" step="10">
 <span class="ctrl-val" id="sensingVal">40</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Thermal mixing (Boltzmann rotational diffusion): random jitter on each boid's heading. 0 = near-ballistic, higher = more mixing/roaming.">temp (mix)</label>
 <input type="range" id="boltzRotSlider" min="0" max="150" value="0" step="1">
 <span class="ctrl-val" id="boltzRotVal">0.00</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Cohesion strength (conservative spring toward the local flock centre). Higher = tighter clusters.">cohere k</label>
 <input type="range" id="cohKSlider" min="0" max="100" value="84" step="1">
 <span class="ctrl-val" id="cohKVal">0.084</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Alignment (Vicsek): each boid steers toward its neighbours' average heading. 0 = static clumps; higher = clusters spontaneously pick a direction and wander. Competes with temp — high temp keeps them meandering/reorienting.">align / roam</label>
 <input type="range" id="alignSlider" min="0" max="100" value="57" step="1">
 <span class="ctrl-val" id="alignVal">0.050</span>
@@ -1679,7 +1667,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="depthSlider" min="0" max="600" value="600" step="25">
 <span class="ctrl-val" id="depthVal">600</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>no overlap</label>
 <button id="noOverlapBtn" title="Toggle body separation" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1693,59 +1681,8 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </section>
 
-<section class="panel astro-only">
-<h2>Astro (gravity)</h2>
-<div class="ctrl-row">
-<label title="Newtonian gravity strength between every pair of bodies.">gravity</label>
-<input type="range" id="astroGSlider" min="0" max="400" value="100" step="5">
-<span class="ctrl-val" id="astroGVal">100</span>
-</div>
-<div class="ctrl-row">
-<label title="Momentum. 0 = overdamped (like the flock's fixed speed); 1 = full inertia, so bodies fall in, overshoot and orbit.">inertia</label>
-<input type="range" id="astroInertiaSlider" min="0" max="100" value="100" step="1">
-<span class="ctrl-val" id="astroInertiaVal">1.00</span>
-</div>
-<div class="ctrl-row">
-<label title="Softening length: smooths the 1/r² force at close range so bodies don't fling to infinity.">softening</label>
-<input type="range" id="astroSoftSlider" min="1" max="40" value="8" step="1">
-<span class="ctrl-val" id="astroSoftVal">8</span>
-</div>
-<div class="ctrl-row">
-<label title="Initial rotation of the seeded cloud. 0 = cold collapse to a cluster; higher = a spinning disk.">spin</label>
-<input type="range" id="astroSpinSlider" min="0" max="150" value="80" step="5">
-<span class="ctrl-val" id="astroSpinVal">0.80</span>
-</div>
-<div class="ctrl-row">
-<label title="Gas-like dissipation of vertical motion (needs depth > 0). Stars are collisionless and stay a 3D ball forever; gas radiates energy away and settles into the rotation plane. 0 = stars; higher = gas — a spinning 3D cloud flattens into a disk.">settle (gas)</label>
-<input type="range" id="astroSettleSlider" min="0" max="100" value="20" step="1">
-<span class="ctrl-val" id="astroSettleVal">0.020</span>
-</div>
-<div class="ctrl-row">
-<label title="How fast simulated time runs, as a multiple of the old 'speed 1' (log scale: 0.06× up to 12×). Slow it right down to watch clouds collapse and bodies accrete over minutes instead of seconds.">sim speed</label>
-<input type="range" id="astroRateSlider" min="0" max="36" value="20" step="1">
-<span class="ctrl-val" id="astroRateVal">×1.0</span>
-</div>
-<div class="ctrl-row">
-<label title="Collisions stick only below this fraction of the mutual escape speed; harder hits bounce inelastically. 1.0 = the physical criterion, lower = slower accretion, 0 = nothing ever sticks (bouncing gravel).">stickiness</label>
-<input type="range" id="astroStickSlider" min="0" max="200" value="100" step="5">
-<span class="ctrl-val" id="astroStickVal">1.00</span>
-</div>
-<div class="ctrl-row">
-<label title="Chance per frame that a touching, below-escape-speed pair actually coalesces. Lower = slower growth and longer-lived disks; 1.0 = merge on first touch.">growth</label>
-<input type="range" id="astroGrowSlider" min="1" max="100" value="10" step="1">
-<span class="ctrl-val" id="astroGrowVal">0.10</span>
-</div>
-<div class="ctrl-row" style="gap:8px;">
-<label>accretion</label>
-<button id="astroMergeBtn" class="on" title="Merge bodies that collide (conserving mass & momentum) so they grow — planets/stars by accretion.">accretion: on</button>
-</div>
-<div class="ctrl-row" style="gap:8px;">
-<label>auto-zoom</label>
-<button id="astroZoomBtn" class="on" title="The camera keeps the cluster framed by zooming in and out as it collapses or spreads. Off = the zoom freezes where it is (the view still follows the centre of mass).">auto-zoom: on</button>
-</div>
-</section>
 
-<section class="panel flock-only">
+<section class="panel">
 <h2>Disease</h2>
 <div class="ctrl-row">
 <label>infect. hits</label>
@@ -1770,7 +1707,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </section>
 
-<section class="panel flock-only">
+<section class="panel">
 <h2>Predators</h2>
 <div class="ctrl-row">
 <label>predators</label>
@@ -1835,7 +1772,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="detailsLabel" style="font-size:10px;font-weight:700;color:#a29bfe;letter-spacing:0.5px;text-transform:uppercase;">on</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>dim infertile</label>
 <button id="dimBtn" title="Draw infertile boids at 55% opacity (off = everyone fully opaque; fertility still shows via the glow)" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1847,7 +1784,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="dimLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>upright</label>
 <button id="uprightBtn" title="Keep every body image upright instead of rotating with the movement direction. With this on, ordinary uploaded images ripple too (see Body image → ripple) — that costs one mesh per boid, so use it with a small population." style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1864,7 +1801,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="tiltSlider" min="0" max="180" value="0" step="1">
 <span class="ctrl-val" id="tiltVal">0°</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>aura</label>
 <button id="auraGradBtn" title="Cycle the bonded/fertile aura: off → flat → gradient" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1876,12 +1813,12 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="auraGradLabel" style="font-size:10px;font-weight:700;color:#35d78a;letter-spacing:0.5px;text-transform:uppercase;">gradient</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Brightness of the bonded/fertile aura glow. 100% = the original look; above 100% boosts it, 0 hides it without changing the aura mode.">aura opacity</label>
 <input type="range" id="auraOpacitySlider" min="0" max="300" value="100" step="5">
 <span class="ctrl-val" id="auraOpacityVal">100%</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label title="Cell differentiation (embryo fate model): undecided grey cells commit to one of three fate colours (red/green/blue), driven by a vertical morphogen gradient + neighbour coupling. Run with low motion (align/temp down) so territories hold.">differentiate</label>
 <button id="diffBtn" title="Toggle cell differentiation" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1893,32 +1830,32 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="diffLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">off</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Neighbour rule for differentiation. +1 = community effect (neighbours reinforce the same fate → coherent organ territories). −1 = lateral inhibition (a committing cell pushes neighbours to a different fate → salt-and-pepper). 0 = neighbours ignored, fate set by the gradient + noise alone.">fate coupling</label>
 <input type="range" id="diffCouplingSlider" min="-100" max="100" value="100" step="5">
 <span class="ctrl-val" id="diffCouplingVal">+1.00</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Morphogen gradient strength — how strongly a cell's vertical position dictates its fate (French-flag positional information). 0 = position ignored (fate from neighbours + noise only); 1 = position dominates (clean top/middle/bottom bands).">morphogen</label>
 <input type="range" id="diffGradientSlider" min="0" max="100" value="60" step="5">
 <span class="ctrl-val" id="diffGradientVal">0.60</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Cell motility while differentiating — how much cells actually move. 0 = pinned like packed tissue (territories hold still, best for watching the pattern form); 1 = cells swim freely (patterns smear). Only active while differentiate is on.">motility</label>
 <input type="range" id="diffMotilitySlider" min="0" max="100" value="12" step="2">
 <span class="ctrl-val" id="diffMotilityVal">0.12</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Commitment rate — how fast a cell decides. Low = cells sit undecided (grey) and drift under the gradient/neighbours/noise for a long time before locking; high = they snap to a fate almost instantly. Committed neighbours still accelerate nearby cells on top of this.">commit rate</label>
 <input type="range" id="diffRateSlider" min="2" max="100" value="25" step="1">
 <span class="ctrl-val" id="diffRateVal">0.25</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Migrate-then-settle — how much committing freezes a cell in place. 1 = undecided cells drift (at the motility rate) but a cell stops moving as it commits, settling into the tissue like a differentiated cell. 0 = commitment doesn't affect movement (uniform motility, committed and undecided cells move alike).">settle</label>
 <input type="range" id="diffSettleSlider" min="0" max="100" value="100" step="5">
 <span class="ctrl-val" id="diffSettleVal">1.00</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>event fx</label>
 <button id="bondLinesBtn" title="Cycle event fx: all (bond lines + birth rings + death splashes) → bond lines only → none" style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -1944,36 +1881,36 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label>background</label>
 <input type="color" id="bgColorInput" value="#000000" title="Canvas background colour">
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>bg image</label>
 <input type="file" id="bgImgFile" accept="image/*" style="display:none">
 <button id="bgImgBtn" class="mini-btn" title="Load an image to cover the canvas background instead of the colour (flock mode only). Crop it to the pop-out ratio for a clean fit. The ripple / shade / waves sliders apply to it too.">load</button>
 <button id="bgImgClear" class="mini-btn" title="Remove the background image and return to the colour" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bgImgName" class="mini-note">none</span>
 </div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>overlay img</label>
 <input type="file" id="bgOverlayFile" accept="image/*" style="display:none">
 <button id="bgOverlayBtn" class="mini-btn" title="A second layer ABOVE the background and BELOW the boids. Unlike the background it is NOT stretched to the window — it scales uniformly with window height, aspect always kept. Author it as a transparent PNG (props only). It ripples and shades with the background pond.">load</button>
 <button id="bgOverlayClear" class="mini-btn" title="Remove the overlay image" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bgOverlayName" class="mini-note">none</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Shift the overlay layer left/right, as a percentage of the window width. 0 = centred. Stays put when the window is resized.">overlay x</label>
 <input type="range" id="overlayXSlider" min="-50" max="50" value="0" step="1">
 <span class="ctrl-val" id="overlayXVal">0%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Shift the overlay layer up/down, as a percentage of the window height. 0 = centred.">overlay y</label>
 <input type="range" id="overlayYSlider" min="-50" max="50" value="0" step="1">
 <span class="ctrl-val" id="overlayYVal">0%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="How deep into the tank the overlay sits. 50% = halfway: boids DEEPER than the overlay pass behind it (partly or fully hidden), nearer boids swim in front. 0% = at the very front (over every boid), 100% = at the very back (behind every boid). Needs the depth slider above 0.">overlay depth</label>
 <input type="range" id="overlayDepthSlider" min="0" max="100" value="50" step="1">
 <span class="ctrl-val" id="overlayDepthVal">50%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label></label>
 <span id="bgImgTarget" class="mini-note" title="Pop-out canvas / Pi pop-out open at this size (1:6). Crop the background image to match for a clean 'cover' fit; author the overlay PNG at the same size.">strip pop-out target: —</span>
 </div>
@@ -1987,28 +1924,28 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <button id="bodyImgBtn" title="Load one PNG used by predators, and by either sex that has no images of its own" class="mini-btn">load</button>
 <span id="bodyImgName" class="mini-note">default</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label>♂ images</label>
 <input type="file" id="bodyImgMFile" accept="image/*" multiple style="display:none">
 <button id="bodyImgMBtn" title="Add one or more PNGs to the male pool — each male picks one at random at birth" class="mini-btn">add</button>
 <button id="bodyImgMClear" title="Clear the male image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgMName" class="mini-note">0 imgs</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label>♀ images</label>
 <input type="file" id="bodyImgFFile" accept="image/*" multiple style="display:none">
 <button id="bodyImgFBtn" title="Add one or more PNGs to the female pool — each female picks one at random at birth" class="mini-btn">add</button>
 <button id="bodyImgFClear" title="Clear the female image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgFName" class="mini-note">0 imgs</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Male images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♂ upright</label>
 <input type="file" id="bodyImgMUFile" accept="image/*" multiple style="display:none">
 <button id="bodyImgMUBtn" title="Add one or more PNGs to the male pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
 <button id="bodyImgMUClear" title="Clear the male always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="bodyImgMUName" class="mini-note">0 imgs</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Female images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♀ upright</label>
 <input type="file" id="bodyImgFUFile" accept="image/*" multiple style="display:none">
 <button id="bodyImgFUBtn" title="Add one or more PNGs to the female pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
@@ -2016,23 +1953,23 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="bodyImgFUName" class="mini-note">0 imgs</span>
 </div>
 <div class="mini-note" style="margin-bottom:2px;">— rippling of <b>boid images</b> (upright uploaded images only) —</div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="A travelling wave through a BOID's uploaded image, like cloth in water — constant rate, with a per-boid phase so they never pulse together. 0 = off. Amplitude is a fraction of image width. Applies to any boid wearing an UPLOADED image (never the plain body) that is rendered upright: either its image came from a ↑ row above, or the Upright switch under Appearance is on. Costs one mesh per rippling boid and meshes do not batch, so run this look with a small population — beyond 120 at once the surplus quietly stop rippling to protect the frame rate. Independent of the bg-ripple sliders below.">boid ripple</label>
 <input type="range" id="rippleSlider" min="0" max="100" value="40" step="5">
 <span class="ctrl-val" id="rippleVal">40%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="How dark the light wave gets on a BOID image — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved. Only ever DARKENS. Needs boid ripple above 0, since the shading rides on the same mesh.">boid shade</label>
 <input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
 <span class="ctrl-val" id="shadeVal">30%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 10 quads across — beyond about 5 crests a grid that coarse breaks into facets.">boid waves</label>
 <input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
 <span class="ctrl-val" id="waveVal">1.3</span>
 </div>
 <div class="mini-note" style="margin-bottom:2px;">— rippling of the <b>background image</b> —</div>
-<div class="ctrl-row flock-only" style="gap:8px;">
+<div class="ctrl-row" style="gap:8px;">
 <label>bg style</label>
 <button id="rippleStyleBtn" title="Cycle the BACKGROUND ripple: cloth (a travelling wave, like a flag in water) → pond (concentric rings spreading from points that appear at random, like rain on water). Boid images always use cloth. The bg ripple / shade / waves sliders below drive it — for pond, waves is the ring spacing." style="
 width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
@@ -2044,17 +1981,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </button>
 <span id="rippleStyleLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">cloth</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Ripple amplitude on the BACKGROUND image only. 0 = off (static wallpaper). Independent of the boid-ripple sliders above. The background mesh is 48 quads across, so it carries the full waves range smoothly.">bg ripple</label>
 <input type="range" id="bgRippleSlider" min="0" max="100" value="40" step="5">
 <span class="ctrl-val" id="bgRippleVal">40%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Rolling-shadow depth on the BACKGROUND image. Only ever DARKENS. Works with bg ripple at 0 too (a moving shadow, no geometry) — unlike the boid version.">bg shade</label>
 <input type="range" id="bgShadeSlider" min="0" max="100" value="30" step="5">
 <span class="ctrl-val" id="bgShadeVal">30%</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="For cloth: wave crests across the BACKGROUND image. For pond: the spacing of the concentric rings. The background mesh is dense enough for the whole range.">bg waves</label>
 <input type="range" id="bgWaveSlider" min="0.4" max="4" value="1.3" step="0.1">
 <span class="ctrl-val" id="bgWaveVal">1.3</span>
@@ -2065,17 +2002,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
 <span class="ctrl-val" id="imgScaleVal">0.40×</span>
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Pixels from image centre to nose tip">nose px</label>
 <input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1">
 </div>
-<div class="ctrl-row flock-only">
+<div class="ctrl-row">
 <label title="Sprite scale = r ÷ this value">body scale</label>
 <input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5">
 </div>
 </section>
 
-<section class="panel flock-only" id="pyramidPanel">
+<section class="panel" id="pyramidPanel">
 <h2>Demographics</h2>
 <canvas id="popPyramid" width="260" height="200"></canvas>
 <div class="ctrl-row" style="margin-top:6px;">
@@ -2217,23 +2154,6 @@ let _COH_K = parseInt(document.getElementById('cohKSlider').value) / 1000;
 // 95% of its travel. Position 0 = exactly 0 (off); positions 1..100 sweep 0.001..1.0 logarithmically.
 function _alignKFromSlider(v){ v=parseInt(v); return v<=0 ? 0 : 0.001*Math.pow(1000,(v-1)/99); }
 let _ALIGN_K = _alignKFromSlider(document.getElementById('alignSlider').value);
-// ── Astro (gravitational N-body) mode ────────────────────────────────────────
-// SIM_MODE switches the whole simulation between 'flock' (active-matter boids) and
-// 'astro' (gravitational N-body). The astro params below are read by the astro
-// physics step (added in the next increment). Default 'flock' — nothing changes
-// until the [Astro] button is pressed.
-let SIM_MODE = 'flock';
-let _ASTRO_G        = parseInt(document.getElementById('astroGSlider').value);
-let _ASTRO_INERTIA  = parseInt(document.getElementById('astroInertiaSlider').value) / 100;
-let _ASTRO_SOFT     = parseInt(document.getElementById('astroSoftSlider').value);
-let _ASTRO_SPIN     = parseInt(document.getElementById('astroSpinSlider').value) / 100;
-const _astroRateOf = v => Math.pow(2, (v-20)/5);   // slider 0..36 → 0.0625×..12×, 20 = 1× (the old fixed speed)
-let _ASTRO_RATE = _astroRateOf(parseInt(document.getElementById('astroRateSlider').value)); // simulated time per frame
-let _ASTRO_SETTLE   = parseInt(document.getElementById('astroSettleSlider').value) / 1000;
-let _ASTRO_STICK    = parseInt(document.getElementById('astroStickSlider').value) / 100;
-let _ASTRO_GROW     = parseInt(document.getElementById('astroGrowSlider').value) / 100;
-let _ASTRO_MERGE    = true;
-let _ASTRO_AUTOZOOM = true;   // false → astroView stops adjusting the zoom
 let pyramidRefreshInterval = 3;
 let lastPyramidUpdate = -Infinity;
 
@@ -2742,57 +2662,6 @@ wire('sndColorSlider','sndColorVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_COL
 wire('sndClimaxSlider','sndClimaxVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_CLIMAX=v; });
 wire('sndDiseaseSlider','sndDiseaseVal', v=>parseInt(v)/100, v=>v+'%', v=>{ _SND_DISEASE=v; });
 wire('climaxPopSlider','climaxPopVal', v=>parseInt(v), v=>v, v=>{ CLIMAX_POP=v; });
-// Astro controls
-wire('astroGSlider',       'astroGVal',       v=>parseInt(v),      v=>parseInt(v),                    v=>{
-  // Adiabatic G change: orbital speed scales as √G, so rescaling velocities with G keeps the
-  // virial balance — structures survive a live gravity sweep instead of collapsing/unbinding.
-  const _old=_ASTRO_G; _ASTRO_G=v;
-  if(SIM_MODE==='astro' && _old>0 && v>0){ const f=Math.sqrt(v/_old); for(const b of boids){ b.vx*=f; b.vy*=f; } }
-});
-wire('astroInertiaSlider', 'astroInertiaVal', v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_INERTIA=v; });
-wire('astroSoftSlider',    'astroSoftVal',    v=>parseInt(v),      v=>parseInt(v),                    v=>{ _ASTRO_SOFT=v; });
-wire('astroSpinSlider',    'astroSpinVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_SPIN=v; });
-wire('astroRateSlider',    'astroRateVal',    v=>_astroRateOf(parseInt(v)), v=>{ const r=_astroRateOf(parseInt(v)); return '×'+(r>=10?r.toFixed(0):r>=1?r.toFixed(1):r.toFixed(2)); }, v=>{ _ASTRO_RATE=v; });
-wire('astroSettleSlider',  'astroSettleVal',  v=>parseInt(v)/1000, v=>(parseInt(v)/1000).toFixed(3),  v=>{ _ASTRO_SETTLE=v; });
-wire('astroStickSlider',   'astroStickVal',   v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_STICK=v; });
-wire('astroGrowSlider',    'astroGrowVal',    v=>parseInt(v)/100,  v=>(parseInt(v)/100).toFixed(2),   v=>{ _ASTRO_GROW=v; });
-// Mode switch: [✦ Astro] ⇄ [← Active Matter]. Toggles which control groups show and
-// relabels the header/speed control. Physics branching + tank-forward come next increment.
-function _applySimMode(){
-  const ui=document.getElementById('ui');
-  ui.classList.toggle('astro-mode', SIM_MODE==='astro');
-  const btn=document.getElementById('astroModeBtn'), sub=document.getElementById('dbSub'), spd=document.getElementById('speedLabel');
-  if(SIM_MODE==='astro'){ btn.textContent='← Active Matter'; if(sub) sub.textContent='gravitational sandbox'; if(spd) spd.textContent='initial spread'; }
-  else { btn.textContent='✦ Astro'; if(sub) sub.textContent='population laboratory'; if(spd) spd.textContent='speed'; }
-}
-// Per-mode memory for the shared pop/scale controls. Astro wants a big cloud of small
-// bodies (small scale also = small merge radius → gradual accretion); the flock doesn't.
-// Entering astro stashes the flock values and applies the astro ones; leaving restores.
-let _flockCtlStash=null;
-const _astroCtlStash={ initPopSlider:'700', imgScaleSlider:'0.1', depthSlider:'400',
-                       trailLengthSlider:'150', bgColorInput:'#000000' };
-function _setCtl(id,val){ const el=document.getElementById(id); if(el){ el.value=val; el.dispatchEvent(new Event('input',{bubbles:true})); } }
-function _swapModeCtls(toAstro){
-  const ids=Object.keys(_astroCtlStash);
-  if(toAstro){
-    _flockCtlStash={}; for(const id of ids) _flockCtlStash[id]=document.getElementById(id).value;
-    for(const id of ids) _setCtl(id,_astroCtlStash[id]);
-  } else {
-    for(const id of ids){ _astroCtlStash[id]=document.getElementById(id).value; if(_flockCtlStash) _setCtl(id,_flockCtlStash[id]); }
-  }
-}
-document.getElementById('astroModeBtn').addEventListener('click',()=>{
-  SIM_MODE=(SIM_MODE==='astro')?'flock':'astro';
-  _swapModeCtls(SIM_MODE==='astro'); // BEFORE reseed/mode-send, so the new pop/scale are live when seeding
-  _applySimMode();
-  // Dashboard: sync the tank with an EXPLICIT target mode (a forwarded click would
-  // blind-toggle and could desync the two sides). Tank/kiosk: re-seed for the new mode.
-  if(RUN_MODE==='dash'){ if(_tankAlive()) _tankSend({boid:1,t:'mode',mode:SIM_MODE}); }
-  else { if(SIM_MODE==='astro') astroSeed(); else startSim(); }
-});
-document.getElementById('astroZoomBtn').addEventListener('click',function(){ _ASTRO_AUTOZOOM=!_ASTRO_AUTOZOOM; this.textContent='auto-zoom: '+(_ASTRO_AUTOZOOM?'on':'off'); this.classList.toggle('on',_ASTRO_AUTOZOOM); });
-document.getElementById('astroMergeBtn').addEventListener('click',function(){ _ASTRO_MERGE=!_ASTRO_MERGE; this.textContent='accretion: '+(_ASTRO_MERGE?'on':'off'); this.classList.toggle('on',_ASTRO_MERGE); });
-_applySimMode();
 wire('depthSlider', 'depthVal', v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ DEPTH=v; });
 wire('imgScaleSlider','imgScaleVal', v=>parseFloat(v), v=>parseFloat(v).toFixed(2)+'×', v=>{ IMG_SCALE=v; });
 wire('singleSlider', 'singleVal', v=>parseInt(v), v=>v+'%', v=>{ SINGLE_FRACTION=v/100; updateViability(); });
@@ -4760,7 +4629,7 @@ const m=_bgMesh; if(!m) return;
 try {
 _pondActive=null;   // cleared every frame; only the pond branch below re-arms it (for the boids)
 const tex=m.texture;
-const ready = !!_bgImagePNG && SIM_MODE!=='astro'
+const ready = !!_bgImagePNG
            && tex && tex.baseTexture && tex.baseTexture.valid && tex.width>0;
 m.visible=ready;
 if(!ready) return;
@@ -4827,7 +4696,7 @@ function _layoutBgOverlayMesh(){
 const m=_bgOverlayMesh; if(!m) return;
 try {
 const tex=m.texture;
-const ready = !!_bgOverlayPNG && SIM_MODE!=='astro'
+const ready = !!_bgOverlayPNG
            && tex && tex.baseTexture && tex.baseTexture.valid && tex.width>0;
 m.visible=ready;
 _ovRect.on=false;
@@ -6134,15 +6003,10 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 return { app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, SIM_MODE, ASTRO_MERGE:_ASTRO_MERGE, ASTRO_AUTOZOOM:_ASTRO_AUTOZOOM, HUE_LOCK, RIPPLE_STYLE } };
+  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, immigrationEnabled, HUNT_MODE, HUE_LOCK, RIPPLE_STYLE } };
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
-// Restore SIM_MODE FIRST: the mode click swaps the per-mode pop/scale stash, so it must run
-// before the file's input values are applied — otherwise the swap would overwrite them.
-if(s.toggles && s.toggles.SIM_MODE!==undefined && s.toggles.SIM_MODE!==SIM_MODE){
-  const b=document.getElementById('astroModeBtn'); if(b) b.click();
-}
 if(s.inputs) for(const id in s.inputs){
   const el=document.getElementById(id);
   if(el && (el.type==='range'||el.type==='number'||el.type==='color')){
@@ -6162,8 +6026,6 @@ if(t.UPRIGHT_SPRITE!==undefined)    clickTo(!!UPRIGHT_SPRITE   !== !!t.UPRIGHT_S
 if(t.immigrationEnabled!==undefined)clickTo(!!immigrationEnabled!== !!t.immigrationEnabled,'immigrationBtn');
 if(t.HUNT_MODE!==undefined)         clickTo(t.HUNT_MODE!==HUNT_MODE,'huntModeBtn');
 if(t.HUE_LOCK!==undefined)          clickTo(!!HUE_LOCK         !== !!t.HUE_LOCK,          'hueLockBtn');
-if(t.ASTRO_MERGE!==undefined)       clickTo(!!_ASTRO_MERGE         !== !!t.ASTRO_MERGE,   'astroMergeBtn');
-if(t.ASTRO_AUTOZOOM!==undefined)    clickTo(!!_ASTRO_AUTOZOOM     !== !!t.ASTRO_AUTOZOOM, 'astroZoomBtn');
 if(t.EVENT_FX!==undefined){ let n=((EVENT_FX-t.EVENT_FX)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('bondLinesBtn').click(); } // bondLinesBtn cycles BACKWARD (EVENT_FX = (x+2)%3), so click count = (current − target) mod 3
 if(t.AURA_MODE!==undefined){ let n=((t.AURA_MODE-AURA_MODE)%3+3)%3; for(let i=0;i<n;i++) document.getElementById('auraGradBtn').click(); }
 if(t.RIPPLE_STYLE!==undefined){ let n=((t.RIPPLE_STYLE-RIPPLE_STYLE)%2+2)%2; for(let i=0;i<n;i++) document.getElementById('rippleStyleBtn').click(); }
@@ -6299,299 +6161,6 @@ pctx.fillStyle = 'rgba(253,121,168,0.9)';
 pctx.fillText('♀', centerX + labelW / 2 + halfW / 2, padT / 2);
 }
 
-// ── Astro (gravitational N-body) mode ───────────────────────────────────────
-// A second physics engine that shares this app's boids array, sprite pool and
-// appearance controls. Bodies carry a mass; they attract each other with softened
-// Newtonian gravity (1/r²), integrate with real inertia so they fall in, overshoot
-// and orbit, and merge on contact (conserving mass + momentum) so they accrete into
-// growing "planets/stars". Society subsystems (breeding/disease/predators) don't run.
-let _astroZoom=1, _astroCx=0, _astroCy=0, _astroCz=0, _astroSnap=false, _astroRh=30; // auto-framing state (Rh = half-mass radius)
-let _astroFrameR=0; // envelope-followed frame radius: expands instantly, contracts slowly — kills zoom pumping
-let _astroAxis={x:0,y:0,z:1}; // spin axis (set at seed): tilted from the viewing axis so the disk forms edge-on-visible
-// Ball sprite for astro bodies — the teardrop "fish" looks odd orbiting a disk. Drawn once
-// as a soft-shaded white sphere (80×80, same dims as the teardrop so all scale math holds);
-// white so the normal per-body tint colours it. Lazy: only built where a PIXI app exists.
-// Perspective for astro bodies. Astro has no z-walls (unlike the flock, which clamps z to
-// [0,DEPTH]), so the raw zScaleOf blows up as an oscillating body flies toward the viewer —
-// bodies were filling the whole screen. Measure z relative to the cloud's CoM and clamp.
-function _astroPersp(b){
-  if(DEPTH<=0) return 1;
-  const s=Z_FOCAL/(Z_FOCAL+(b.z-_astroCz));
-  return (s<=0 || s>2.2) ? 2.2 : Math.max(0.25, s);
-}
-let _astroBallTex=null;
-function _getAstroBallTex(){
-  if(_astroBallTex) return _astroBallTex;
-  const g=new PIXI.Graphics();
-  // Solid, crisp-edged sphere. Shading lives in the GREYS (tint multiplies: grey = darker
-  // tint, white = full tint), not in alpha — translucent shading made small bodies fuzzy/dim.
-  // 9 steps (few enough to batch, enough to read as a smooth gradient when magnified) from a
-  // dark rim to a white highlight drifting toward the upper-left → lit sphere.
-  for(let i=0;i<9;i++){
-    const t=i/8, g8=Math.round(0x88+(0xff-0x88)*t), col=(g8<<16)|(g8<<8)|g8;
-    g.beginFill(col,1); g.drawCircle(40-5*t,40-5*t,36-25*t); g.endFill();
-  }
-  // resolution 4: texture reports 80×80 (so all scale math is unchanged) but carries 320×320
-  // pixels — accreted giants magnify ~5×, and at resolution 1 they went blurry.
-  _astroBallTex=app.renderer.generateTexture(g,{region:new PIXI.Rectangle(0,0,80,80),resolution:4});
-  g.destroy();
-  return _astroBallTex;
-}
-function _astroRadiusPx(b){
-  // Physical (merge) radius = the DRAWN ball's world-space radius, so what visibly touches is
-  // what merges — previously the physics radius was ~7× smaller than the rendered ball, and two
-  // giants could sail through each other and pop out the far side without triggering accretion.
-  // 36 = the ball's disc radius within its 80 px texture; camera factors (√Z, perspective) are
-  // display-only and deliberately excluded. Also fixes the giant glow, which was computed from
-  // the old tiny radius and rendered invisibly INSIDE the body.
-  return 36*(RADIUS/_bodyScale)*IMG_SCALE*Math.cbrt(b.m);
-}
-
-function astroSeed(){
-  if(_idleText) _idleText.visible=false;
-  nextId=0; boids=[]; predators=[]; deathSplashes=[]; birthRings=[];
-  simClock=0; lastTime=null; _astroSnap=true;
-  const cx=canvas.width/2, cy=canvas.height/2;
-  const R=Math.min(canvas.width,canvas.height)*0.30;
-  const N=Math.max(2, INIT_POP);
-  const Geff=_ASTRO_G*0.03;
-  const baseV=Math.sqrt(Geff*N/Math.max(R,1)); // ~circular speed at the cloud edge
-  const disp=SPEED*0.15;                        // "initial spread" (reused speed slider)
-  // Spin axis: with depth on, tilt it 65° from the viewing axis. A disk whose spin axis points
-  // at the viewer forms face-on — the flattening happens along the line of sight and is invisible
-  // (a face-on pancake is just a circle). Tilted, the cloud visibly collapses into a thin band.
-  const _tilt=DEPTH>0?65*Math.PI/180:0;
-  _astroAxis={x:0, y:Math.sin(_tilt), z:Math.cos(_tilt)};
-  const zHalf=DEPTH>0?Math.min(R,DEPTH/2):0; // z half-extent of the seeded blob
-  for(let i=0;i<N;i++){
-    // uniform 3D ball (z compressed into the depth range), centred on (cx, cy, DEPTH/2)
-    let px,py,pz;
-    do{ px=Math.random()*2-1; py=Math.random()*2-1; pz=Math.random()*2-1; }while(px*px+py*py+pz*pz>1);
-    px*=R; py*=R; pz*=zHalf;
-    const b=makeBoid(cx+px, cy+py);
-    b.z=DEPTH/2+pz; b.m=1; b.ax=0; b.ay=0; b.az=0; b.birthTimer=0; b.age=0; b.partnerId=null;
-    // tangential direction about the spin axis: n × p (normalised); at depth 0 this reduces
-    // exactly to the old in-plane tangential seeding
-    const nx=_astroAxis.x, ny=_astroAxis.y, nz=_astroAxis.z;
-    let tx=ny*pz-nz*py, ty=nz*px-nx*pz, tz=nx*py-ny*px;
-    const tl=Math.hypot(tx,ty,tz)||1; tx/=tl; ty/=tl; tz/=tl;
-    b.vx=tx*baseV*_ASTRO_SPIN + gaussianRandom(0,disp);
-    b.vy=ty*baseV*_ASTRO_SPIN + gaussianRandom(0,disp);
-    b.vz=DEPTH>0?(tz*baseV*_ASTRO_SPIN + gaussianRandom(0,disp)):0;
-    boids.push(b);
-  }
-  // zero net momentum so the cloud doesn't drift off-frame
-  let M=0,px=0,py=0,pz=0; for(const b of boids){M+=b.m;px+=b.m*b.vx;py+=b.m*b.vy;pz+=b.m*b.vz;}
-  if(M>0){ const vmx=px/M, vmy=py/M, vmz=pz/M; for(const b of boids){b.vx-=vmx; b.vy-=vmy; b.vz-=vmz;} }
-  running=true;
-  playBtn.innerHTML='&#9646;&#9646;'; playBtn.classList.add('running'); playBtn.title='Pause simulation';
-  if(rafId) cancelAnimationFrame(rafId); rafId=requestAnimationFrame(loop); // single loop only
-}
-
-function astroStep(h){
-  const n=boids.length, G=_ASTRO_G*0.03, e2=_ASTRO_SOFT*_ASTRO_SOFT;
-  for(let i=0;i<n;i++){ boids[i].ax=0; boids[i].ay=0; boids[i].az=0; }
-  for(let i=0;i<n;i++){ const bi=boids[i];
-    for(let j=i+1;j<n;j++){ const bj=boids[j];
-      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z; // dz≡0 at depth 0 → exactly the 2D maths
-      const r2=dx*dx+dy*dy+dz*dz+e2, inv=1/Math.sqrt(r2), s=G*inv/r2; // softened 1/r²
-      bi.ax+=s*bj.m*dx; bi.ay+=s*bj.m*dy; bi.az+=s*bj.m*dz;
-      bj.ax-=s*bi.m*dx; bj.ay-=s*bi.m*dy; bj.az-=s*bi.m*dz;
-    }
-  }
-  // semi-implicit Euler (symplectic-ish, stable with softening). inertia<1 adds drag →
-  // overdamped collapse like the flock; inertia=1 keeps full momentum → orbits persist.
-  const dragK=(1-_ASTRO_INERTIA)*0.5*h; // per unit sim time, so slowing the clock doesn't add drag
-  // Gas settling: dissipate VERTICAL motion only. A collisionless (stellar) system conserves
-  // energy, so z-oscillations never die and no disk forms — physically correct but pancake-free.
-  // Gas collides and radiates that energy away while angular momentum keeps the in-plane
-  // rotation, so the cloud flattens. _ASTRO_SETTLE = the "gas-ness" of the medium.
-  const settleK=(DEPTH>0)?_ASTRO_SETTLE*h:0;
-  for(const b of boids){
-    b.vx+=b.ax*h; b.vy+=b.ay*h; b.vz+=b.az*h;
-    if(dragK>0){ b.vx-=b.vx*dragK; b.vy-=b.vy*dragK; b.vz-=b.vz*dragK; }
-    if(settleK>0){ // damp the velocity component along the spin axis (the disk normal) —
-      // in-plane rotation is untouched, so the cloud flattens instead of decaying
-      const n=_astroAxis, vn=b.vx*n.x+b.vy*n.y+b.vz*n.z;
-      b.vx-=vn*settleK*n.x; b.vy-=vn*settleK*n.y; b.vz-=vn*settleK*n.z;
-    }
-    b.x+=b.vx*h; b.y+=b.vy*h; b.z+=b.vz*h;
-  }
-}
-
-function astroMerge(){
-  const n=boids.length; if(n<2) return;
-  // Velocity-gated sticking (real accretion): a collision merges only when the relative speed is
-  // below _ASTRO_STICK × the mutual escape speed √(2G·m/r) — gentle hits are gravitationally
-  // bound and stick; hard hits BOUNCE inelastically (e=0.4) instead. Consequences: the hot early
-  // disk resists clumping, each bounce dissipates energy so accretion accelerates as the disk
-  // cools (like real disks), and massive bodies capture more readily (gravitational focusing).
-  const G=_ASTRO_G*0.03, s2=_ASTRO_STICK*_ASTRO_STICK;
-  // Compact grains: small bodies collide at a fraction of their DRAWN radius (their rendering is
-  // dominated by the 6px visibility floor anyway, so no visible tunneling), growing back to the
-  // full drawn radius for giants — where visual contact must equal physical contact. Slows early
-  // grain-grain growth so the disk phase survives long enough to be watched.
-  const _mrOf=b=>{ const f=Math.min(1, 0.35+0.22*(Math.cbrt(b.m)-1)); return _astroRadiusPx(b)*f; };
-  const dead=new Uint8Array(n); let any=false;
-  for(let i=0;i<n;i++){ if(dead[i])continue; const bi=boids[i];
-    for(let j=i+1;j<n;j++){ if(dead[j])continue; const bj=boids[j];
-      const dx=bj.x-bi.x, dy=bj.y-bi.y, dz=bj.z-bi.z, mr=_mrOf(bi)+_mrOf(bj);
-      const d2=dx*dx+dy*dy+dz*dz;
-      if(d2 >= mr*mr) continue;
-      const m=bi.m+bj.m;
-      const dvx=bj.vx-bi.vx, dvy=bj.vy-bi.vy, dvz=bj.vz-bi.vz;
-      // gentle (sub-escape) hits coalesce with probability _ASTRO_GROW per frame — a touching
-      // bound pair keeps bouncing softly until it fuses, stretching the accretion timeline
-      if(dvx*dvx+dvy*dvy+dvz*dvz <= (2*G*m/mr)*s2 && Math.random()<_ASTRO_GROW*Math.min(1,_ASTRO_RATE)){ // coalescence per unit sim time: slow-mo must not accrete faster relative to the dynamics
-        // stick: inelastic merge — conserve mass & momentum
-        bi.x=(bi.x*bi.m+bj.x*bj.m)/m; bi.y=(bi.y*bi.m+bj.y*bj.m)/m; bi.z=(bi.z*bi.m+bj.z*bj.m)/m;
-        bi.vx=(bi.vx*bi.m+bj.vx*bj.m)/m; bi.vy=(bi.vy*bi.m+bj.vy*bj.m)/m; bi.vz=(bi.vz*bi.m+bj.vz*bj.m)/m;
-        bi.m=m; dead[j]=1; any=true;
-      } else {
-        // bounce: separate along the line of centres (mass-weighted), then reflect the closing
-        // radial velocity with restitution 0.4 — dissipative, and prevents visual tunneling
-        const d=Math.sqrt(d2)||1e-6, nx=dx/d, ny=dy/d, nz=dz/d, ov=mr-d;
-        bi.x-=nx*ov*(bj.m/m); bi.y-=ny*ov*(bj.m/m); bi.z-=nz*ov*(bj.m/m);
-        bj.x+=nx*ov*(bi.m/m); bj.y+=ny*ov*(bi.m/m); bj.z+=nz*ov*(bi.m/m);
-        const vn=dvx*nx+dvy*ny+dvz*nz;
-        if(vn<0){ // approaching
-          const P=-(1+0.4)*vn/(1/bi.m+1/bj.m);
-          bi.vx-=P*nx/bi.m; bi.vy-=P*ny/bi.m; bi.vz-=P*nz/bi.m;
-          bj.vx+=P*nx/bj.m; bj.vy+=P*ny/bj.m; bj.vz+=P*nz/bj.m;
-        }
-      }
-    }
-  }
-  if(any) boids=boids.filter((b,i)=>!dead[i]);
-}
-
-function astroView(){ // auto-framing: track CoM + frame the HALF-MASS core, so ejected escapers can't drag the camera out
-  let M=0,cx=0,cy=0,cz=0; for(const b of boids){M+=b.m;cx+=b.m*b.x;cy+=b.m*b.y;cz+=b.m*b.z;}
-  if(M<=0) return; cx/=M; cy/=M; cz/=M; _astroCz=cz;
-  // half-mass radius Rh (3D): sort by distance from CoM, walk outward until half the total mass is
-  // enclosed. Mass-weighted, so once accretion builds heavy bodies the camera frames the mass, not the dust.
-  let Rh=30;
-  if(boids.length>1){
-    const ds=boids.map(b=>({d:Math.hypot(b.x-cx,b.y-cy,b.z-cz),m:b.m})).sort((a,b)=>a.d-b.d);
-    let acc=0; for(const e of ds){ acc+=e.m; if(acc>=M/2){ Rh=Math.max(e.d,30); break; } }
-  }
-  _astroRh=Rh;
-  // Endgame framing: with only a few bodies left, half-mass framing collapses onto the single
-  // dominant giant and its light companions orbit invisibly outside the view ("3 bodies but I
-  // only see 1"). With ≤12 bodies, widen the frame to include every remaining body.
-  let needR=Rh*2.5;
-  if(boids.length<=12){
-    let dmax=30; for(const b of boids){ const d=Math.hypot(b.x-cx,b.y-cy,b.z-cz); if(d>dmax) dmax=d; }
-    needR=Math.max(needR, dmax*1.15);
-  }
-  // Envelope follower: the frame widens instantly when a body needs more room, but contracts only
-  // ~0.4% per frame. Orbiting bodies swing out and back — chasing that directly made the zoom
-  // pump nervously in and out; the envelope settles on the widest recent extent instead.
-  _astroFrameR = _astroSnap ? needR : Math.max(needR, _astroFrameR*0.996);
-  const tZoom=Math.max(0.05, Math.min(4, 0.40*Math.min(canvas.width,canvas.height)/_astroFrameR));
-  if(_astroSnap){ _astroCx=cx; _astroCy=cy; _astroZoom=tZoom; _astroSnap=false; } // (a fresh seed always frames itself, even with auto-zoom off)
-  else { _astroCx+=(cx-_astroCx)*0.10; _astroCy+=(cy-_astroCy)*0.10; if(_ASTRO_AUTOZOOM) _astroZoom+=(tZoom-_astroZoom)*0.05; }
-}
-
-function astroDraw(){
-  const g=_gfx.boids, cw=canvas.width/2, ch=canvas.height/2, Z=_astroZoom;
-  const tc=Math.cos(PANEL_TILT), ts=Math.sin(PANEL_TILT); // panel tilt turns the whole field about the canvas centre (same sense as the flock's background)
-  // Positions use the true zoom Z; SIZES use √Z — the cartographer's compromise. Bodies stay
-  // visible when the camera pulls far out and don't balloon when it dives in; distances remain
-  // faithful while rendered dot size is semi-symbolic (like star markers in astronomy software).
-  const Zs=Math.sqrt(Z);
-  // depth>0: painter's order (far first) + the flock's perspective shrink, so the 3D blob reads as 3D
-  const list = DEPTH>0 ? [...boids].sort((a,b)=>b.z-a.z) : boids;
-  for(const b of list){
-    const zsp=_astroPersp(b); // CoM-relative, clamped; 1 at depth 0
-    const px=(b.x-_astroCx)*Z, py=(b.y-_astroCy)*Z;
-    const sx=cw+px*tc-py*ts, sy=ch+px*ts+py*tc;
-    let scale=(RADIUS/_bodyScale*IMG_SCALE)*Math.cbrt(b.m)*Zs*zsp;
-    // Astro ignores the per-sex pools (bodies have no meaningful sex; the pool rows are hidden
-    // in this mode, and fish loaded for the flock shouldn't leak in). User-LOADED shared image
-    // wins; the built-in teardrop does not (_sharedTex falls back to it, so test _customBoidPNG).
-    const bt=(_customBoidPNG&&_sharedTex)||_getAstroBallTex();
-    scale=Math.max(scale, 6/Math.max((bt&&bt.width)||80,1)); // never render below ~6px, whatever the zoom
-    const spr=_getBodySprite(_spriteCount++);
-    if(spr.texture!==bt) spr.texture=bt;
-    spr.visible=true; spr.x=sx; spr.y=sy;
-    spr.rotation=UPRIGHT_SPRITE?PANEL_TILT:Math.atan2(b.vy,b.vx)+PANEL_TILT;
-    spr.tint=_drawHex(b, SHOW_COLOR ? SPRITE_L : 100-DEPTH_LIGHT); // as in the flock branch
-    spr.alpha=1;
-    spr.scale.set(scale);
-    if(SHOW_DETAILS && b.m>3){ // glow around accreted "stars"
-      const gr=_astroRadiusPx(b)*2.4*Zs*zsp, col=_drawHex(b,60); // glow tracks the √Z body size (and depth)
-      g.beginFill(col,0.05); g.drawCircle(sx,sy,gr);     g.endFill();
-      g.beginFill(col,0.10); g.drawCircle(sx,sy,gr*0.5); g.endFill();
-    }
-  }
-}
-
-function astroTrails(){ // orbital paths — what makes spin / inertia / gravity legible. Reuses trail length + opacity.
-  const g=_gfx.trails; g.clear();
-  if(!SHOW_DETAILS) return;
-  const cw=canvas.width/2, ch=canvas.height/2, Z=_astroZoom, Zs=Math.sqrt(Z);
-  const tc=Math.cos(PANEL_TILT), ts=Math.sin(PANEL_TILT);
-  for(const b of boids){
-    const n=b.trail.length; if(n<2) continue;
-    const col=_drawHex(b,50), zsb=_astroPersp(b); // trail width follows the body's depth (1 at depth 0)
-    for(let i=1;i<n;i++){
-      const t=Math.pow(i/(n-1),0.5);
-      g.lineStyle(Math.max((t*2.4+0.5)*Zs*zsb,0.7), col, t*0.85*TRAIL_OPACITY); // width uses √Z like body size, with a visibility floor
-      const ax=(b.trail[i-1].x-_astroCx)*Z, ay=(b.trail[i-1].y-_astroCy)*Z, bx=(b.trail[i].x-_astroCx)*Z, by=(b.trail[i].y-_astroCy)*Z;
-      g.moveTo(cw+ax*tc-ay*ts, ch+ax*ts+ay*tc);
-      g.lineTo(cw+bx*tc-by*ts, ch+bx*ts+by*tc);
-    }
-  }
-  g.lineStyle(0);
-}
-
-function astroFrame(dt){
-  if(_fpsEl) _fpsEl.innerHTML = '☄ ASTRO · '+boids.length+' bodies'+_sndHint();
-  // Simulated time per frame = _ASTRO_RATE. Below 1 it is ONE shorter step; above, round(rate) steps
-  // of rate/n each (so rate 1,2,3… reproduces the old integer substeps exactly).
-  const nSteps=Math.max(1,Math.round(_ASTRO_RATE)), h=_ASTRO_RATE/nSteps;
-  for(let s=0;s<nSteps;s++){
-    // adaptive substepping: keep the fastest body's motion under ~half the softening length per
-    // integration, else close encounters inject spurious energy ("numerical heating") and the
-    // structure boils into fast noise. Capped ×4 to bound the O(N²) cost per frame.
-    let v2=0; for(const b of boids){ const q=b.vx*b.vx+b.vy*b.vy; if(q>v2) v2=q; }
-    const k=Math.min(4, Math.max(1, Math.ceil(Math.sqrt(v2)*h/(_ASTRO_SOFT*0.5))));
-    for(let i=0;i<k;i++) astroStep(h/k);
-  }
-  if(_ASTRO_MERGE) astroMerge();
-  astroView();
-  // cull far escapers: slingshot ejecta beyond 12× the half-mass radius never come back —
-  // they only waste O(N²) force work. (Skipped for small N so wide binaries survive.)
-  if(boids.length>16) boids=boids.filter(b=>Math.hypot(b.x-_astroCx,b.y-_astroCy,b.z-_astroCz)<12*_astroRh);
-  else if(boids.length>2){
-    // Small-N cull: endgame framing includes every body, so a true escaper would drag the view
-    // out forever. Remove only bodies that are provably UNBOUND (positive orbital energy),
-    // receding, and far — a bound orbiting companion always fails this test and is never culled.
-    const G=_ASTRO_G*0.03; let M=0; for(const b of boids) M+=b.m;
-    boids=boids.filter(b=>{
-      const dx=b.x-_astroCx, dy=b.y-_astroCy, dz=b.z-_astroCz;
-      const r=Math.hypot(dx,dy,dz); if(r<Math.max(6*_astroRh,600)) return true;
-      const receding=dx*b.vx+dy*b.vy+dz*b.vz>0;
-      const unbound=0.5*(b.vx*b.vx+b.vy*b.vy+b.vz*b.vz) > G*(M-b.m)/r;
-      return !(receding&&unbound);
-    });
-  }
-  for(const b of boids) _trailPush(b.trail, b.x, b.y); // record orbital path (no per-frame allocation)
-  drawBackground();
-  _spriteCount=0;
-  for(const sp of _bodySprites) sp.visible=false;
-  // Astro shares the body container. It assigns sprites in depth order, so no sorting is wanted —
-  // and the flock's ripple meshes must be hidden or they would hang over the orbital field with
-  // whatever visibility they held when the mode switched.
-  for(const m of _rippleMeshes) m.visible=false;
-  _gfx.bodySprites.sortableChildren=false;
-  _gfx.tails.clear(); _gfx.predFin.clear(); _gfx.predators.clear(); _gfx.boids.clear();
-  astroTrails();
-  astroDraw();
-  app.renderer.render(app.stage);
-}
-
 // ── click a boid to bring it forward ─────────────────────────────────────────
 // Tank and standalone only — the dashboard has no canvas. Deliberately NOT using Pixi's
 // interaction system: sprites are pooled and reassigned to a different boid every frame, so
@@ -6625,7 +6194,7 @@ if(RUN_MODE!=='dash'){
 // click into an unfocused popup (the pop-out strip is one) is often consumed activating the
 // window rather than delivered to the page. pointerdown also covers touch on the Pi.
 canvas.addEventListener('pointerdown', e => {
-  if(SIM_MODE!=='flock' || DEPTH<=0) return; // nothing to come forward to in a flat tank
+  if(DEPTH<=0) return; // nothing to come forward to in a flat tank
   // Map to canvas space: clientWidth/clientLeft exclude the 1px CSS border, and the canvas can be
   // scaled by CSS (max-width:100%), so never assume 1:1 with client coordinates.
   const rect=canvas.getBoundingClientRect();
@@ -6670,10 +6239,9 @@ if(lastTime!==null && ts-lastTime < FRAME_MIN_MS-2) return;
 const dt=lastTime===null?0:Math.min((ts-lastTime)/1000,0.1);
 lastTime=ts;
 simClock+=dt;
-if(++_sndTick>=6){ _sndTick=0; _sndUpdate(); } // sonification mappings at ~5 Hz (both modes)
+if(++_sndTick>=6){ _sndTick=0; _sndUpdate(); } // sonification mappings at ~5 Hz
 _sndPredSchedule(); // predator ostinato needs per-frame look-ahead scheduling for a steady beat
 _sndLeadSchedule(); // generative Bach-arpeggio lead — same per-frame look-ahead scheduling
-if(SIM_MODE==='astro'){ astroFrame(dt); return; } // gravitational N-body branch (rafId already queued)
 _imgScaleShown += (IMG_SCALE-_imgScaleShown)*0.16; // ease boid size toward the slider value (~0.3 s glide, one scalar/frame — no Pi cost)
 // Overlay: live boid count + preferred colour family
 // The overlay used to re-parse its innerHTML EVERY frame (30 Hz HTML parse + layout, for a
@@ -7006,19 +6574,6 @@ _rebuildBgTex();
 _rebuildBgOverlayTex();
 window.addEventListener('resize', resize);
 resize();
-// Boot in the dashboard's simulation mode (astro params baked alongside)
-SIM_MODE        = ${JSON.stringify(SIM_MODE)};
-_ASTRO_G        = ${_ASTRO_G};
-_ASTRO_INERTIA  = ${_ASTRO_INERTIA};
-_ASTRO_SOFT     = ${_ASTRO_SOFT};
-_ASTRO_SPIN     = ${_ASTRO_SPIN};
-_ASTRO_RATE = ${_ASTRO_RATE};
-_ASTRO_SETTLE   = ${_ASTRO_SETTLE};
-_ASTRO_STICK    = ${_ASTRO_STICK};
-_ASTRO_GROW     = ${_ASTRO_GROW};
-_ASTRO_MERGE    = ${_ASTRO_MERGE};
-_ASTRO_AUTOZOOM = ${_ASTRO_AUTOZOOM};
-_applySimMode();
 SOUND_ON        = ${SOUND_ON};
 _SND_DRONE      = ${_SND_DRONE};
 _SND_CHIME      = ${_SND_CHIME};
@@ -7039,7 +6594,7 @@ _SND_CLIMAX     = ${_SND_CLIMAX};
 _SND_DISEASE    = ${_SND_DISEASE};
 CLIMAX_POP      = ${CLIMAX_POP};
 if(SOUND_ON){ _sndSetBtn(); _sndInit(); } // audio starts on the first tap (browser gesture rule)
-if(SIM_MODE==='astro') astroSeed(); else startSim();
+startSim();
 ${(runMode==='standalone' && _composition) ? `window.__COMP=${JSON.stringify(_composition)};\n_tcStart(window.__COMP, true); // self-contained composition kiosk — loop the recorded piece` : '// no composition baked'}
 })();
 <\/script>`;
@@ -7125,7 +6680,7 @@ const toggles={};
 const g=(n,k)=>{ const v=_importConst(boot,n); if(v!==undefined) toggles[k||n]=v; };
 g('EVENT_FX'); g('AURA_MODE'); g('DIFF_MODE'); g('SHOW_COLOR'); g('SHOW_DETAILS');
 g('NO_OVERLAP'); g('DIM_INFERTILE'); g('UPRIGHT_SPRITE'); g('immigrationEnabled');
-g('HUNT_MODE'); g('SIM_MODE'); g('HUE_LOCK'); g('_ASTRO_MERGE','ASTRO_MERGE'); g('_ASTRO_AUTOZOOM','ASTRO_AUTOZOOM'); g('RIPPLE_STYLE');
+g('HUNT_MODE'); g('HUE_LOCK'); g('RIPPLE_STYLE');
 return { app:'boid-world', v:1, inputs, toggles };
 }
 function _importApply(html, fname){
@@ -7179,7 +6734,7 @@ applyBgOverlayPNG(bgOv||null, null);
 if(RUN_MODE==='dash') _tankSend({boid:1,t:'bgoverlay',data:bgOv||null});
 const on=document.getElementById('bgOverlayName'); if(on) on.textContent=bgOv?'imported':'none';
 
-_applySettings(s);                       // restores SIM_MODE first, then drives every control
+_applySettings(s);                       // drives every control
 if(comp && Array.isArray(comp.events)) _composition=comp;
 
 _compStatus('imported '+Object.keys(s.inputs).length+' controls'+(nImg?' · '+nImg+' images':'')+
@@ -7249,7 +6804,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','astroMergeBtn','astroZoomBtn','soundBtn','hueLockBtn','rippleStyleBtn']); // astroModeBtn deliberately NOT here — mode syncs via an explicit {t:'mode'} message, never a blind toggle. recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
@@ -7328,8 +6883,7 @@ _compLoadInput.addEventListener('change',e=>{
 // calls _applySettings — which fires the same input/click events the recorder captures — so a pad
 // press made WHILE RECORDING is baked into the composition as its individual control changes, and
 // thus survives replay and kiosk export with no dependency on the preset files. Slots persist in
-// localStorage. Dashboard-only. Caveat: a preset that changes SIM_MODE clicks astroModeBtn, which
-// is not in _FWD_CLICKS, so the mode switch itself is not recorded — use presets within one mode.
+// localStorage. Dashboard-only.
 const _PRESET_SLOTS=8;
 let _presets=[], _presetTarget=-1;
 const _presetFileInput=document.getElementById('presetFileInput');
@@ -7776,12 +7330,6 @@ window.addEventListener('message', e => {
     _tcStart(m.comp);
   } else if(m.t==='comp-stop'){
     _tcOn=false;
-  } else if(m.t==='mode'){
-    // explicit mode set (idempotent): only act when it actually changes
-    if(m.mode!==SIM_MODE){
-      SIM_MODE=m.mode; _applySimMode();
-      if(SIM_MODE==='astro') astroSeed(); else startSim();
-    }
   } else if(m.t==='bodyimg'){
     if(m.slot==='M'||m.slot==='F') addBodyPoolPNG(m.slot, m.data, m.upright);
     else applyBodySharedPNG(m.data);
