@@ -1971,7 +1971,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="shadeVal">30%</span>
 </div>
 <div class="ctrl-row">
-<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 10 quads across — beyond about 5 crests a grid that coarse breaks into facets.">boid waves</label>
+<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 16 quads across — beyond about 8 crests a grid that coarse breaks into facets.">boid waves</label>
 <input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
 <span class="ctrl-val" id="waveVal">1.3</span>
 </div>
@@ -3040,7 +3040,7 @@ function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 // bad well before that; 10 carries the slider's full range with room to spare. The cost is vertex
 // work only — 242 floats a frame per mesh instead of 98 — which at the intended handful of image
 // boids is nothing, and the geometry is still a unit plane that never needs rebuilding.
-const _RIPPLE_SEG   = 10;
+const _RIPPLE_SEG   = 16;   // was 10; raised for the swimming koi — the tail fin is only the last third of the image and needs enough columns to bend (vertex work only, see below)
 // The background image rides the same _rippleProgram but on its OWN, much denser grid: a
 // full-screen surface at 10 quads would facet badly once `waves` climbs. Write-once geometry,
 // ~2400 verts, one mesh — the cost is a one-time buffer alloc. (The light/shade wave is
@@ -3197,6 +3197,7 @@ float swimY(float x){
 // steps — constant loop bound for GLSL ES 1.0). Turning is a vertical-plane curl in this view, so the
 // bend term stays an in-plane y offset.
 void swimSide(inout vec2 b){
+  float yr = b.y;                                        // rest height, before the depth scaling below
   float t = 1.0 - b.x;                                   // 0 at the nose, 1 at the tail tip
   float w = 6.2832 * uSwimK;
   float s = 0.0;
@@ -3212,16 +3213,27 @@ void swimSide(inout vec2 b){
   b.x = 1.0 - s;
   b.y = 0.5 + (b.y - 0.5) * (1.0 + 1.4 * lat) + uSwimAsp * uSwimBend * 0.10 * t * t;
   vShade = 1.2 * lat;
-  // TAIL FIN STROKE. The caudal fin is a vertical blade; as it sweeps sideways it turns edge-on and back,
-  // so from the side it narrows and widens every beat — the most visible sign of swimming in this view.
-  // Its yaw grows toward the trailing edge (the fin flexes) and follows the body wave at the tail with a
-  // small lag. Foreshortened toward the fin root, so the root itself never moves; dimmer when edge-on.
+  // TAIL FIN STROKE, WITH FLEX. The caudal fin is a vertical blade; as it sweeps sideways it turns edge-on
+  // and back, so from the side it narrows and widens every beat. It is not stiff: the stroke travels down
+  // the fin (the trailing edge lags the root by lag) and the upper and lower lobes lag more than the
+  // middle (lobe, by distance ly from the fin's centre line), so the fin cups and its trailing edge goes
+  // from forked to straight to cupped through the stroke. Each point is pulled toward the root by the
+  // integral of (1 - cos yaw) from the root out to it (5 midpoint steps), so the root never moves.
+  // The body-wave slider sets how floppy the fin is. Dimmer where the fin is edge-on.
   float tf = smoothstep(0.68, 1.0, t);
   if (tf > 0.0) {
-    float ang = uFinAmp * sin(w * 0.85 - uSwimPh - 0.6) * pow(tf, 0.8);
-    float xr  = 0.32;                                    // fin root, in rest coordinates (head at x = 1)
-    b.x = xr + (b.x - xr) * cos(ang);
-    vShade += 0.22 * (cos(ang) - 1.0);
+    float ly   = min(1.0, abs(yr - 0.52) / 0.30);       // 0 on the fin's centre line (koi centre at 52% height), 1 at the lobe tips
+    float lag  = 1.2 * uSwimK;
+    float lobe = 0.8 * uSwimK;
+    float ph0  = w * 0.85 - uSwimPh - 0.6;              // the stroke follows the body wave at the tail
+    float ext  = 0.0;
+    for (int i = 0; i < 5; i++) {
+      float f = smoothstep(0.68, 1.0, 0.68 + (t - 0.68) * (float(i) + 0.5) / 5.0);
+      ext += 1.0 - cos(uFinAmp * pow(f, 0.8) * sin(ph0 - lag * f - lobe * ly * f));
+    }
+    b.x += ext * (t - 0.68) / 5.0;
+    float a0 = uFinAmp * pow(tf, 0.8) * sin(ph0 - lag * tf - lobe * ly * tf);
+    vShade += 0.22 * (cos(a0) - 1.0);
   }
 }
 void main(void){
