@@ -4202,12 +4202,15 @@ if((b._bcT-=dt)<=0){
   else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=0.4+Math.random()*0.4; } else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; } }
   else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; }
 }
+const _ch=b._chase||0;                                    // pulled toward its group (see _cohesionMove): no hovering, swim harder
+if(_ch>0.3 && b._bcMode===3){ b._bcMode=1; b._bcT=1.5+Math.random()*2.5; }
 let fT, thrT;
 if(b._fturn){ fT=0.7; thrT=0.8; }                        // turning round takes effort
 else if(b._bcMode===0){ fT=1.25; thrT=1.0; }              // burst
 else if(b._bcMode===1){ fT=0.75; thrT=0.5; }              // cruise
 else if(b._bcMode===2){ fT=0.45; thrT=0.12; }             // glide
 else { fT=0.08; thrT=0.25; }                              // hover — the tail still idles
+if(!b._fturn){ fT*=1+0.6*_ch; thrT=Math.max(thrT, 0.5+0.5*_ch); }
 b._f+=(fT-b._f)*(1-Math.exp(-dt/(fT>b._f?0.25:1.1)));    // quick to speed up, slow to glide down
 b._thrust+=(thrT-b._thrust)*(1-Math.exp(-dt/0.2));
 // move (per frame, like the rest of the engine)
@@ -4269,7 +4272,21 @@ if(o._ovBack){ if(o.z<ovD){ o.z=ovD; if(o.vz<0) o.vz=-o.vz*0.5; } }
 else if(o.z>=ovD-0.001){ o.z=ovD-0.001; if(o.vz>0) o.vz=-o.vz*0.5; }
 }
 
+// Cohesion moves a boid by direct position projection (a spring toward the local centroid). A fish can't be
+// moved like that — it slides there tail-first. For a fish the same displacement becomes INTENT: it steers the
+// wish toward the group, harder the stronger the pull, and _chase (pull ÷ swim speed, 0..1) makes it swim harder
+// to catch up (read by _fishStep). It then turns round if it has to and swims there head-first.
+function _cohesionMove(b, dx, dy){
+if(b._fish){
+  const m=Math.hypot(dx,dy);
+  b._chase=Math.min(1, m/Math.max(SPEED,0.01));
+  if(m>1e-4) steerToward(b, b.x+dx, b.y+dy, Math.min(3, 0.6+2.4*b._chase));
+  return;
+}
+b.x+=dx; b.y+=dy;
+}
 function nearnessBehavior(boid){
+boid._chase=0;
 const thresholdScale = 1.0+(BOND_THRESHOLD-1)*0.24;
 
 // combine local density and raw population overshoot
@@ -4295,8 +4312,7 @@ boid._hasAlign=false;
 // frame in the main loop; subtracting self reproduces the same centroid arithmetic in O(1).
 const gc=_flockN-1;
 if(gc>0){ const k=_COH_K*EMIG_RETURN;
-  boid.x+=k*((_flockSumX-boid.x)/gc-boid.x);
-  boid.y+=k*((_flockSumY-boid.y)/gc-boid.y); }
+  _cohesionMove(boid, k*((_flockSumX-boid.x)/gc-boid.x), k*((_flockSumY-boid.y)/gc-boid.y)); }
 return;
 }
 
@@ -4309,7 +4325,7 @@ if(boid._hasAlign) boid._alignAng = Math.atan2(hy,hx);
 // over the flock, it is CoM-preserving — the flock clusters WITHOUT creeping toward its densest edge
 // (the old fixed-speed steerToward cohesion was non-conservative and drove the flock into a corner).
 // `strength` keeps the density/warmup scaling; heading is left to wander + Boltzmann thermal noise.
-if(strength>0){ const k=_COH_K*strength; const tx=cx/count, ty=cy/count; boid.x+=k*(tx-boid.x); boid.y+=k*(ty-boid.y); }
+if(strength>0){ const k=_COH_K*strength; const tx=cx/count, ty=cy/count; _cohesionMove(boid, k*(tx-boid.x), k*(ty-boid.y)); }
 }
 
 function bondAttraction(boid){
