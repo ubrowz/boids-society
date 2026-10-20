@@ -3900,16 +3900,22 @@ steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*
 const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 2.2, FISH_PITCH_RATE = 0.9, FISH_TURN_HOLD = 2.0;
 function _fishStep(b, dt){
 dt=Math.min(Math.max(dt||0,0),0.1);
+// Everything below works in the ROOM's frame, not the canvas's: the panel can hang rotated (PANEL_TILT),
+// and "horizontal" for a fish means horizontal in the room. Room right = (hx,hy) in canvas coords, room
+// down = (-hy,hx) — the same frame an upright sprite uses when it is rotated by PANEL_TILT.
+const hx=Math.cos(PANEL_TILT), hy=Math.sin(PANEL_TILT);
+const wX=Math.cos(b._sa), wY=Math.sin(b._sa);
+const wR=wX*hx+wY*hy, wD=-wX*hy+wY*hx;                     // the flock's wish along room-right / room-down
 if(b._psi===undefined){                                    // first frame as a fish: start from the current heading
-  const c=Math.cos(b._sa);
+  const c=wR;
   b._fface=c<0?-1:1; b._psi=c<0?Math.PI:0; b._th=0; b._phi=0; b._phiT=0; b._phiTimer=0;
-  b._dsx=c; b._dsy=Math.sin(b._sa); b._dsxSlow=c; b._fturn=0; b._fturnLeft=0; b._fhold=0;
+  b._dsx=c; b._dsy=wD; b._dsxSlow=c; b._fturn=0; b._fturnLeft=0; b._fhold=0;
   b._bcMode=1; b._bcT=Math.random()*2; b._f=0.75; b._thrust=0.5; b._fbend=0;
 }
 // smoothed wish
 const k=1-Math.exp(-dt/0.35);
-b._dsx+=(Math.cos(b._sa)-b._dsx)*k; b._dsy+=(Math.sin(b._sa)-b._dsy)*k;
-b._dsxSlow+=(Math.cos(b._sa)-b._dsxSlow)*(1-Math.exp(-dt/1.2));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round
+b._dsx+=(wR-b._dsx)*k; b._dsy+=(wD-b._dsy)*k;
+b._dsxSlow+=(wR-b._dsxSlow)*(1-Math.exp(-dt/1.2));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round
 // cruising depth angle: a slow wander, pushed back toward the middle near the front or back glass
 if((b._phiTimer-=dt)<=0){
   if(DEPTH>0 && Math.random()<0.4){                        // a DEPTH RUN: swim mostly toward or away from the glass (you see its face or tail)
@@ -3967,7 +3973,8 @@ b._f+=(fT-b._f)*(1-Math.exp(-dt/(fT>b._f?0.25:1.1)));    // quick to speed up, s
 b._thrust+=(thrT-b._thrust)*(1-Math.exp(-dt/0.2));
 // move (per frame, like the rest of the engine)
 const sp=SPEED*b._f, cth=Math.cos(b._th);
-const vx=sp*cth*Math.cos(b._psi), vy=sp*Math.sin(b._th), vz=sp*cth*Math.sin(b._psi);
+const vR=sp*cth*Math.cos(b._psi), vD=sp*Math.sin(b._th), vz=sp*cth*Math.sin(b._psi);
+const vx=vR*hx-vD*hy, vy=vR*hy+vD*hx;                    // room frame → canvas
 b.x+=vx; b.y+=vy; b._fvx=vx; b._fvy=vy;
 if(DEPTH>0 && !(b._front>0)){ b.z=Math.max(0,Math.min(DEPTH,b.z+vz)); b.vz=vz; }
 _ovGuardZ(b,(b.isSingle?RADIUS*0.7:RADIUS)*zScaleOf(b)*_imgScaleShown);   // depth moved after the guard ran in the steering chain
@@ -5299,7 +5306,7 @@ const px=-sin, py=cos; // perpendicular (left)
 let _flipX=1, _sideRot=0;
 const _sideOn = SIDE_VIEW && _bt && _bt!==_defaultTex && !(_forceUpright || UPRIGHT_SPRITE);
 if(_sideOn){
-  const ca=Math.cos(boid._drawAngle), sa=Math.sin(boid._drawAngle);
+  const ca=Math.cos(boid._drawAngle-PANEL_TILT), sa=Math.sin(boid._drawAngle-PANEL_TILT);   // heading relative to the ROOM (the panel may hang rotated)
   if(boid._yaw===undefined){ boid._face = ca<0 ? -1 : 1; boid._yaw = ca<0 ? Math.PI : 0; boid._turn=-1; boid._hold=0; boid._sideLast=simClock; }
   let _tdt=simClock-boid._sideLast; boid._sideLast=simClock; if(_tdt<0||_tdt>0.25) _tdt=0;   // real time, clamped (a hidden tab must not complete a turn in one frame)
   if(boid._hold>0) boid._hold-=_tdt;
@@ -5318,7 +5325,7 @@ if(_sideOn){
   const _cy=Math.cos(boid._yaw);
   _flipX = Math.abs(_cy)<0.08 ? (_cy<0||(_cy===0&&boid._face<0) ? -0.08 : 0.08) : _cy;
   const _pitch = (boid._fish && boid._th!==undefined) ? boid._th : Math.max(-1.0, Math.min(1.0, Math.atan2(sa, Math.abs(ca))))*0.85;
-  _sideRot=_pitch*_cy;
+  _sideRot=PANEL_TILT+_pitch*_cy;                            // upright in the room, plus the climb/dive
 }
 boid._fish = _sideOn;                                        // physics reads this next frame (see _fishStep)
 let spr=null;
