@@ -1981,7 +1981,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <button id="sideViewBtn" class="mini-btn" title="Side-profile fish, swinging round to turn">off</button>
 </div>
 <div class="ctrl-row" style="gap:8px;">
-<label title="Draw the koi as real 3D fish: a lit model built in code, turned by the fish motion, so they swing round, swim toward and away from you and climb or dive as solid bodies instead of flat drawings. Needs side view on and the koi set loaded. Only the nearest few koi are 3D (see 3D koi max); the rest stay 2D. Step 1: the model is still rigid — swimming motion comes next.">3D koi</label>
+<label title="Draw the koi as real 3D fish: a lit model built in code, turned by the fish motion, so they swing round, swim toward and away from you and climb or dive as solid bodies instead of flat drawings. Needs side view on and the koi set loaded. Only the nearest few koi are 3D (see 3D koi max); the rest stay 2D. It swims with the same beat, rhythm and sliders as the 2D koi: a side-to-side wave down the body into a cupping tail fin, a curl into turns, sculling pectoral fins.">3D koi</label>
 <button id="koi3dBtn" class="mini-btn" title="3D koi on/off">off</button>
 </div>
 <div class="ctrl-row">
@@ -3418,8 +3418,10 @@ const DORS=[[0,.13],[.10,.20],[.24,.42],[.38,.68],[.52,.88],[.64,.90],[.76,.78],
 const VENT=[[0,.12],[.10,.18],[.24,.32],[.38,.52],[.52,.68],[.64,.72],[.76,.64],[.86,.46],[.94,.28],[.985,.14],[1.0,.05]];
 const prof=(tab,u)=>{ u=Math.max(0,Math.min(1,u)); let i=0; while(i<tab.length-2 && u>tab[i+1][0]) i++;
   let t=(u-tab[i][0])/(tab[i+1][0]-tab[i][0]); t=(1-Math.cos(t*Math.PI))/2; return tab[i][1]*(1-t)+tab[i+1][1]*t; };
-const pos=[], uv=[], col=[], idx=[];
-const V=(x,y,z,u,v,r,g,b,a)=>{ pos.push(x,y,z); uv.push(u,v); col.push(r,g,b,a); return pos.length/3-1; };
+const pos=[], uv=[], col=[], idx=[], fid=[], base=[];
+// fid: 0 body · 1 caudal · 2 dorsal · 3 anal · 4/5 pectoral left/right · 6/7 pelvic left/right; base = the root a paired fin pivots on
+let _fid=0, _base=[0,0,0];
+const V=(x,y,z,u,v,r,g,b,a)=>{ pos.push(x,y,z); uv.push(u,v); col.push(r,g,b,a); fid.push(_fid); base.push(_base[0],_base[1],_base[2]); return pos.length/3-1; };
 const tri=(a,b,c)=>idx.push(a,b,c);
 // body: rings from tail root to nose, denser at both ends
 const RU=[0,.03,.07,.12,.18,.25,.32,.40,.48,.56,.64,.72,.79,.85,.90,.94,.965,.982,.993,1.0];
@@ -3444,37 +3446,39 @@ const tailc=V(-0.5-0.004,0.0,0, 0.265, 0.52, 1,1,1,1);
 for(let k=0;k<SEG;k++){ tri(ring[RU.length-1][k],ring[RU.length-1][(k+1)%SEG],nose); tri(ring[0][(k+1)%SEG],ring[0][k],tailc); }
 const bodyIdx=idx.length;
 // fins: grid helper (rows × cols of points from a function), double-sided
-const fin=(cols,rows,f,rgb,alphaAt)=>{
+const fin=(cols,rows,f,rgb,alphaAt,id,root)=>{
+  _fid=id; _base=root||[0,0,0];
   const g=[];
   for(let i=0;i<=cols;i++){ const row=[]; for(let j=0;j<=rows;j++){ const p=f(i/cols,j/rows); row.push(V(p[0],p[1],p[2],-1,-1,rgb[0],rgb[1],rgb[2],alphaAt(i/cols,j/rows))); } g.push(row); }
   for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){ tri(g[i][j],g[i+1][j],g[i][j+1]); tri(g[i+1][j],g[i+1][j+1],g[i][j+1]); }
+  _fid=0; _base=[0,0,0];
 };
 const W=[1,0.94,0.88];                                       // fin base colour (the per-variety tint is a uniform)
 const sm=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
 // caudal fin: vertical fan behind the tail root, soft fork
 fin(10,8,(t,s)=>{ const r=s*2-1, span=0.021+0.157*Math.pow(Math.sin(t*Math.PI/2),1.35);
   const notch=1-0.16*(1-Math.abs(r))*sm(0.7,1,t);
-  return [-0.47-0.34*t*notch, r*span, 0]; }, W, (t)=>0.80-0.20*t);
+  return [-0.47-0.34*t*notch, r*span, 0]; }, W, (t)=>0.80-0.20*t, 1);
 // dorsal fin: along the back, leaning back
 fin(8,1,(t,s)=>{ const x=-0.14+0.33*t, u=x+0.5, yb=prof(DORS,u)*D-0.006;
   const h=0.075*Math.pow(Math.sin(Math.PI*Math.min(1,Math.pow(t,0.8))),0.8)*(1-0.25*t)*s;
-  return [x-0.35*h, yb+h, 0]; }, W, ()=>0.75);
+  return [x-0.35*h, yb+h, 0]; }, W, ()=>0.75, 2);
 // anal fin: small, under the rear body, pointing back-down
 fin(4,1,(t,s)=>{ const x=-0.33+0.08*t, u=x+0.5, yb=-prof(VENT,u)*D+0.004;
-  const h=0.040*Math.sin(Math.PI*t)*s; return [x-0.6*h, yb-h, 0]; }, W, ()=>0.75);
+  const h=0.040*Math.sin(Math.PI*t)*s; return [x-0.6*h, yb-h, 0]; }, W, ()=>0.75, 3);
 // paired fins: leaves swept back from a base point, in the plane of their direction and a side vector
-const leaf=(base,dir,len,wid,cols)=>{
+const leaf=(base,dir,len,wid,cols,id)=>{
   const n=Math.hypot(...dir), d=dir.map(v=>v/n);
   let e=[-d[2],0,d[0]];                                      // horizontal vector across the fin's direction const en=Math.hypot(...e)||1; e=e.map(v=>v/en);
   const f=(t,s)=>{ const w=wid*Math.pow(Math.sin(Math.PI*Math.min(1,Math.pow(t,0.75))),0.9)*(s*2-1);
     return [base[0]+d[0]*len*t+e[0]*w, base[1]+d[1]*len*t+e[1]*w-0.02*len*t*t, base[2]+d[2]*len*t+e[2]*w]; };
-  fin(cols,2,f,W,()=>0.80);
+  fin(cols,2,f,W,()=>0.80,id,base);
 };
 for(const sg of [-1,1]){
   const up=0.765, wz=0.77*(prof(DORS,up)+prof(VENT,up))/2*D;
-  leaf([0.265,-0.045,sg*0.80*wz],[-0.75,-0.40,sg*0.52],0.20,0.034,6);            // pectoral
+  leaf([0.265,-0.045,sg*0.80*wz],[-0.75,-0.40,sg*0.52],0.20,0.034,6, sg<0?4:5);  // pectoral
   const uq=0.50, wq=0.77*(prof(DORS,uq)+prof(VENT,uq))/2*D;
-  leaf([0.0,-0.090,sg*0.45*wq],[-0.62,-0.62,sg*0.30],0.10,0.020,4);              // pelvic
+  leaf([0.0,-0.090,sg*0.45*wq],[-0.62,-0.62,sg*0.30],0.10,0.020,4, sg<0?6:7);    // pelvic
 }
 // normals
 const nrm=new Float32Array(pos.length);
@@ -3485,7 +3489,7 @@ for(let i=0;i<idx.length;i+=3){
   for(const q of [a,b,c]){ nrm[q]+=nx; nrm[q+1]+=ny; nrm[q+2]+=nz; }
 }
 for(let i=0;i<nrm.length;i+=3){ const l=Math.hypot(nrm[i],nrm[i+1],nrm[i+2])||1; nrm[i]/=l; nrm[i+1]/=l; nrm[i+2]/=l; }
-return { pos:new Float32Array(pos), nrm, uv:new Float32Array(uv), col:new Float32Array(col), idx:new Uint16Array(idx), bodyIdx };
+return { pos:new Float32Array(pos), nrm, uv:new Float32Array(uv), col:new Float32Array(col), fid:new Float32Array(fid), base:new Float32Array(base), idx:new Uint16Array(idx), bodyIdx };
 }
 // ── 3D koi: program + per-fish mesh pool ─────────────────────────────────────
 // One shared geometry (_koi3dBuild) and program; one Mesh per 3D koi (each its own draw call, so the count is
@@ -3498,9 +3502,17 @@ return { pos:new Float32Array(pos), nrm, uv:new Float32Array(uv), col:new Float3
 // (unpremultiplied, forced opaque); fins = vertex colour × the variety's fin colour, see-through.
 const _KOI3D_VERT = `
 precision highp float;
-attribute vec3 aPos; attribute vec3 aNorm; attribute vec2 aUV; attribute vec4 aCol;
+attribute vec3 aPos; attribute vec3 aNorm; attribute vec2 aUV; attribute vec4 aCol; attribute float aFin; attribute vec3 aBase;
 uniform mat3 projectionMatrix;
 uniform vec2 uCenter; uniform float uScale; uniform float uYaw; uniform float uPitch; uniform float uTilt; uniform vec2 uDepth;
+uniform float uAmp;    // side-to-side swing at the tail tip, in body lengths (0 = rigid)
+uniform float uPh;     // tail-beat phase (radians, wrapped)
+uniform float uK;      // body wavelengths per body length (the body-wave slider)
+uniform float uLobe;   // extra lag of the tail-fin lobes → the fin cups
+uniform float uBendZ;  // -1..1 sideways C-curl from turning (yaw rate)
+uniform float uBendY;  // -1..1 vertical curl from climbing/diving (pitch change)
+uniform float uPecB;   // pectoral sweep (rad): + forward/out, - folded back against the body
+uniform float uFin;    // tail-fin stroke (rad at the trailing edge) — what makes the swimming visible from the side
 varying vec2 vUV; varying vec4 vCol; varying float vLight;
 vec3 orient(vec3 p){
   float cp = cos(uPitch), sp = sin(uPitch);
@@ -3508,9 +3520,49 @@ vec3 orient(vec3 p){
   float cy = cos(uYaw), sy = sin(uYaw);
   return vec3(p.x * cy - p.z * sy, p.y, p.x * sy + p.z * cy);   // x = room right, y = up, z = away from the glass
 }
+// SWIMMING. All in model space (x forward, y up, z = the fish's side), before the fish is turned:
+// paired fins sweep about the vertical through their root; then the whole fish (fins included) takes a
+// side-to-side wave running head→tail, growing toward the tail, with the tail-fin lobes lagging the middle;
+// turning adds a C-curl, climbing/diving a vertical curl. Normals are tilted by the local spine slope so the
+// light slides along the bending body. s = 0 at the nose → 1 at the tail-fin tip (model length 1.31).
+void swim(inout vec3 q, inout vec3 n){
+  if (aFin > 3.5) {
+    float side = (aFin < 4.5 || (aFin > 5.5 && aFin < 6.5)) ? -1.0 : 1.0;
+    float a = -side * (aFin < 5.5 ? uPecB : 0.5 * uPecB);
+    float ca = cos(a), sa = sin(a);
+    vec3 r = q - aBase;
+    q = aBase + vec3(r.x * ca - r.z * sa, r.y, r.x * sa + r.z * ca);
+    n = vec3(n.x * ca - n.z * sa, n.y, n.x * sa + n.z * ca);
+  }
+  float w = 6.2832 * uK;
+  if (aFin > 0.5 && aFin < 1.5) {
+    // TAIL-FIN STROKE: the fin yaws about its root (a vertical axis at x = -0.47) on every beat, flexing — the
+    // trailing edge lags the root and the lobes lag the middle, so it narrows, cups and widens as you watch.
+    // The realistic body wave alone tilts it only ~20°, which hardly shows from the side; this matches the
+    // 2D koi's stroke (up to ~50°).
+    float sc = clamp((0.5 - q.x) / 1.31, 0.0, 1.0);
+    float tc = clamp((sc - 0.74) / 0.26, 0.0, 1.0);
+    float lc = clamp(abs(q.y) / 0.18, 0.0, 1.0);
+    float al = uFin * pow(tc, 0.8) * sin(w * 0.85 - uPh - 0.6 - 1.2 * uK * tc - uLobe * lc * tc);
+    float c2 = cos(al), s2 = sin(al), rx = q.x + 0.47;
+    q = vec3(-0.47 + rx * c2, q.y, q.z + rx * s2);
+    n = vec3(n.x * c2 - n.z * s2, n.y, n.x * s2 + n.z * c2);
+  }
+  float s   = clamp((0.5 - q.x) / 1.31, 0.0, 1.0);
+  float env = 0.06 + 0.94 * s * s;
+  float ph  = w * s - uPh;
+  float lat = uAmp * env * sin(ph);
+  float dl  = uAmp * (1.88 * s * sin(ph) + env * w * cos(ph));
+  q.z += lat + uBendZ * 0.12 * s * s;
+  q.y -= uBendY * 0.06 * s * s;
+  float slope = -(dl + uBendZ * 0.24 * s) / 1.31;
+  n = normalize(vec3(n.x - slope * n.z, n.y, n.z + slope * n.x));
+}
 void main(void){
-  vec3 p = orient(aPos);
-  vec3 n = normalize(orient(aNorm));
+  vec3 q = aPos, m = aNorm;
+  swim(q, m);
+  vec3 p = orient(q);
+  vec3 n = normalize(orient(m));
   vec2 s = vec2(p.x, -p.y) * uScale;
   float ct = cos(uTilt), st = sin(uTilt);
   vec2 c = uCenter + vec2(s.x * ct - s.y * st, s.x * st + s.y * ct);
@@ -3538,12 +3590,14 @@ const _KOI3D_FIN_DEFAULT = new Float32Array([1.0, 0.93, 0.88]);
 function _getKoi3DMesh(){
 if(!_koi3dProg){
   const g=_koi3dBuild();
-  _koi3dGeom=new PIXI.Geometry().addAttribute('aPos',g.pos,3).addAttribute('aNorm',g.nrm,3).addAttribute('aUV',g.uv,2).addAttribute('aCol',g.col,4).addIndex(g.idx);
+  _koi3dGeom=new PIXI.Geometry().addAttribute('aPos',g.pos,3).addAttribute('aNorm',g.nrm,3).addAttribute('aUV',g.uv,2).addAttribute('aCol',g.col,4)
+                              .addAttribute('aFin',g.fid,1).addAttribute('aBase',g.base,3).addIndex(g.idx);
   _koi3dProg=PIXI.Program.from(_KOI3D_VERT,_KOI3D_FRAG);
 }
 if(_koi3dUsed>=_koi3dMeshes.length){
   const sh=new PIXI.Shader(_koi3dProg,{ uTex:PIXI.Texture.WHITE, uCenter:new Float32Array(2), uScale:100, uYaw:0, uPitch:0, uTilt:0,
-                                         uDepth:new Float32Array([0,0.05]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_FIN_DEFAULT, uAlpha:1 });
+                                         uDepth:new Float32Array([0,0.05]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_FIN_DEFAULT, uAlpha:1,
+                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0 });
   const m=new PIXI.Mesh(_koi3dGeom, sh);
   m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
   _gfx.bodySprites.addChild(m);
@@ -4112,6 +4166,10 @@ if(b._fturn){
   let d=tgt-b._psi; d=Math.atan2(Math.sin(d),Math.cos(d));
   b._psi+=Math.max(-0.9*dt,Math.min(0.9*dt,d));
 }
+// yaw rate → sideways C-curl for the 3D koi (ψ increasing = nose swinging away from the glass; the body bows into the turn)
+if(b._psiPrev===undefined) b._psiPrev=b._psi;
+{ let dpsi=b._psi-b._psiPrev; dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi)); b._psiPrev=b._psi;
+  const tgtB=dt>0 ? Math.max(-1,Math.min(1,dpsi/dt*0.45)) : 0; b._yawBend=(b._yawBend||0)+(tgtB-(b._yawBend||0))*(1-Math.exp(-dt/0.15)); }
 // pitch: limited climb/dive, rate-limited; its rate also curls the body (read in drawBoid)
 let thT=Math.max(-FISH_PITCH_MAX,Math.min(FISH_PITCH_MAX,Math.atan2(b._dsy,Math.abs(b._dsx)+0.15)));
 if(b._fturn) thT*=0.5;
@@ -5583,6 +5641,14 @@ if(_k3){
   u.uDepth[0]=0.97-(2*k+1)*half; u.uDepth[1]=half*0.9;       // this koi's own depth slice, nearer for later (nearer) koi
   const _tn=spr.tint; u.uTint[0]=((_tn>>16)&255)/255; u.uTint[1]=((_tn>>8)&255)/255; u.uTint[2]=(_tn&255)/255;
   u.uAlpha=baseAlpha;
+  // swimming: the same beat, rhythm and sliders as the 2D koi. Swing in body lengths: swim 50% → 0.075 cruising,
+  // 0.125 in a burst, 0.037 gliding. Curls scale with the swim amount so a gentle setting stays gentle.
+  const _sw = _swimOn ? Math.min(1.5, Math.sqrt(SWIM_AMT/0.04)) : 0, _th3 = boid._thrust!==undefined ? boid._thrust : 0.5;
+  u.uAmp=Math.min(0.16, 0.10*_sw*(0.25+_th3));
+  u.uPh=boid._swimPh||0; u.uK=SWIM_WAVE; u.uLobe=0.8*SWIM_WAVE;
+  u.uBendZ=(boid._yawBend||0)*Math.min(1,_sw); u.uBendY=(boid._fbend||0)*Math.min(1,_sw);
+  u.uPecB=_swimOn ? (boid._pecBeta||0) : 0;
+  u.uFin=_swimOn ? Math.min(0.95, 0.85*Math.sqrt(SWIM_AMT/0.04))*(0.35+0.65*_th3) : 0;   // same stroke strength as the 2D koi's fin
   m.zIndex=spr.zIndex;
 }
 if(boid._visR > _maxVisR) _maxVisR = boid._visR;
