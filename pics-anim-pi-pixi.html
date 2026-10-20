@@ -1921,7 +1921,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <h2>Body image</h2>
 <div class="ctrl-row">
 <label title="Five hand-drawn koi — kohaku, sanke, showa, ogon, asagi — in side profile, facing right (the swim wave and the side view both expect that). Fills BOTH sex pools, sets the image size to suit and turns swimming on. (A tank where every boid wears an image hides the predator — it still hunts, you just hear it.)">koi set</label>
-<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools, set image size 0.10×, a gentle swim (35%) and side view on">load koi</button>
+<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools, set image size 0.10×, swim 50% and side view on">load koi</button>
 <button id="koiClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="koiName" class="mini-note"></span>
 </div>
@@ -2505,7 +2505,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
     document.getElementById('bodyImg'+sex+'Name').textContent=urls.length+' imgs';
   }
   _setSlider('imgScaleSlider', 0.1);                                        // the koi textures are 6× the teardrop's size
-  if(parseInt(document.getElementById('swimSlider').value)===0) _setSlider('swimSlider', 35);
+  if(parseInt(document.getElementById('swimSlider').value)===0) _setSlider('swimSlider', 50);
   if(!SIDE_VIEW) document.getElementById('sideViewBtn').click();
   _setSlider('speedSlider', 6); _setSlider('cohKSlider', 45); _setSlider('alignSlider', 30);   // koi pond: slower, looser shoaling, less schooling           // fish are drawn in side profile; the click also reaches the tank
   document.getElementById('koiName').textContent=urls.length+' koi';
@@ -3152,6 +3152,7 @@ uniform float uSwimPh;   // wrapped beat phase, radians
 uniform float uSwimK;    // wavelengths along the body
 uniform float uSwimBend; // -1..1 body curvature from turning
 uniform float uSwimAsp;  // texture width / height — converts length-fractions into unit-square y
+uniform float uFinAmp;   // side view: how far the tail fin yaws into depth (radians) — the stroke you actually see from the side
 uniform float uSwimSide; // 1 = fish seen from the SIDE: the swing runs into depth (see swimSide), 0 = in-plane wave (seen from above)
 varying float vShade;    // swim: >0 lighter (swung toward the viewer), <0 darker
 varying vec2 vTextureCoord;
@@ -3211,6 +3212,17 @@ void swimSide(inout vec2 b){
   b.x = 1.0 - s;
   b.y = 0.5 + (b.y - 0.5) * (1.0 + 1.4 * lat) + uSwimAsp * uSwimBend * 0.10 * t * t;
   vShade = 1.2 * lat;
+  // TAIL FIN STROKE. The caudal fin is a vertical blade; as it sweeps sideways it turns edge-on and back,
+  // so from the side it narrows and widens every beat — the most visible sign of swimming in this view.
+  // Its yaw grows toward the trailing edge (the fin flexes) and follows the body wave at the tail with a
+  // small lag. Foreshortened toward the fin root, so the root itself never moves; dimmer when edge-on.
+  float tf = smoothstep(0.68, 1.0, t);
+  if (tf > 0.0) {
+    float ang = uFinAmp * sin(w * 0.85 - uSwimPh - 0.6) * pow(tf, 0.8);
+    float xr  = 0.32;                                    // fin root, in rest coordinates (head at x = 1)
+    b.x = xr + (b.x - xr) * cos(ang);
+    vShade += 0.22 * (cos(ang) - 1.0);
+  }
 }
 void main(void){
   // aVertexPosition is the rest grid and stays that way — read the waves from it, never from the
@@ -3318,7 +3330,7 @@ if(_rippleUsed>=_rippleMeshes.length){
   // and the meshes each carry their own draw call already, which is the cost this look pays.
   const m=new PIXI.Mesh(_rippleGeom, new PIXI.MeshMaterial(tex, { program:_rippleProgram,
     uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-               uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+               uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) } }));
                // uStyle 0 = own cloth ripple; flips to 2 (rides the background pond) in _rippleUpdate when a pond is live
@@ -3339,13 +3351,14 @@ return m;
 // a mesh that is NOT swimming this frame must be zeroed or it would inherit the last swimmer's wave.
 function _swimUpdate(m, tex, boid, face, side){
 const u=m.shader.uniforms;
-if(!boid){ u.uSwimAmp=0; u.uSwimBend=0; u.uSwimSide=0; return; }
+if(!boid){ u.uSwimAmp=0; u.uSwimBend=0; u.uSwimSide=0; u.uFinAmp=0; return; }
 u.uSwimSide = side ? 1 : 0;                           // side view: the swing goes into depth (foreshortening + size/brightness) instead of bending in the picture plane
-u.uSwimAmp  = SWIM_AMT*(1+0.8*Math.abs(boid._bend))*(side?1.25:1)*(boid._fish && boid._thrust!==undefined ? 0.25+boid._thrust : 1);   // a turning fish beats harder; a depth swing needs more amplitude to read than an in-plane wave
+u.uSwimAmp  = Math.min(0.2, SWIM_AMT*(1+0.8*Math.abs(boid._bend))*(side?3:1)*(boid._fish && boid._thrust!==undefined ? 0.25+boid._thrust : 1));   // side view ×3: a swing into depth only shows as foreshortening and size/light, which at ×1 was under a pixel on a 75 px koi   // a turning fish beats harder; a depth swing needs more amplitude to read than an in-plane wave
 u.uSwimPh   = boid._swimPh;
 u.uSwimK    = SWIM_WAVE;
 u.uSwimBend = boid._bend*(face||1)*Math.min(1.5, Math.pow(SWIM_AMT/0.04, 2));   // quadratic: a gentle swim setting means a barely-there curl                  // a left-facing fish is mirrored: its 'inside of the turn' is the other way in local y
 u.uSwimAsp  = (tex.width||1)/(tex.height||1);
+u.uFinAmp   = side ? Math.min(0.95, 0.85*Math.sqrt(SWIM_AMT/0.04))*(boid._fish && boid._thrust!==undefined ? 0.35+0.65*boid._thrust : 1) : 0;   // tail-fin yaw: swim 50% → 0.85 rad at full thrust, ~0.57 cruising, ~0.36 gliding   // tail-fin yaw: ~0.85 rad (≈50°) in a burst at swim 50%, ~0.25 rad while gliding
 }
 function _rippleUpdate(m, tex, phase, bx, by){
 const u=m.shader.uniforms;
@@ -3388,7 +3401,7 @@ if(app){ // RUN_MODE!=='dash'
     _bgMesh = new PIXI.Mesh(_bgGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                   uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
@@ -3403,7 +3416,7 @@ if(app){ // RUN_MODE!=='dash'
     _bgOverlayMesh = new PIXI.Mesh(_ovGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                   uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
@@ -3841,26 +3854,31 @@ steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*
 //    the speed, _thrust the tail beat (read by the swim shader through drawBoid).
 // boid.vx/vy keep the DESIRED heading so every steering helper keeps working; the fish's real screen
 // velocity is _fvx/_fvy. Gated by boid._fish, which drawBoid sets (side view on, image boid, not upright).
-const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 1.3, FISH_PITCH_RATE = 0.9;
+const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 2.2, FISH_PITCH_RATE = 0.9, FISH_TURN_HOLD = 2.0;
 function _fishStep(b, dt){
 dt=Math.min(Math.max(dt||0,0),0.1);
 if(b._psi===undefined){                                    // first frame as a fish: start from the current heading
   const c=Math.cos(b._sa);
   b._fface=c<0?-1:1; b._psi=c<0?Math.PI:0; b._th=0; b._phi=0; b._phiT=0; b._phiTimer=0;
-  b._dsx=c; b._dsy=Math.sin(b._sa); b._fturn=0; b._fturnLeft=0; b._fhold=0;
-  b._bcMode=1; b._bcT=Math.random()*1.5; b._f=0.6; b._thrust=0.3; b._fbend=0;
+  b._dsx=c; b._dsy=Math.sin(b._sa); b._dsxSlow=c; b._fturn=0; b._fturnLeft=0; b._fhold=0;
+  b._bcMode=1; b._bcT=Math.random()*2; b._f=0.75; b._thrust=0.5; b._fbend=0;
 }
 // smoothed wish
 const k=1-Math.exp(-dt/0.35);
 b._dsx+=(Math.cos(b._sa)-b._dsx)*k; b._dsy+=(Math.sin(b._sa)-b._dsy)*k;
+b._dsxSlow+=(Math.cos(b._sa)-b._dsxSlow)*(1-Math.exp(-dt/1.2));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round
 // cruising depth angle: a slow wander, pushed back toward the middle near the front or back glass
-if((b._phiTimer-=dt)<=0){ b._phiTimer=3+Math.random()*4; b._phiT=(Math.random()*2-1)*0.55; }
+if((b._phiTimer-=dt)<=0){
+  if(DEPTH>0 && Math.random()<0.4){                        // a DEPTH RUN: swim mostly toward or away from the glass (you see its face or tail)
+    b._phiTimer=2+Math.random()*2.5; b._phiT=(b.z<DEPTH*0.5 ? 1 : -1)*(0.95+Math.random()*0.35);
+  } else { b._phiTimer=3+Math.random()*4; b._phiT=(Math.random()*2-1)*0.5; }
+}
 if(DEPTH>0){ if(b.z<DEPTH*0.15) b._phiT=0.45; else if(b.z>DEPTH*0.85) b._phiT=-0.45; } else b._phiT=0;
-b._phi+=Math.max(-0.25*dt,Math.min(0.25*dt,b._phiT-b._phi));
+b._phi+=Math.max(-0.7*dt,Math.min(0.7*dt,b._phiT-b._phi));
 // facing + turning round through depth
 if(b._fhold>0) b._fhold-=dt;
 if(!b._fturn){
-  const want = b._dsx>0.25 ? 1 : (b._dsx<-0.25 ? -1 : b._fface);
+  const want = b._dsxSlow>0.3 ? 1 : (b._dsxSlow<-0.3 ? -1 : b._fface);
   if(want!==b._fface && b._fhold<=0){
     const away = DEPTH<=0 ? (Math.random()<0.5) : b.z < DEPTH*0.5;      // swing round on the side with room
     // right→left via 'away' turns ψ positive (sinψ>0 = moving away); left→right via 'away' turns it negative
@@ -3869,32 +3887,39 @@ if(!b._fturn){
   }
 }
 if(b._fturn){
-  const step=Math.min(b._fturnLeft, Math.PI/FISH_TURN_SECS*dt);
+  // slower while facing the glass (|cos ψ| small): the fold-over in the middle is where a constant rate looked like a flip.
+  // 0.80 is the mean of the ease over a half-turn, so the whole turn still takes ≈ FISH_TURN_SECS.
+  const step=Math.min(b._fturnLeft, Math.PI/FISH_TURN_SECS*dt*(0.45+0.55*Math.abs(Math.cos(b._psi)))/0.80);
   b._psi+=b._fturn*step; b._fturnLeft-=step;
   if(b._fturnLeft<=1e-6){
-    b._fface=-b._fface; b._fturn=0; b._fhold=1.0;
+    b._fface=-b._fface; b._fturn=0; b._fhold=FISH_TURN_HOLD;
     b._psi=Math.atan2(Math.sin(b._psi),Math.cos(b._psi));                // normalise to (-π, π]
   }
 } else {
   const tgt = b._fface>0 ? b._phi : Math.PI-b._phi;
   let d=tgt-b._psi; d=Math.atan2(Math.sin(d),Math.cos(d));
-  b._psi+=Math.max(-0.5*dt,Math.min(0.5*dt,d));
+  b._psi+=Math.max(-0.9*dt,Math.min(0.9*dt,d));
 }
 // pitch: limited climb/dive, rate-limited; its rate also curls the body (read in drawBoid)
 let thT=Math.max(-FISH_PITCH_MAX,Math.min(FISH_PITCH_MAX,Math.atan2(b._dsy,Math.abs(b._dsx)+0.15)));
 if(b._fturn) thT*=0.5;
 b._th+=Math.max(-FISH_PITCH_RATE*dt,Math.min(FISH_PITCH_RATE*dt,thT-b._th));
 b._fbend=Math.max(-1,Math.min(1,(thT-b._th)*3));
-// burst-and-coast
+// swimming rhythm: CRUISE is the normal state (steady strokes); now and then a BURST, a short GLIDE, rarely a HOVER.
+// 0 burst · 1 cruise · 2 glide · 3 hover
 if((b._bcT-=dt)<=0){
-  if(b._bcMode===0){ if(Math.random()<0.12){ b._bcMode=2; b._bcT=2+Math.random()*3; } else { b._bcMode=1; b._bcT=0.9+Math.random()*1.8; } }
-  else { b._bcMode=0; b._bcT=0.35+Math.random()*0.45; }
+  const r=Math.random();
+  if(b._bcMode===1){ if(r<0.35){ b._bcMode=0; b._bcT=0.4+Math.random()*0.4; } else if(r<0.88){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=3; b._bcT=2+Math.random()*2; } }
+  else if(b._bcMode===0){ if(r<0.6){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; } }
+  else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=0.4+Math.random()*0.4; } else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; } }
+  else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; }
 }
 let fT, thrT;
 if(b._fturn){ fT=0.7; thrT=0.8; }                        // turning round takes effort
-else if(b._bcMode===0){ fT=1.3; thrT=1.0; }               // burst
-else if(b._bcMode===1){ fT=0.42; thrT=0.12; }             // glide
-else { fT=0.06; thrT=0.05; }                              // hover
+else if(b._bcMode===0){ fT=1.25; thrT=1.0; }              // burst
+else if(b._bcMode===1){ fT=0.75; thrT=0.5; }              // cruise
+else if(b._bcMode===2){ fT=0.45; thrT=0.12; }             // glide
+else { fT=0.08; thrT=0.25; }                              // hover — the tail still idles
 b._f+=(fT-b._f)*(1-Math.exp(-dt/(fT>b._f?0.25:1.1)));    // quick to speed up, slow to glide down
 b._thrust+=(thrT-b._thrust)*(1-Math.exp(-dt/0.2));
 // move (per frame, like the rest of the engine)
