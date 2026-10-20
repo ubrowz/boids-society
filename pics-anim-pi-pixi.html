@@ -2556,7 +2556,9 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   // koi pond population: about 10 koi, every one of them 3D (the Pi + 192×32 panel target). The ceiling culls the
   // surplus right away (one fading out per frame); target and start size keep it there through births and restarts.
   _setSlider('popCeilSlider', 10); _setSlider('targetSlider', 9); _setSlider('initPopSlider', 10);
-  if(parseInt(document.getElementById('koi3dMaxSlider').value)<10) _setSlider('koi3dMaxSlider', 10);
+  // 3D max above the ceiling: koi that are dying (or culled) keep drawing while they fade, so the tank briefly holds
+  // 11–13; with max = 10 the farthest koi would flip to the flat 2D drawing for a moment, which reads as a jump.
+  if(parseInt(document.getElementById('koi3dMaxSlider').value)<14) _setSlider('koi3dMaxSlider', 14);
   if(!KOI3D) document.getElementById('koi3dBtn').click();           // fish are drawn in side profile; the click also reaches the tank
   document.getElementById('koiName').textContent=urls.length+' koi';
 });
@@ -4549,7 +4551,9 @@ boid.vx=(boid.vx/spd)*SPEED; boid.vy=(boid.vy/spd)*SPEED;
 if(bounced){
   boid._sa=Math.atan2(boid.vy,boid.vx);       // physics angle: snap immediately
   boid._drawAngle=boid._sa;                    // display angle: snap too — avoids lerping through 180°
-  boid._drawX=boid.x; boid._drawY=boid.y;      // and the display position, or the lag pokes through the wall
+  // and the display position, or the lag pokes through the wall. Not for a fish: it keeps facing its own way
+  // (its pose isn't the bounced heading), so the snap would only skip its ~2-frame lag — a visible jump forward.
+  if(!boid._fish){ boid._drawX=boid.x; boid._drawY=boid.y; }
 }
 }
 
