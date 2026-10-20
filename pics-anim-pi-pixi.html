@@ -3615,9 +3615,9 @@ void swim(inout vec3 q, inout vec3 n){
   if (aFin < 0.5) {
     // BREATHING: the mouth pushes forward and the lower jaw drops (koi mouths protrude); the gill covers lift
     // at their trailing edge (x = 0.29). The dark opening itself is painted in the fragment stage.
-    float wn = smoothstep(0.43, 0.50, q.x), low = clamp((-0.004 - q.y) / 0.010, 0.0, 1.0);
-    q.x += 0.030 * uMouth * wn;
-    q.y -= 0.012 * uMouth * wn * low;
+    float wn = smoothstep(0.40, 0.50, q.x), low = clamp((-0.004 - q.y) / 0.010, 0.0, 1.0);
+    q.x += 0.050 * uMouth * wn;
+    q.y -= 0.024 * uMouth * wn * low;
     float wg = smoothstep(0.26, 0.29, q.x) * (1.0 - smoothstep(0.29, 0.40, q.x));
     q.z += sign(q.z) * 0.008 * uGill * wg * abs(n.z);
   }
@@ -3697,8 +3697,8 @@ void main(void){
     vec3 a = texture2D(uTex, vUV).rgb;                           // unlit body colour map (opaque)
     // open mouth: a dark round opening at the snout tip (on the panel this is the part of a gulp that shows);
     // lifted gill covers: a dark red slit just behind the cover's curved edge (same curve as the colour map)
-    float dm = length((vM - vec3(0.505, -0.004, 0.0)) * vec3(0.7, 1.0, 1.0));
-    a = mix(a, vec3(0.16, 0.07, 0.06), uMouth * (1.0 - smoothstep(0.010, 0.024, dm)));
+    float dm = length((vM - vec3(0.505, -0.004, 0.0)) * vec3(0.6, 1.0, 1.0));
+    a = mix(a, vec3(0.08, 0.03, 0.03), uMouth * (1.0 - smoothstep(0.018, 0.040, dm)));
     float up = cos(3.14159 + 6.28318 * vUV.y), ug = 0.79 + 0.025 * (1.0 - up * up);
     float gs = (vUV.x - ug) / 0.006;
     a = mix(a, vec3(0.40, 0.09, 0.08), 0.55 * uGill * exp(-gs * gs) * step(-0.9, up));
@@ -5804,7 +5804,7 @@ if(_k3){
   u.uPecB=_swimOn ? (boid._pecBeta||0) : 0;
   u.uFin=_swimOn ? Math.min(0.95, 0.85*Math.sqrt(SWIM_AMT/0.04))*(0.35+0.65*_th3) : 0;   // same stroke strength as the 2D koi's fin
   // breathing: a small steady pump (~0.9 Hz, gills half a breath behind the mouth), and every 5–20 s a gulp —
-  // the mouth opens wide for ~0.5 s, the gill covers lift as it closes. Never mid-burst; more often when hovering.
+  // the mouth snaps wide open, holds ~0.4 s and closes, the gill covers lift as it closes. Never mid-burst; more often when hovering.
   // (No blink: koi have no eyelids.)
   if(boid._gulpN===undefined || boid._gulpN-simClock>30){ boid._gulpN=simClock+2+Math.random()*12; boid._gulpS=-1; boid._brPh=Math.random()*6.2832; boid._brLast=simClock; }
   let _gdt=simClock-boid._brLast; boid._brLast=simClock; if(_gdt<0||_gdt>0.25) _gdt=0;
@@ -5812,11 +5812,11 @@ if(_k3){
   if(boid._gulpS<0 && simClock>=boid._gulpN && boid._bcMode!==0) boid._gulpS=simClock;
   let _gm=0, _gg=0;
   if(boid._gulpS>=0){
-    const t=(simClock-boid._gulpS)/0.9;
+    const t=(simClock-boid._gulpS)/1.3;                       // open fast, hold, close: long enough to catch on the panel
     if(t>=1||t<0){ boid._gulpS=-1; boid._gulpN=simClock+(boid._bcMode===3?3:5)+Math.random()*15; }
-    else { _gm=t<0.55 ? Math.sin(Math.PI*t/0.55) : 0; _gg=t>0.3 ? Math.sin(Math.PI*(t-0.3)/0.7) : 0; }
+    else { _gm=t<0.15 ? Math.sin(Math.PI/2*t/0.15) : (t<0.45 ? 1 : (t<0.7 ? 0.5+0.5*Math.cos(Math.PI*(t-0.45)/0.25) : 0)); _gg=t>0.4 ? Math.sin(Math.PI*(t-0.4)/0.6) : 0; }
   }
-  u.uMouth=Math.max(_gm, 0.20*(0.5+0.5*Math.sin(boid._brPh)));
+  u.uMouth=Math.max(_gm, 0.12*(0.5+0.5*Math.sin(boid._brPh)));   // the steady breathing stays small, so it doesn't flicker
   u.uGill =Math.max(_gg, 0.20*(0.5+0.5*Math.sin(boid._brPh-1.6)));
   u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE : 0; u.uCausT=_causT; u.uCausScale=_causScale;   // water light
   u.uCausO[0]=_wrap20pi(bx*_causScale); u.uCausO[1]=_wrap20pi(by*_causScale);
