@@ -1921,7 +1921,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <h2>Body image</h2>
 <div class="ctrl-row">
 <label title="Five hand-drawn koi — kohaku, sanke, showa, ogon, asagi — in side profile, facing right (the swim wave and the side view both expect that). Fills BOTH sex pools, sets the image size to suit and turns swimming on. (A tank where every boid wears an image hides the predator — it still hunts, you just hear it.)">koi set</label>
-<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools, set image size 0.10×, swim 50% and side view on">load koi</button>
+<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: image size 0.10×, swim 50%, side view and 3D koi on, slower and looser shoaling, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
 <button id="koiClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="koiName" class="mini-note"></span>
 </div>
@@ -2523,7 +2523,12 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   _setSlider('imgScaleSlider', 0.1);                                        // the koi textures are 6× the teardrop's size
   if(parseInt(document.getElementById('swimSlider').value)===0) _setSlider('swimSlider', 50);
   if(!SIDE_VIEW) document.getElementById('sideViewBtn').click();
-  _setSlider('speedSlider', 6); _setSlider('cohKSlider', 45); _setSlider('alignSlider', 30);   // koi pond: slower, looser shoaling, less schooling           // fish are drawn in side profile; the click also reaches the tank
+  _setSlider('speedSlider', 6); _setSlider('cohKSlider', 45); _setSlider('alignSlider', 30);   // koi pond: slower, looser shoaling, less schooling
+  // koi pond population: about 10 koi, every one of them 3D (the Pi + 192×32 panel target). The ceiling culls the
+  // surplus right away (one fading out per frame); target and start size keep it there through births and restarts.
+  _setSlider('popCeilSlider', 10); _setSlider('targetSlider', 9); _setSlider('initPopSlider', 10);
+  if(parseInt(document.getElementById('koi3dMaxSlider').value)<10) _setSlider('koi3dMaxSlider', 10);
+  if(!KOI3D) document.getElementById('koi3dBtn').click();           // fish are drawn in side profile; the click also reaches the tank
   document.getElementById('koiName').textContent=urls.length+' koi';
 });
 document.getElementById('koiClear').addEventListener('click', () => {
@@ -6844,6 +6849,7 @@ const _fpsEl = document.getElementById('fpsDisplay');
 let _statusThrottle = 0; // updateStatus runs every 5th frame (~6fps) — it's O(N²)
 let _zOrder = 0; // explicit depth order for the mixed sprite/mesh container
 let _fpsThrottle = 0, _fpsLastHTML = ''; // same treatment for the boid-count overlay
+let _fpsFrames = 0, _fpsT0 = 0, _fpsNow = 0, _k3Shown = 0; // measured frame rate (for judging the 3D koi on the Pi) and last frame's 3D koi count
 function loop(ts){
 if(!running) return;
 rafId=requestAnimationFrame(loop);
@@ -6863,11 +6869,14 @@ _imgScaleShown += (IMG_SCALE-_imgScaleShown)*0.16; // ease boid size toward the 
 // The overlay used to re-parse its innerHTML EVERY frame (30 Hz HTML parse + layout, for a
 // string that changes a few times a second at most). Throttled to ~6 Hz like updateStatus, and
 // only written when the text actually differs — an unchanged assignment still costs a parse.
+{ const _t=performance.now(); _fpsFrames++; if(!_fpsT0) _fpsT0=_t; if(_t-_fpsT0>=1000){ _fpsNow=Math.round(_fpsFrames*1000/(_t-_fpsT0)); _fpsFrames=0; _fpsT0=_t; } }
+_k3Shown=_koi3dUsed;
 if(_fpsEl && ++_fpsThrottle>=5){
   _fpsThrottle=0;
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
-  const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')+_sndHint();
+  const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')
+            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_sndHint();
   if(html!==_fpsLastHTML){ _fpsLastHTML=html; _fpsEl.innerHTML=html; }
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
