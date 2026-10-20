@@ -1756,6 +1756,20 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="depthHazeSlider" min="0" max="100" value="60" step="5">
 <span class="ctrl-val" id="depthHazeVal">60%</span>
 </div>
+<div class="ctrl-row" style="gap:8px;">
+<label title="The colour of the water. Boids further back sink toward it (see water tint), so depth reads as water rather than just darkness. Keep it dark: the background stays black, and on the LED panel very low values (below about 15–20 per channel) collapse to black.">water colour</label>
+<input type="color" id="waterColorInput" value="#1e504b" title="Water colour">
+</div>
+<div class="ctrl-row">
+<label title="How far the boids at the very back blend into the water colour (0 = off). The front keeps its own colours; the blend grows with depth.">water tint</label>
+<input type="range" id="waterTintSlider" min="0" max="100" value="0" step="5">
+<span class="ctrl-val" id="waterTintVal">off</span>
+</div>
+<div class="ctrl-row">
+<label title="Gives every boid its own body size, up to about ±50% at 100% (±30% at 60%), and lets the young grow: a newborn starts smaller and reaches full size over the first quarter of its life. 0 = everyone the same size (singles are always a little smaller).">size variety</label>
+<input type="range" id="sizeVarSlider" min="0" max="100" value="0" step="5">
+<span class="ctrl-val" id="sizeVarVal">off</span>
+</div>
 <div class="ctrl-row">
 <label title="Ties lightness to depth: boids at the front render lighter, boids at the back darker, by this many L units either side of the tint L above. 0 = off (flat lighting, the original look). Needs depth &gt; 0. Keep tint L + this &lt;= 100 or the front half clips and the effect loses range; at the default tint L of 50 the full ±50 is available. Applies to body, trail, tail, beak and aura together — and works in greyscale too.">depth light</label>
 <input type="range" id="depthLightSlider" min="0" max="50" value="30" step="1">
@@ -1921,7 +1935,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <h2>Body image</h2>
 <div class="ctrl-row">
 <label title="Five hand-drawn koi — kohaku, sanke, showa, ogon, asagi — in side profile, facing right (the swim wave and the side view both expect that). Fills BOTH sex pools, sets the image size to suit and turns swimming on. (A tank where every boid wears an image hides the predator — it still hunts, you just hear it.)">koi set</label>
-<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: image size 0.10×, swim 50%, side view and 3D koi on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
+<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: image size 0.10×, swim 50%, side view and 3D koi on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50%, size variety 60%, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
 <button id="koiClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="koiName" class="mini-note"></span>
 </div>
@@ -2318,6 +2332,10 @@ if(NO_OVERLAP){
 let SHOW_COLOR = true;
 let SPRITE_L = parseInt(document.getElementById('spriteLSlider').value);
 let DEPTH_LIGHT = parseInt(document.getElementById('depthLightSlider').value); // L units added at the front / subtracted at the back
+let WATER_HEX  = parseInt(document.getElementById('waterColorInput').value.slice(1),16);   // water colour (0xRRGGBB)
+let WATER_TINT = parseInt(document.getElementById('waterTintSlider').value)/100;          // how far the very back blends into it
+let SIZE_VAR   = parseInt(document.getElementById('sizeVarSlider').value)/100;            // per-boid size spread + growing up
+const _WATER_RGB = new Float32Array([((WATER_HEX>>16)&255)/255, ((WATER_HEX>>8)&255)/255, (WATER_HEX&255)/255]);
 let DEPTH_HAZE = parseInt(document.getElementById('depthHazeSlider').value)/100; // fraction of saturation lost by the furthest rank
 let SWIM_AMT  = Math.pow(parseInt(document.getElementById('swimSlider').value)/100, 2)*0.16; // lateral tail swing, fraction of body length (0 = off). Quadratic: the low end is where 'a minimal wave' lives
 let SWIM_BEAT = parseInt(document.getElementById('swimBeatSlider').value)/10;          // tail beats per second at cruising speed
@@ -2531,6 +2549,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   if(SHOW_DETAILS) document.getElementById('detailsBtn').click();
   for(let i=((EVENT_FX%3)+3)%3; i>0; i--) document.getElementById('bondLinesBtn').click();      // the button cycles backward (all → bonds → none), so EVENT_FX clicks reach 0 = off
   _setSlider('tiltSlider', 90);
+  _setSlider('waterTintSlider', 50); _setSlider('sizeVarSlider', 60);                              // far koi sink into the water; a pond of different sizes
   // koi pond population: about 10 koi, every one of them 3D (the Pi + 192×32 panel target). The ceiling culls the
   // surplus right away (one fading out per frame); target and start size keep it there through births and restarts.
   _setSlider('popCeilSlider', 10); _setSlider('targetSlider', 9); _setSlider('initPopSlider', 10);
@@ -2702,6 +2721,9 @@ wire('initPopSlider','initPopVal', v=>parseInt(v), v=>v, v=>{ INIT_POP=v; }); //
 wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ POP_CEILING=v; });
 wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
+wire('waterTintSlider','waterTintVal', v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ WATER_TINT=v; });
+wire('sizeVarSlider','sizeVarVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ SIZE_VAR=v; });
+document.getElementById('waterColorInput').addEventListener('input', e=>{ WATER_HEX=parseInt(e.target.value.slice(1),16); _WATER_RGB[0]=((WATER_HEX>>16)&255)/255; _WATER_RGB[1]=((WATER_HEX>>8)&255)/255; _WATER_RGB[2]=(WATER_HEX&255)/255; });
 wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
 wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
 wire('shadeSlider','shadeVal',           v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_SHADE=v; });
@@ -3046,7 +3068,26 @@ return 1-DEPTH_HAZE*t;   // 1 at the very front → 1-DEPTH_HAZE at the very bac
 }
 function _drawHex(b, l){
 const L=Math.max(0,Math.min(100, l+_depthL(b)));
-return SHOW_COLOR ? hslToHex(b.hue,b.sat*100*_depthS(b),L) : hslToHex(0,0,L);
+const h = SHOW_COLOR ? hslToHex(b.hue,b.sat*100*_depthS(b),L) : hslToHex(0,0,L);
+return WATER_TINT>0 ? _mixHex(h, WATER_HEX, _waterF(b)) : h;      // further back = more water colour
+}
+// Water: 0 at the very front → WATER_TINT at the very back (linear in z, like _depthL)
+function _waterF(b){
+if(WATER_TINT<=0 || DEPTH<=0) return 0;
+return WATER_TINT*Math.max(0,Math.min(1,(b.z||0)/DEPTH));
+}
+function _mixHex(a, c, f){
+if(f<=0) return a;
+const ar=(a>>16)&255, ag=(a>>8)&255, ab=a&255, cr=(c>>16)&255, cg=(c>>8)&255, cb=c&255;
+return (Math.round(ar+(cr-ar)*f)<<16)|(Math.round(ag+(cg-ag)*f)<<8)|Math.round(ab+(cb-ab)*f);
+}
+// Body-size factor: each boid's own size (a fixed draw, roughly bell-shaped in -1..1) and growing up over the
+// first quarter of its life. 1 when the size variety slider is off.
+function _sizeK(b){
+if(SIZE_VAR<=0) return 1;
+if(b._sizeR===undefined) b._sizeR=(Math.random()+Math.random()+Math.random())/1.5-1;
+const g=Math.min(1,(b.age||0)/(0.25*(b.maxLifespan||BASE_LIFESPAN||60)));
+return (1+0.50*SIZE_VAR*b._sizeR)*(1-0.40*SIZE_VAR*(1-g));
 }
 function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 
@@ -3325,6 +3366,8 @@ uniform float uCausT;      // its clock, wrapped at 20π
 uniform float uCausScale;  // pattern scale, radians per px
 uniform vec2  uCausC;      // this fish's centre (world px) and …
 uniform vec2  uCausO;      // … that centre already scaled and wrapped at 20π — keeps the sine arguments small (mediump on the Pi)
+uniform vec3  uWater;      // water colour
+uniform float uWaterF;     // how far this body has sunk into it (0 = front)
 uniform float uAmt;    // shade depth, 0 = off
 uniform float uT;      // same wrapped clock as the geometry's x wave
 uniform float uPhase;  // per-boid, so a shoal never pulses in unison
@@ -3402,6 +3445,7 @@ void main(void){
   c.rgb *= 1.0 - clamp(dark, 0.0, 0.95);   // only ever darkens: 1.0 at the crest, dimmer in the trough
   c.rgb *= 1.0 + vShade;                   // swimming (side view): nearer body parts lighter, farther darker
   if (uCaus > 0.0) c.rgb *= 1.0 - 0.30 * uCaus + 1.2 * uCaus * caustic((vWorld - uCausC) * uCausScale + uCausO, uCausT);
+  c.rgb = mix(c.rgb, uWater * c.a, uWaterF);   // sink into the water colour with depth (premultiplied)
   gl_FragColor = c;
 }`);
 const _rippleMeshes = [];   // pool, indexed like _bodySprites
@@ -3417,7 +3461,7 @@ if(_rippleUsed>=_rippleMeshes.length){
   // and the meshes each carry their own draw call already, which is the cost this look pays.
   const m=new PIXI.Mesh(_rippleGeom, new PIXI.MeshMaterial(tex, { program:_rippleProgram,
     uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-               uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+               uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0, uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) } }));
                // uStyle 0 = own cloth ripple; flips to 2 (rides the background pond) in _rippleUpdate when a pond is live
@@ -3605,7 +3649,7 @@ void main(void){
 const _KOI3D_FRAG = `
 precision mediump float;
 uniform sampler2D uTex; uniform vec3 uTint; uniform vec3 uFinCol; uniform float uAlpha;
-uniform float uCaus; uniform float uCausT;
+uniform float uCaus; uniform float uCausT; uniform vec3 uWater; uniform float uWaterF;
 varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW;
 // WATER LIGHT (caustics, same as the 2D koi): bright streaks thrown by the rippling surface, fixed in the ROOM (world px) so a fish
 // swims through them instead of carrying them along. Three wobbling sine sheets, sharpened by a cube. Every
@@ -3637,6 +3681,7 @@ void main(void){
   }
   if (uCaus > 0.0) c.rgb *= 1.0 - 0.30 * uCaus + 1.2 * uCaus * caustic(vW, uCausT) * (0.35 + 0.65 * max(n.y, 0.0));   // light from above lands on the back
   c.rgb *= uTint;
+  c.rgb = mix(c.rgb, uWater * c.a, uWaterF);   // further back = more water colour (premultiplied)
   gl_FragColor = c * uAlpha;
 }`;
 let _koi3dGeom = null, _koi3dProg = null, _koi3dUsed = 0;
@@ -3652,7 +3697,7 @@ if(!_koi3dProg){
 if(_koi3dUsed>=_koi3dMeshes.length){
   const sh=new PIXI.Shader(_koi3dProg,{ uTex:PIXI.Texture.WHITE, uCenter:new Float32Array(2), uScale:100, uYaw:0, uPitch:0, uTilt:0,
                                          uDepth:new Float32Array([0,0.05]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_FIN_DEFAULT, uAlpha:1,
-                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2) });
+                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0 });
   const m=new PIXI.Mesh(_koi3dGeom, sh);
   m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
   _gfx.bodySprites.addChild(m);
@@ -3714,7 +3759,7 @@ if(app){ // RUN_MODE!=='dash'
     _bgMesh = new PIXI.Mesh(_bgGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0, uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                   uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
@@ -3729,7 +3774,7 @@ if(app){ // RUN_MODE!=='dash'
     _bgOverlayMesh = new PIXI.Mesh(_ovGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0, uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                   uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
@@ -5553,7 +5598,7 @@ const fertile = isFertile(boid);
 // perspective: zs=1 at z=0 (near) shrinking with depth; everything below is
 // drawn from r, so scaling r scales body, tail, eyes, beak and glow together
 const zs = zScaleOf(boid);
-const r = (boid.isSingle ? RADIUS*0.7 : RADIUS) * zs;
+const r = (boid.isSingle ? RADIUS*0.7 : RADIUS) * zs * _sizeK(boid);   // size variety: each boid its own size, the young smaller
 const baseAlpha = alpha * ((fertile||!DIM_INFERTILE) ? 1.0 : 0.55) * Math.min(1, 0.45+0.55*zs); // dim beyond the midplane only
 
 // aura glow — mode 0 = off, 1 = flat disc, 2 = gradient (three concentric circles)
@@ -5688,7 +5733,17 @@ if(_pa && !_rip && _pa.dark>0 && BG_RIPPLE_SHADE>0) spr.tint=_dim(spr.tint, 1-Ma
 spr.alpha=baseAlpha;
 // Drawn images that carry their own colours (the koi) are not tinted by the boid's hue — that would
 // recolour a red-and-white koi blue. They get only the depth shading, as a neutral grey tint.
-if(_entry && _entry.natural) spr.tint=hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(boid))));
+const _wf=_waterF(boid);
+let _koiGrey=0xffffff;
+if(_entry && _entry.natural){
+  _koiGrey=hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(boid))));
+  // a mesh blends into the water colour in its shader (uWater); a plain sprite can only multiply, so it gets a
+  // tint pulled toward the water hue at the same brightness — close enough for the far, small ones
+  if(_rip) spr.tint=_koiGrey;
+  else { const g=(_koiGrey&255)/255, wm=Math.max(_WATER_RGB[0],_WATER_RGB[1],_WATER_RGB[2],0.01);
+         spr.tint=_mixHex(_koiGrey, (Math.round(255*g*_WATER_RGB[0]/wm)<<16)|(Math.round(255*g*_WATER_RGB[1]/wm)<<8)|Math.round(255*g*_WATER_RGB[2]/wm), _wf); }
+}
+if(_rip){ const _u=spr.shader.uniforms; _u.uWater=_WATER_RGB; _u.uWaterF=(_entry && _entry.natural) ? _wf : 0; }   // other images already got the water via _drawHex
 // _bodyScale calibration × user image-scale slider (eased so size changes glide). A sprite scales
 // its own texture; a mesh is a UNIT square, so the texture's size has to go into its scale too.
 const _s = r/_bodyScale*_imgScaleShown;
@@ -5709,7 +5764,8 @@ if(_k3){
   u.uScale=0.69*_bt.width*_s;                                // model unit = body length, matched to the 2D koi's body
   u.uYaw=boid._psi; u.uPitch=boid._th||0; u.uTilt=PANEL_TILT;
   u.uDepth[0]=0.97-(2*k+1)*half; u.uDepth[1]=half*0.9;       // this koi's own depth slice, nearer for later (nearer) koi
-  const _tn=spr.tint; u.uTint[0]=((_tn>>16)&255)/255; u.uTint[1]=((_tn>>8)&255)/255; u.uTint[2]=(_tn&255)/255;
+  const _tn=_koiGrey; u.uTint[0]=((_tn>>16)&255)/255; u.uTint[1]=((_tn>>8)&255)/255; u.uTint[2]=(_tn&255)/255;
+  u.uWater=_WATER_RGB; u.uWaterF=_wf;
   u.uAlpha=baseAlpha;
   // swimming: the same beat, rhythm and sliders as the 2D koi. Swing in body lengths: swim 50% → 0.075 cruising,
   // 0.125 in a burst, 0.037 gliding. Curls scale with the swim amount so a gentle setting stays gentle.
@@ -7101,7 +7157,7 @@ if(_statusThrottle >= 5){ _statusThrottle=0; updateStatus(); if(RUN_MODE==='tank
 // runMode 'tank'       → the "open aquarium" tab (bridged to this dashboard)
 function buildStandaloneHTML(runMode, clean, lean){
 // Sync current slider positions → HTML attributes so outerHTML captures them
-document.querySelectorAll('input[type="range"]').forEach(el => el.setAttribute('value', el.value));
+document.querySelectorAll('input[type="range"],input[type="color"]').forEach(el => el.setAttribute('value', el.value));   // colour pickers too (water colour)
 
 let html = document.documentElement.outerHTML;
 html = runMode==='tank'
