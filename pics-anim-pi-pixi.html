@@ -3597,7 +3597,9 @@ uniform float uBendY;  // -1..1 vertical curl from climbing/diving (pitch change
 uniform float uPecB;   // pectoral sweep (rad): + forward/out, - folded back against the body
 uniform float uCausScale; uniform vec2 uCausO;   // water light: pattern scale and the wrapped, scaled fish centre
 uniform float uFin;    // tail-fin stroke (rad at the trailing edge) — what makes the swimming visible from the side
-varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW;
+uniform mediump float uMouth;  // 0..1 mouth open (breathing, and the occasional gulp); mediump: shared with the fragment stage
+uniform mediump float uGill;   // 0..1 gill covers lifted (the pump half a breath behind the mouth)
+varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW; varying vec3 vM;
 vec3 orient(vec3 p){
   float cp = cos(uPitch), sp = sin(uPitch);
   p = vec3(p.x * cp + p.y * sp, -p.x * sp + p.y * cp, p.z);
@@ -3610,6 +3612,15 @@ vec3 orient(vec3 p){
 // turning adds a C-curl, climbing/diving a vertical curl. Normals are tilted by the local spine slope so the
 // light slides along the bending body. s = 0 at the nose → 1 at the tail-fin tip (model length 1.31).
 void swim(inout vec3 q, inout vec3 n){
+  if (aFin < 0.5) {
+    // BREATHING: the mouth pushes forward and the lower jaw drops (koi mouths protrude); the gill covers lift
+    // at their trailing edge (x = 0.29). The dark opening itself is painted in the fragment stage.
+    float wn = smoothstep(0.43, 0.50, q.x), low = clamp((-0.004 - q.y) / 0.010, 0.0, 1.0);
+    q.x += 0.030 * uMouth * wn;
+    q.y -= 0.012 * uMouth * wn * low;
+    float wg = smoothstep(0.26, 0.29, q.x) * (1.0 - smoothstep(0.29, 0.40, q.x));
+    q.z += sign(q.z) * 0.008 * uGill * wg * abs(n.z);
+  }
   if (aFin > 3.5) {
     float side = (aFin < 4.5 || (aFin > 5.5 && aFin < 6.5)) ? -1.0 : 1.0;
     float a = -side * (aFin < 5.5 ? uPecB : 0.5 * uPecB);
@@ -3653,12 +3664,14 @@ void main(void){
   vec3 clip = projectionMatrix * vec3(c, 1.0);
   gl_Position = vec4(clip.xy, uDepth.x + clamp(p.z / 0.85, -1.0, 1.0) * uDepth.y, 1.0);
   vN = n; vUV = aUV; vCol = aCol; vW = (c - uCenter) * uCausScale + uCausO;   // small numbers for the mediump fragment stage
+  vM = aPos;                                                   // rest position, for the mouth opening
 }`;
 const _KOI3D_FRAG = `
 precision mediump float;
 uniform sampler2D uTex; uniform vec3 uTint; uniform vec3 uFinCol; uniform float uAlpha;
 uniform float uCaus; uniform float uCausT; uniform vec3 uWater; uniform float uWaterF;
-varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW;
+uniform float uMouth; uniform float uGill;
+varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW; varying vec3 vM;
 // WATER LIGHT (caustics, same as the 2D koi): bright streaks thrown by the rippling surface, fixed in the ROOM (world px) so a fish
 // swims through them instead of carrying them along. Three wobbling sine sheets, sharpened by a cube. Every
 // time factor is a multiple of 0.1, so the CPU can wrap the clock at 20π (62.832) without a visible jump.
@@ -3682,6 +3695,13 @@ void main(void){
     c = vec4(uFinCol * vCol.rgb * (0.42 + 0.68 * abs(d)) * vCol.a, vCol.a);
   } else {
     vec3 a = texture2D(uTex, vUV).rgb;                           // unlit body colour map (opaque)
+    // open mouth: a dark round opening at the snout tip (on the panel this is the part of a gulp that shows);
+    // lifted gill covers: a dark red slit just behind the cover's curved edge (same curve as the colour map)
+    float dm = length((vM - vec3(0.505, -0.004, 0.0)) * vec3(0.7, 1.0, 1.0));
+    a = mix(a, vec3(0.16, 0.07, 0.06), uMouth * (1.0 - smoothstep(0.010, 0.024, dm)));
+    float up = cos(3.14159 + 6.28318 * vUV.y), ug = 0.79 + 0.025 * (1.0 - up * up);
+    float gs = (vUV.x - ug) / 0.006;
+    a = mix(a, vec3(0.40, 0.09, 0.08), 0.55 * uGill * exp(-gs * gs) * step(-0.9, up));
     vec3 H = normalize(L + vec3(0.0, 0.0, -1.0));
     float spec = 0.30 * pow(max(dot(n, H), 0.0), 24.0);
     float rim  = 0.22 * pow(1.0 - abs(n.z), 2.5);
@@ -3705,7 +3725,7 @@ if(!_koi3dProg){
 if(_koi3dUsed>=_koi3dMeshes.length){
   const sh=new PIXI.Shader(_koi3dProg,{ uTex:PIXI.Texture.WHITE, uCenter:new Float32Array(2), uScale:100, uYaw:0, uPitch:0, uTilt:0,
                                          uDepth:new Float32Array([0,0.05]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_FIN_DEFAULT, uAlpha:1,
-                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0 });
+                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uMouth:0, uGill:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0 });
   const m=new PIXI.Mesh(_koi3dGeom, sh);
   m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
   _gfx.bodySprites.addChild(m);
@@ -5783,6 +5803,21 @@ if(_k3){
   u.uBendZ=(boid._yawBend||0)*Math.min(1,_sw); u.uBendY=(boid._fbend||0)*Math.min(1,_sw);
   u.uPecB=_swimOn ? (boid._pecBeta||0) : 0;
   u.uFin=_swimOn ? Math.min(0.95, 0.85*Math.sqrt(SWIM_AMT/0.04))*(0.35+0.65*_th3) : 0;   // same stroke strength as the 2D koi's fin
+  // breathing: a small steady pump (~0.9 Hz, gills half a breath behind the mouth), and every 5–20 s a gulp —
+  // the mouth opens wide for ~0.5 s, the gill covers lift as it closes. Never mid-burst; more often when hovering.
+  // (No blink: koi have no eyelids.)
+  if(boid._gulpN===undefined || boid._gulpN-simClock>30){ boid._gulpN=simClock+2+Math.random()*12; boid._gulpS=-1; boid._brPh=Math.random()*6.2832; boid._brLast=simClock; }
+  let _gdt=simClock-boid._brLast; boid._brLast=simClock; if(_gdt<0||_gdt>0.25) _gdt=0;
+  boid._brPh=(boid._brPh+6.2832*0.9*_gdt)%6.2832;
+  if(boid._gulpS<0 && simClock>=boid._gulpN && boid._bcMode!==0) boid._gulpS=simClock;
+  let _gm=0, _gg=0;
+  if(boid._gulpS>=0){
+    const t=(simClock-boid._gulpS)/0.9;
+    if(t>=1||t<0){ boid._gulpS=-1; boid._gulpN=simClock+(boid._bcMode===3?3:5)+Math.random()*15; }
+    else { _gm=t<0.55 ? Math.sin(Math.PI*t/0.55) : 0; _gg=t>0.3 ? Math.sin(Math.PI*(t-0.3)/0.7) : 0; }
+  }
+  u.uMouth=Math.max(_gm, 0.20*(0.5+0.5*Math.sin(boid._brPh)));
+  u.uGill =Math.max(_gg, 0.20*(0.5+0.5*Math.sin(boid._brPh-1.6)));
   u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE : 0; u.uCausT=_causT; u.uCausScale=_causScale;   // water light
   u.uCausO[0]=_wrap20pi(bx*_causScale); u.uCausO[1]=_wrap20pi(by*_causScale);
   m.zIndex=spr.zIndex;
