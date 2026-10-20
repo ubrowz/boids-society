@@ -1757,7 +1757,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="depthHazeVal">60%</span>
 </div>
 <div class="ctrl-row" style="gap:8px;">
-<label title="The colour of the water. Boids further back sink toward it (see water tint), so depth reads as water rather than just darkness. Keep it dark: the background stays black, and on the LED panel very low values (below about 15–20 per channel) collapse to black.">water colour</label>
+<label title="The colour of the water. It also sets the tank background, and boids further back sink toward it (see water tint), so they fade into the water they swim in. On the LED panel a lit background means every LED is on a little (more PWM activity); very low values (below about 15–20 per channel) collapse to black. The background picker can still override it afterwards.">water colour</label>
 <input type="color" id="waterColorInput" value="#1e504b" title="Water colour">
 </div>
 <div class="ctrl-row">
@@ -1935,7 +1935,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <h2>Body image</h2>
 <div class="ctrl-row">
 <label title="Five hand-drawn koi — kohaku, sanke, showa, ogon, asagi — in side profile, facing right (the swim wave and the side view both expect that). Fills BOTH sex pools, sets the image size to suit and turns swimming on. (A tank where every boid wears an image hides the predator — it still hunts, you just hear it.)">koi set</label>
-<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: image size 0.10×, swim 50%, side view and 3D koi on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50%, size variety 60%, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
+<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: swim 50%, side view and 3D koi on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50% toward teal, size variety 60%, image size 0.45×, trails off, immigration on, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
 <button id="koiClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="koiName" class="mini-note"></span>
 </div>
@@ -2540,7 +2540,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
     for(const u of urls){ addBodyPoolPNG(sex,u,false); if(RUN_MODE==='dash') _tankSend({boid:1,t:'bodyimg',slot:sex,data:u,upright:false}); }
     document.getElementById('bodyImg'+sex+'Name').textContent=urls.length+' imgs';
   }
-  _setSlider('imgScaleSlider', 0.1);                                        // the koi textures are 6× the teardrop's size
+  _setSlider('imgScaleSlider', 0.45);                                       // koi size tuned by eye on the Pi + panel (a pond of ~10 big koi)
   if(parseInt(document.getElementById('swimSlider').value)===0) _setSlider('swimSlider', 50);
   if(!SIDE_VIEW) document.getElementById('sideViewBtn').click();
   _setSlider('speedSlider', 2); _setSlider('cohKSlider', 45); _setSlider('alignSlider', 30);   // koi pond: slow, looser shoaling, less schooling
@@ -2550,6 +2550,9 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   for(let i=((EVENT_FX%3)+3)%3; i>0; i--) document.getElementById('bondLinesBtn').click();      // the button cycles backward (all → bonds → none), so EVENT_FX clicks reach 0 = off
   _setSlider('tiltSlider', 90);
   _setSlider('waterTintSlider', 50); _setSlider('sizeVarSlider', 60);                              // far koi sink into the water; a pond of different sizes
+  _setSlider('waterColorInput', '#008080');                                                        // teal water
+  _setSlider('trailLengthSlider', 0);                                                              // no trails behind koi
+  if(!immigrationEnabled) document.getElementById('immigrationBtn').click();                       // newcomers keep the small pond's gene pool fresh
   // koi pond population: about 10 koi, every one of them 3D (the Pi + 192×32 panel target). The ceiling culls the
   // surplus right away (one fading out per frame); target and start size keep it there through births and restarts.
   _setSlider('popCeilSlider', 10); _setSlider('targetSlider', 9); _setSlider('initPopSlider', 10);
@@ -2723,7 +2726,12 @@ wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
 wire('waterTintSlider','waterTintVal', v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ WATER_TINT=v; });
 wire('sizeVarSlider','sizeVarVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ SIZE_VAR=v; });
-document.getElementById('waterColorInput').addEventListener('input', e=>{ WATER_HEX=parseInt(e.target.value.slice(1),16); _WATER_RGB[0]=((WATER_HEX>>16)&255)/255; _WATER_RGB[1]=((WATER_HEX>>8)&255)/255; _WATER_RGB[2]=(WATER_HEX&255)/255; });
+document.getElementById('waterColorInput').addEventListener('input', e=>{
+  WATER_HEX=parseInt(e.target.value.slice(1),16); _WATER_RGB[0]=((WATER_HEX>>16)&255)/255; _WATER_RGB[1]=((WATER_HEX>>8)&255)/255; _WATER_RGB[2]=(WATER_HEX&255)/255;
+  // the water IS the tank: the background takes the water colour too, so far boids sink into the water they swim in
+  const bg=document.getElementById('bgColorInput');
+  if(bg && bg.value!==e.target.value){ bg.value=e.target.value; bg.dispatchEvent(new Event('input',{bubbles:true})); }
+});
 wire('depthHazeSlider','depthHazeVal',   v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ DEPTH_HAZE=v; });
 wire('rippleSlider','rippleVal',         v=>parseInt(v)/100*0.12, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_AMT=v; });
 wire('shadeSlider','shadeVal',           v=>parseInt(v)/100*0.95, v=>parseInt(v)===0?'off':v+'%', v=>{ RIPPLE_SHADE=v; });
