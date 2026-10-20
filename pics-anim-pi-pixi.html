@@ -1966,12 +1966,12 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="rippleVal">40%</span>
 </div>
 <div class="ctrl-row">
-<label title="How dark the light wave gets on a BOID image — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved. Only ever DARKENS. Needs boid ripple above 0, since the shading rides on the same mesh.">boid shade</label>
+<label title="How dark the light wave gets on a BOID image — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved. Only ever DARKENS. Needs boid ripple above 0, since the shading rides on the same mesh. SWIMMING KOI (2D and 3D) instead get WATER LIGHT: bright streaks from the rippling surface, fixed in the room so the fish swims through them, without changing its shape. This slider sets how strong that light is, and boid waves how fine the pattern is.">boid shade</label>
 <input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
 <span class="ctrl-val" id="shadeVal">30%</span>
 </div>
 <div class="ctrl-row">
-<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 16 quads across — beyond about 8 crests a grid that coarse breaks into facets.">boid waves</label>
+<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 16 quads across — beyond about 8 crests a grid that coarse breaks into facets. For swimming koi it sets how fine the water-light pattern is.">boid waves</label>
 <input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
 <span class="ctrl-val" id="waveVal">1.3</span>
 </div>
@@ -2327,7 +2327,9 @@ let SIDE_VIEW = false;
 let KOI3D = false;                                                                      // draw the nearest koi as lit 3D models (see _getKoi3DMesh)
 let KOI3D_MAX = parseInt(document.getElementById('koi3dMaxSlider').value);
 let _k3From = 0, _k3Idx = 0;                                                           // first draw index allowed 3D (the nearest get it) / this frame's 3D count (depth slices)                                                                 // fish seen through the glass: face left/right, small pitch, swing round to turn (see drawBoid)
-let _drawIdx = 0, _swimFrom = 0;                                                       // draw-order index vs the first boid allowed a swim mesh (the NEAREST get them)
+let _drawIdx = 0, _swimFrom = 0;
+let _causT = 0, _causScale = 0.06;
+const _wrap20pi = v => ((v % 62.8318) + 62.8318) % 62.8318;                                                    // water light: wrapped clock and pattern scale, set once per frame                                                       // draw-order index vs the first boid allowed a swim mesh (the NEAREST get them)
 let RIPPLE_AMT = parseInt(document.getElementById('rippleSlider').value)/100*0.12; // boid-image ripple amplitude (fraction of image width)
 let BG_RIPPLE_AMT = parseInt(document.getElementById('bgRippleSlider').value)/100*0.12; // background-image ripple amplitude — independent of RIPPLE_AMT
 const colorBtn   = document.getElementById('colorBtn');
@@ -3266,9 +3268,10 @@ void main(void){
   // running total, or the axes would feed each other.
   vec2 base = aVertexPosition;
   vShade = 0.0;
+  vWorld = vec2(0.0);
   if (uSwimSide > 0.5) swimSide(base); else base.y += swimY(base.x);
   vec2 p = base;
-  vWorld = vec2(0.0);
+  vWorld = (translationMatrix * vec3(base, 1.0)).xy;      // styles 0/1: room position for the water light (2/3 set their own below)
   if (uStyle < 0.5) {
     p.x += uAmpX * sin(6.2832 * (aVertexPosition.y * uWaves - uT) + uPhase);
     p.y += uAmpY * sin(6.2832 * (aVertexPosition.x * uWaves - uT2) + uPhase * 1.7);
@@ -3312,6 +3315,11 @@ uniform vec4  uPecBox;     // the fin image's box in body UV
 uniform vec2  uPecHinge;   // fin root, body UV
 uniform vec2  uPecTip;     // fin tip at rest, body UV
 uniform float uSwimAsp;    // body texture width / height (same uniform as the vertex stage)
+uniform float uCaus;       // water light strength (0 = off) — swimming koi only
+uniform float uCausT;      // its clock, wrapped at 20π
+uniform float uCausScale;  // pattern scale, radians per px
+uniform vec2  uCausC;      // this fish's centre (world px) and …
+uniform vec2  uCausO;      // … that centre already scaled and wrapped at 20π — keeps the sine arguments small (mediump on the Pi)
 uniform float uAmt;    // shade depth, 0 = off
 uniform float uT;      // same wrapped clock as the geometry's x wave
 uniform float uPhase;  // per-boid, so a shoal never pulses in unison
@@ -3342,6 +3350,16 @@ float pondDark(vec2 uv, vec2 ctr, vec2 drop){
   float spread = inversesqrt(1.0 + 4.0 * d);
   float calm   = smoothstep(0.0, 0.15, d);
   return uAmt * (0.5 - 0.5 * s) * win * spread * calm * drop.y;
+}
+// WATER LIGHT (caustics): bright streaks thrown by the rippling surface, fixed in the ROOM (world px) so a fish
+// swims through them instead of carrying them along. Three wobbling sine sheets, sharpened by a cube. Every
+// time factor is a multiple of 0.1, so the CPU can wrap the clock at 20π (62.832) without a visible jump.
+float caustic(vec2 p, float t){
+  float c = sin(p.x * 1.0 + t * 1.3 + 1.5 * sin(p.y * 0.8 + t * 0.7))
+          + sin(p.y * 1.1 - t * 1.1 + 1.5 * sin(p.x * 0.9 - t * 0.5))
+          + sin((p.x + p.y) * 0.7 + t * 0.9);
+  c = 0.5 + c / 6.0;
+  return c * c * c;
 }
 void main(void){
   vec4 c = texture2D(uSampler, vTextureCoord);
@@ -3378,6 +3396,7 @@ void main(void){
   }
   c.rgb *= 1.0 - clamp(dark, 0.0, 0.95);   // only ever darkens: 1.0 at the crest, dimmer in the trough
   c.rgb *= 1.0 + vShade;                   // swimming (side view): nearer body parts lighter, farther darker
+  if (uCaus > 0.0) c.rgb *= 1.0 - 0.30 * uCaus + 1.2 * uCaus * caustic((vWorld - uCausC) * uCausScale + uCausO, uCausT);
   gl_FragColor = c;
 }`);
 const _rippleMeshes = [];   // pool, indexed like _bodySprites
@@ -3393,7 +3412,7 @@ if(_rippleUsed>=_rippleMeshes.length){
   // and the meshes each carry their own draw call already, which is the cost this look pays.
   const m=new PIXI.Mesh(_rippleGeom, new PIXI.MeshMaterial(tex, { program:_rippleProgram,
     uniforms:{ uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-               uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+               uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) } }));
                // uStyle 0 = own cloth ripple; flips to 2 (rides the background pond) in _rippleUpdate when a pond is live
@@ -3519,8 +3538,9 @@ uniform float uLobe;   // extra lag of the tail-fin lobes → the fin cups
 uniform float uBendZ;  // -1..1 sideways C-curl from turning (yaw rate)
 uniform float uBendY;  // -1..1 vertical curl from climbing/diving (pitch change)
 uniform float uPecB;   // pectoral sweep (rad): + forward/out, - folded back against the body
+uniform float uCausScale; uniform vec2 uCausO;   // water light: pattern scale and the wrapped, scaled fish centre
 uniform float uFin;    // tail-fin stroke (rad at the trailing edge) — what makes the swimming visible from the side
-varying vec2 vUV; varying vec4 vCol; varying vec3 vN;
+varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW;
 vec3 orient(vec3 p){
   float cp = cos(uPitch), sp = sin(uPitch);
   p = vec3(p.x * cp + p.y * sp, -p.x * sp + p.y * cp, p.z);
@@ -3575,12 +3595,24 @@ void main(void){
   vec2 c = uCenter + vec2(s.x * ct - s.y * st, s.x * st + s.y * ct);
   vec3 clip = projectionMatrix * vec3(c, 1.0);
   gl_Position = vec4(clip.xy, uDepth.x + clamp(p.z / 0.85, -1.0, 1.0) * uDepth.y, 1.0);
-  vN = n; vUV = aUV; vCol = aCol;
+  vN = n; vUV = aUV; vCol = aCol; vW = (c - uCenter) * uCausScale + uCausO;   // small numbers for the mediump fragment stage
 }`;
 const _KOI3D_FRAG = `
 precision mediump float;
 uniform sampler2D uTex; uniform vec3 uTint; uniform vec3 uFinCol; uniform float uAlpha;
-varying vec2 vUV; varying vec4 vCol; varying vec3 vN;
+uniform float uCaus; uniform float uCausT;
+varying vec2 vUV; varying vec4 vCol; varying vec3 vN; varying vec2 vW;
+// WATER LIGHT (caustics, same as the 2D koi): bright streaks thrown by the rippling surface, fixed in the ROOM (world px) so a fish
+// swims through them instead of carrying them along. Three wobbling sine sheets, sharpened by a cube. Every
+// time factor is a multiple of 0.1, so the CPU can wrap the clock at 20π (62.832) without a visible jump.
+float caustic(vec2 p, float t){
+  float c = sin(p.x * 1.0 + t * 1.3 + 1.5 * sin(p.y * 0.8 + t * 0.7))
+          + sin(p.y * 1.1 - t * 1.1 + 1.5 * sin(p.x * 0.9 - t * 0.5))
+          + sin((p.x + p.y) * 0.7 + t * 0.9);
+  c = 0.5 + c / 6.0;
+  return c * c * c;
+}
+
 // Lit per pixel in the ROOM frame (x right, y up, z away from the glass): key light from above and a little
 // toward the viewer; a wet specular glint; and a soft rim where the body turns away from the viewer, which keeps
 // the silhouette readable against a black background on the LED panel. Fins are thin: lit from either side.
@@ -3598,6 +3630,7 @@ void main(void){
     float rim  = 0.22 * pow(1.0 - abs(n.z), 2.5);
     c = vec4(a * (0.42 + 0.68 * max(d, 0.0)) + spec + rim, 1.0);
   }
+  if (uCaus > 0.0) c.rgb *= 1.0 - 0.30 * uCaus + 1.2 * uCaus * caustic(vW, uCausT) * (0.35 + 0.65 * max(n.y, 0.0));   // light from above lands on the back
   c.rgb *= uTint;
   gl_FragColor = c * uAlpha;
 }`;
@@ -3614,7 +3647,7 @@ if(!_koi3dProg){
 if(_koi3dUsed>=_koi3dMeshes.length){
   const sh=new PIXI.Shader(_koi3dProg,{ uTex:PIXI.Texture.WHITE, uCenter:new Float32Array(2), uScale:100, uYaw:0, uPitch:0, uTilt:0,
                                          uDepth:new Float32Array([0,0.05]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_FIN_DEFAULT, uAlpha:1,
-                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0 });
+                                         uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2) });
   const m=new PIXI.Mesh(_koi3dGeom, sh);
   m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
   _gfx.bodySprites.addChild(m);
@@ -3676,7 +3709,7 @@ if(app){ // RUN_MODE!=='dash'
     _bgMesh = new PIXI.Mesh(_bgGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                   uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
@@ -3691,7 +3724,7 @@ if(app){ // RUN_MODE!=='dash'
     _bgOverlayMesh = new PIXI.Mesh(_ovGeom, new PIXI.MeshMaterial(PIXI.Texture.EMPTY, {
       program: _rippleProgram,
       uniforms: { uAmt:0, uT:0, uT2:0, uPhase:0, uWaves:1, uAmpX:0, uAmpY:0,
-                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
+                  uStyle:0, uSwimAmp:0, uSwimPh:0, uSwimK:1, uSwimBend:0, uSwimAsp:1, uSwimSide:0, uFinAmp:0, uCaus:0, uCausT:0, uCausScale:0.06, uCausC:new Float32Array(2), uCausO:new Float32Array(2), uPec:new Float32Array(3), uPecBox:new Float32Array([0,0,1,1]), uPecHinge:new Float32Array(2), uPecTip:new Float32Array([1,0]), uPecTex:PIXI.Texture.WHITE, uAspect:1, uCenterA:new Float32Array([0.5,0.5]), uCenterB:new Float32Array([0.5,0.5]),
                   uDropA:new Float32Array(2), uDropB:new Float32Array(2),
                   uBgOrigin:new Float32Array(2), uBgScale:new Float32Array([1,1]), uBgRot:new Float32Array([1,0]), uCenterUV:new Float32Array([0.5,0.5]) }
     }));
@@ -5620,6 +5653,10 @@ if(_rip){
   // of y — the back sliding sideways against the belly. Cloth is for upright images; a live pond (style 2)
   // is left alone, since riding the water is deliberate.
   if(!_pondActive && !(RIPPLE_AMT>0 && (_forceUpright || UPRIGHT_SPRITE))){ const _u=spr.shader.uniforms; _u.uAmpX=0; _u.uAmpY=0; _u.uAmt=0; }
+  // …but a swimming koi does get the WATER LIGHT (boid shade = strength, boid waves = pattern size), fixed in the room
+  { const _u=spr.shader.uniforms;
+    if(_swimOn && !_pondActive && RIPPLE_SHADE>0){ _u.uCaus=RIPPLE_SHADE; _u.uCausT=_causT; _u.uCausScale=_causScale;
+      _u.uCausC[0]=bx; _u.uCausC[1]=by; _u.uCausO[0]=_wrap20pi(bx*_causScale); _u.uCausO[1]=_wrap20pi(by*_causScale); } else _u.uCaus=0; }
   _swimUpdate(spr, _bt, _swimOn ? boid : null, _flipX<0 ? -1 : 1, _sideOn);
   { const _u=spr.shader.uniforms;                          // pooled meshes are reused, so switch the pectoral off explicitly when not wanted
     if(_pecOn){ _u.uPec[0]=1; _u.uPec[1]=boid._pecBeta||0; _u.uPec[2]=boid._pecSF||1; _u.uPecTex=_entry.pec; _u.uPecBox=_PEC_BOX; _u.uPecHinge=_PEC_HINGE; _u.uPecTip=_PEC_TIP; }
@@ -5683,6 +5720,8 @@ if(_k3){
   u.uBendZ=(boid._yawBend||0)*Math.min(1,_sw); u.uBendY=(boid._fbend||0)*Math.min(1,_sw);
   u.uPecB=_swimOn ? (boid._pecBeta||0) : 0;
   u.uFin=_swimOn ? Math.min(0.95, 0.85*Math.sqrt(SWIM_AMT/0.04))*(0.35+0.65*_th3) : 0;   // same stroke strength as the 2D koi's fin
+  u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE : 0; u.uCausT=_causT; u.uCausScale=_causScale;   // water light
+  u.uCausO[0]=_wrap20pi(bx*_causScale); u.uCausO[1]=_wrap20pi(by*_causScale);
   m.zIndex=spr.zIndex;
 }
 if(boid._visR > _maxVisR) _maxVisR = boid._visR;
@@ -7021,6 +7060,7 @@ for(const b of boids) _drawList.push(b);
 const _predSeen = !_photoTank(); // photo tank → the predator hunts unseen; only its sound gives it away
 if(_predSeen) for(const p of predators) if(p.alive) _drawList.push(p);
 _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order always matches size (far first)
+_causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 // overlay image sits at a mid-depth (BG_OVERLAY_DEPTH·DEPTH). _drawList is far→first, and each drawn
