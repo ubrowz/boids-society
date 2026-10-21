@@ -2108,6 +2108,12 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="micRoomSlider" min="0" max="100" value="0" step="5">
 <span class="ctrl-val" id="micRoomVal">off</span>
 </div>
+<div class="ctrl-row">
+<label title="Feeding time on a clap: when mic clap is on, a clap drops a pinch of this many food pellets at the surface instead of startling the fish. The pellets float a moment, then sink slowly, wobbling. The fish notice them, break away from the shoal (clownfish leave their anemone), rush to them and take each one with the mouth (it is sucked in and gone), each fish until it has had its fill; uneaten pellets lie on the floor a while and then dissolve. 0 = a clap startles them as before. The feed button drops a pinch right away (no microphone needed).">feed on clap</label>
+<input type="range" id="feedSlider" min="0" max="30" value="8" step="1">
+<span class="ctrl-val" id="feedVal">8</span>
+<button id="feedBtn" class="mini-btn" title="Drop a pinch of food now">feed</button>
+</div>
 </section>
 
 <section class="panel" id="pyramidPanel">
@@ -2398,6 +2404,7 @@ let ANEMONE_Y = parseInt(document.getElementById('anemoneYSlider').value)/100;  
 let ANEMONE_HOME = parseInt(document.getElementById('anemoneHomeSlider').value)/100;        // share of the time a clownfish spends at home
 let MIC_CLAP = parseInt(document.getElementById('micClapSlider').value);                     // rise above the room level (%) that counts as a clap; 0 = off
 let MIC_ROOM = parseInt(document.getElementById('micRoomSlider').value)/100;                 // how much the room's loudness unsettles the fish; 0 = off
+let FEED_N = parseInt(document.getElementById('feedSlider').value);                           // pellets a clap drops (feeding time); 0 = a clap startles instead
 // microphone (see _micPoll): level / room level in % · clap waiting for the next frame · noise 0..1 (room loudness × MIC_ROOM)
 const _mic = { level:0, ambient:0, over:false, busy:false, lastClap:0, lastOk:0, timer:null, clap:false, noise:0 };
 let _k3From = 0, _k3Idx = 0;                                                           // first draw index allowed 3D (the nearest get it) / this frame's 3D count (depth slices)                                                                 // fish seen through the glass: face left/right, small pitch, swing round to turn (see drawBoid)
@@ -2833,6 +2840,8 @@ wire('anemoneYSlider','anemoneYVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMON
 wire('anemoneHomeSlider','anemoneHomeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_HOME=v; });
 wire('micClapSlider','micClapVal',     v=>parseInt(v), v=>parseInt(v)===0?'off':'rise ≥ '+v+'%', v=>{ MIC_CLAP=v; _micApply(); });
 wire('micRoomSlider','micRoomVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ MIC_ROOM=v; _micApply(); });
+wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
+document.getElementById('feedBtn').addEventListener('click', () => _feedDrop(FEED_N>0 ? FEED_N : 8));   // the slider's pinch (8 when it is off)
 document.getElementById('koi3dBtn').addEventListener('click', function(){
   KOI3D=!KOI3D; this.textContent=KOI3D?'on':'off'; this.style.color=KOI3D?'#ffb142':''; this.style.borderColor=KOI3D?'#ffb142':'';
 });
@@ -3931,6 +3940,118 @@ function _fishStartleAll(){
     if(b._sp==='clown' && _anem.on && ANEMONE_HOME>0){ b._homing=true; b._homeT=6+Math.random()*6; }
   }
 }
+// ── feeding time ─────────────────────────────────────────────────────────────
+// A clap (with feed on clap > 0) or the feed button drops a pinch of food at the surface: pellets that float a
+// moment, sink slowly with a little wobble, and lie on the floor a while before they dissolve. Every fish notices
+// after a short reaction time, leaves the shoal (and its anemone), swims to the nearest pellet and snaps it — a
+// gulp — until it has had its fill (a few pellets; the appetite comes back over a minute or two).
+// Pellets live in the ROOM frame like the fish: r along room right, d room down from the centre (canvas px), z depth.
+// They are sized by the fish: _anem.L, the smoothed adult fish length, is kept up with or without an anemone.
+// Drawn as small sprites in the body container, slotted between the bodies by depth (_foodPlace, like the anemone).
+const FOOD_MAX = 80;
+const _food = [], _foodSprites = [];
+let _foodTex = null, _foodOrder = [], _foodNext = 0;
+function _feedDrop(n){
+  if(!(SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank()) || !(n>0)) return;   // fish tanks only
+  const F=_roomFrame(), L=_anem.L>0 ? _anem.L : 4*RADIUS;
+  const c=(Math.random()*1.2-0.6)*F.extR;                                   // where the pinch lands along the surface
+  for(let i=0; i<n && _food.length<FOOD_MAX; i++){
+    _food.push({ r:Math.max(-F.extR+RADIUS, Math.min(F.extR-RADIUS, c+(Math.random()+Math.random()-1)*1.2*L)), d:0, z:DEPTH>0 ? DEPTH*(0.15+0.7*Math.random()) : 0,
+                 t:-Math.random()*0.7,                                       // a pinch, not all at once: each one lands up to 0.7 s later
+                 fl:0.6+Math.random()*2.2, v:0, vs:(0.11+0.06*Math.random())*F.extD, ph:Math.random()*6.2832, wf:0.35+Math.random()*0.4,
+                 floor:0, s:0.8+Math.random()*0.45, k:Math.random(), x:0, y:0, eaten:false, suck:null, sk:0 });
+  }
+  for(const b of boids) if(b._fish && !b.dying && !(b._feedWait>0)) b._feedWait=0.2+Math.random()*0.8;   // they notice almost at once, one after another
+}
+// once per frame, before the fish move: float, sink with a wobble, settle, dissolve
+function _foodStep(dt){
+  if(!_food.length) return;
+  dt=Math.min(Math.max(dt||0,0),0.1);
+  const F=_roomFrame(), L=_anem.L>0 ? _anem.L : 4*RADIUS, top=-F.extD+0.5*RADIUS, bot=F.extD-0.5*RADIUS;
+  for(let i=_food.length-1; i>=0; i--){
+    const f=_food[i];
+    if(f.eaten || f.floor>28){ _food.splice(i,1); continue; }
+    if(f.suck){ if(!f.suck.alive || f.suck.dying){ f.suck=null; } else continue; }   // being sucked in: the fish moves it (_feedFish)
+    f.t+=dt;
+    let wob=0;
+    if(f.t<0){ f.d=top; }
+    else if(f.t<f.fl){ f.d=top; f.r+=0.02*L*Math.sin(f.ph+2*f.t)*dt; }              // floating in the surface film
+    else if(f.d<bot){
+      f.v+=(f.vs-f.v)*(1-Math.exp(-dt/1.5));                                         // soaks up and sinks: ~8 s down the tank
+      f.d=Math.min(bot, f.d+f.v*dt);
+      wob=0.12*L*Math.min(1,(f.t-f.fl)/2)*Math.sin(f.ph+6.2832*f.wf*f.t);            // a gentle side-to-side wobble on the way down
+    } else f.floor+=dt;
+    const r=f.r+wob;
+    f.x=F.cx+F.rx*r+F.dx*f.d; f.y=F.cy+F.ry*r+F.dy*f.d;
+  }
+}
+// a fish's part of feeding time, after its anemone pull (it overrides that while it feeds)
+function _feedFish(b, dt){
+  b._fed=Math.max(0,(b._fed||0)-dt/40);                                               // appetite comes back: about one pellet per 40 s
+  b._feeding=false;
+  if(!_food.length || b._rising || !b._fish){ if(!_food.length){ b._feedWait=undefined; b._feedTgt=null; } return; }
+  if(b._fill===undefined) b._fill=3+Math.floor(Math.random()*4);                      // 3–6 pellets and it has had enough
+  if(b._fed>=b._fill){ b._feedTgt=null; return; }
+  if(b._feedWait===undefined) b._feedWait=0.2+Math.random()*0.8;
+  if(b._feedWait>0){ b._feedWait-=dt; return; }
+  // where its mouth is, as drawn: the snout is half a body length (0.69 × the image's half-width) ahead along the nose
+  const vr=b._visR||RADIUS, zs=zScaleOf(b), half=0.69*vr, ps=b._psi||0, th=b._th||0;
+  const nR=Math.cos(th)*Math.cos(ps), nD=Math.sin(th), hx=Math.cos(PANEL_TILT), hy=Math.sin(PANEL_TILT);
+  const ox=half*(nR*hx-nD*hy), oy=half*(nR*hy+nD*hx), oz=half/zs*Math.cos(th)*Math.sin(ps);
+  const bx=b._drawX!==undefined ? b._drawX : b.x, by=b._drawY!==undefined ? b._drawY : b.y;
+  const mx=bx+ox, my=by+oy, mz=(b.z||0)+oz;
+  // a pellet it is sucking in: it slides into the open mouth and is gone
+  if(b._feedTgt && b._feedTgt.suck===b){
+    const f=b._feedTgt, k=1-Math.exp(-dt/0.05);
+    f.x+=(mx-f.x)*k; f.y+=(my-f.y)*k; f.z+=(mz-f.z)*k; f.sk+=dt;
+    b._feeding=true; b._homeZ=undefined; b._nearHome=false; b._feedDist=0; b._feedZ=b.z; b._feedAimX=b.x; b._feedAimY=b.y;
+    if(f.sk>0.16 || Math.hypot(mx-f.x, my-f.y)<0.06*half){ f.eaten=true; b._feedTgt=null; b._fed++; b._feedWait=0.3+Math.random()*0.6; }   // swallowed; a moment before the next
+    return;
+  }
+  // the nearest free pellet in the water (screen distance plus depth), looked for again every 0.4 s
+  if(!b._feedTgt || b._feedTgt.eaten || b._feedTgt.suck || !(b._feedTgt.t>=0) || (b._feedLook-=dt)<=0){
+    b._feedLook=0.4; let best=null, bd=Infinity;
+    for(const f of _food){ if(f.eaten || f.suck || f.t<0) continue; const dd=Math.hypot(f.x-mx, f.y-my)+Math.abs(f.z-mz)*zs; if(dd<bd){ bd=dd; best=f; } }
+    b._feedTgt=best;
+  }
+  const f=b._feedTgt; if(!f) return;
+  b._feeding=true; b._homeZ=undefined; b._nearHome=false;
+  // it steers its MOUTH onto the pellet (read by _fishStep): aim the body so the snout lands on it
+  b._feedAimX=f.x-ox+(b.x-bx); b._feedAimY=f.y-oy+(b.y-by);
+  b._feedDist=Math.hypot(f.x-mx, f.y-my); b._feedZ=f.z-oz;
+  steerToward(b, b._feedAimX, b._feedAimY, 3);
+  // at its mouth (within about a fifth of a body length, in 3D): it opens up and sucks the pellet in
+  if(Math.hypot(b._feedDist, (f.z-mz)*zs) < 0.45*half){ f.suck=b; f.sk=0; b._gulpS=simClock; }
+}
+// draw: pellets in far→near order, each slotted in front of the bodies farther than it (call before every body, then with −∞)
+function _foodFrame(){
+  for(const s of _foodSprites) s.visible=false;
+  _foodOrder.length=0; _foodNext=0;
+  if(!_food.length) return;
+  if(!_foodTex){
+    const c=document.createElement('canvas'); c.width=c.height=16; const g=c.getContext('2d');
+    const gr=g.createRadialGradient(8,8,0,8,8,8); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.55,'rgba(255,255,255,0.95)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=gr; g.fillRect(0,0,16,16); _foodTex=PIXI.Texture.from(c);
+  }
+  for(const f of _food) if(!f.eaten && f.t>=0) _foodOrder.push(f);
+  _foodOrder.sort((a,b)=>b.z-a.z);
+}
+function _foodPlace(z){
+  if(_foodNext>=_foodOrder.length) return;
+  const L=_anem.L>0 ? _anem.L : 4*RADIUS;
+  while(_foodNext<_foodOrder.length && !(_foodOrder[_foodNext].z<z)){
+    const f=_foodOrder[_foodNext], i=_foodNext++;
+    if(i>=_foodSprites.length){ const s=new PIXI.Sprite(_foodTex); s.anchor.set(0.5,0.5); _gfx.bodySprites.addChild(s); _foodSprites.push(s); }
+    const s=_foodSprites[i], zs=zScaleOf(f), dia=Math.max(1.6, 0.075*L*zs*f.s);
+    s.visible=true; s.x=f.x; s.y=f.y; s.scale.set(dia/16*1.6);
+    // a warm brown-orange pellet, depth-shaded and sinking into the water colour like the fish
+    const g=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(f))))&255)/255;
+    const col=(Math.round(g*(225+20*f.k))<<16)|(Math.round(g*(150+30*f.k))<<8)|Math.round(g*(70+20*f.k));
+    s.tint=WATER_TINT>0 ? _mixHex(col, WATER_HEX, _waterF(f)) : col;
+    s.alpha=f.floor>25 ? Math.max(0,(28-f.floor)/3) : 1;                              // dissolves on the floor
+    s.zIndex=_zOrder-0.5;
+  }
+}
 
 // ── sea anemone (reef tank) ──────────────────────────────────────────────────
 // A bubble-tip anemone on the tank floor: the clownfish's home. Built in code like the fish: a squat column
@@ -4666,7 +4787,9 @@ const _bT=()=>S.burstT[0]+Math.random()*S.burstT[1], _cT=()=>S.cruiseT[0]+Math.r
 // and "horizontal" for a fish means horizontal in the room. Room right = (hx,hy) in canvas coords, room
 // down = (-hy,hx) — the same frame an upright sprite uses when it is rotated by PANEL_TILT.
 const hx=Math.cos(PANEL_TILT), hy=Math.sin(PANEL_TILT);
-const wX=Math.cos(b._sa), wY=Math.sin(b._sa);
+const _ft=b._feeding && b._feedTgt;                        // after food: it wants the pellet itself (its mouth onto it), not the flock's turn-capped wish
+let wX=Math.cos(b._sa), wY=Math.sin(b._sa);
+if(_ft){ const ex=b._feedAimX-b.x, ey=b._feedAimY-b.y, el=Math.hypot(ex,ey); if(el>1e-3){ wX=ex/el; wY=ey/el; } }
 const wR=wX*hx+wY*hy, wD=-wX*hy+wY*hx;                     // the flock's wish along room-right / room-down
 if(b._psi===undefined){                                    // first frame as a fish: start from the current heading
   const c=wR;
@@ -4675,9 +4798,9 @@ if(b._psi===undefined){                                    // first frame as a f
   b._bcMode=1; b._bcT=Math.random()*2; b._f=0.75; b._thrust=0.5; b._fbend=0;
 }
 // smoothed wish
-const k=1-Math.exp(-dt/0.35);
+const k=1-Math.exp(-dt/(_ft ? 0.12 : 0.35));
 b._dsx+=(wR-b._dsx)*k; b._dsy+=(wD-b._dsy)*k;
-b._dsxSlow+=(wR-b._dsxSlow)*(1-Math.exp(-dt/1.2));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round
+b._dsxSlow+=(wR-b._dsxSlow)*(1-Math.exp(-dt/(_ft ? 0.25 : 1.2)));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round (food: it whips round at once)
 // cruising depth angle: a slow wander, pushed back toward the middle near the front or back glass
 if((b._phiTimer-=dt)<=0){
   if(DEPTH>0 && Math.random()<0.5){                        // a DEPTH RUN: swim nearly straight toward or away from the glass (you see its face or tail)
@@ -4691,6 +4814,8 @@ if(b._homeZ!==undefined && DEPTH>0 && _anem.Az>0){
   const e=(b._homeZ-b.z)/_anem.Az;
   if(!b._run || Math.abs(e)>0.8){ b._run=false; b._phiT=Math.max(-0.8,Math.min(0.8,e)); }
 }
+// feeding: swim into the depth of its pellet (steeper the closer it is)
+if(b._feeding && DEPTH>0){ b._run=false; b._phiT=Math.max(-1.2,Math.min(1.2,Math.atan2(b._feedZ-b.z, Math.max(b._feedDist||0, 2*RADIUS)))); }
 // STARTLE (a clap on the microphone, like a knock on the glass): a fast-start — the fish swings round sharply
 // (its body curls with the turn) and darts off away from the front glass, then calms down over a few seconds
 let st=0;
@@ -4699,7 +4824,7 @@ if(st>0.3 && b._homeZ===undefined && DEPTH>0 && b.z<DEPTH*0.8) b._phiT=1.1;
 const noise=_mic.noise;                                     // a noisy room: restless (see the rhythm and speed below)
 // angles move like a critically damped spring (ease in AND out) — a plain rate limit starts and stops dead, which reads as mechanical
 const _spring=(x,v,tgt,w)=>{ const a=w*w*(tgt-x)-2*w*v; v+=a*dt; return [x+v*dt, v]; };
-[b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, (b._run ? 2.6 : 1.3)+6*st);   // a depth run swings in within ~1.5 s; startled: fast
+[b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, (b._feeding ? 3.5 : b._run ? 2.6 : 1.3)+6*st);   // a depth run swings in within ~1.5 s; startled: fast
 // facing + turning round through depth
 if(b._fhold>0) b._fhold-=dt;
 if(!b._fturn){
@@ -4721,24 +4846,25 @@ if(!b._fturn){
 }
 if(b._fturn){
   // smoothstep over the whole arc: eases out of the old heading and into the new one (no dead start or stop)
-  b._fturnP=Math.min(1, b._fturnP+dt/S.turn);                            // every turn-round of a species takes the same unhurried time
+  b._fturnP=Math.min(1, b._fturnP+dt/(S.turn*(b._feeding?0.4:1)));       // every turn-round of a species takes the same unhurried time (food: a quick whip round)
   const e=b._fturnP*b._fturnP*(3-2*b._fturnP);
   b._psi=b._fturnFrom+b._fturn*b._fturnSpan*e;
   if(b._fturnP>=1){
-    b._fface=-b._fface; b._fturn=0; b._fhold=S.hold; b._psv=0;
+    b._fface=-b._fface; b._fturn=0; b._fhold=S.hold*(b._feeding?0.1:1); b._psv=0;
     b._psi=Math.atan2(Math.sin(b._psi),Math.cos(b._psi));                // normalise to (-π, π]
   }
 } else {
   const tgt = b._fface>0 ? b._phi : Math.PI-b._phi;
   let d=tgt-b._psi; d=Math.atan2(Math.sin(d),Math.cos(d));
-  [b._psi, b._psv] = _spring(b._psi, b._psv||0, b._psi+d, 2.2+6*st);
+  [b._psi, b._psv] = _spring(b._psi, b._psv||0, b._psi+d, (b._feeding ? 4 : 2.2)+6*st);
 }
 // yaw rate → sideways C-curl for the 3D koi (ψ increasing = nose swinging away from the glass; the body bows into the turn)
 if(b._psiPrev===undefined) b._psiPrev=b._psi;
 { let dpsi=b._psi-b._psiPrev; dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi)); b._psiPrev=b._psi;
   const tgtB=dt>0 ? Math.max(-1,Math.min(1,dpsi/dt*0.45)) : 0; b._yawBend=(b._yawBend||0)+(tgtB-(b._yawBend||0))*(1-Math.exp(-dt/0.15)); }
 // pitch: limited climb/dive, rate-limited; its rate also curls the body (read in drawBoid)
-let thT=Math.max(-FISH_PITCH_MAX,Math.min(FISH_PITCH_MAX,Math.atan2(b._dsy,Math.abs(b._dsx)+0.15)));
+const pmax=FISH_PITCH_MAX*(b._feeding?1.6:1);                // after food a fish climbs and dives steeper (40°)
+let thT=Math.max(-pmax,Math.min(pmax,Math.atan2(b._dsy,Math.abs(b._dsx)+0.15)));
 if(b._fturn) thT*=0.5;
 [b._th, b._thv] = _spring(b._th, b._thv||0, thT, 2.6);
 if(Math.abs(b._thv)>FISH_PITCH_RATE){ b._thv=Math.sign(b._thv)*FISH_PITCH_RATE; }
@@ -4763,10 +4889,15 @@ else if(b._bcMode===1){ fT=0.75; thrT=0.5; }              // cruise
 else if(b._bcMode===2){ fT=0.45; thrT=0.12; }             // glide
 else { fT=0.08; thrT=0.25; }                              // hover — the tail still idles
 if(!b._fturn){ fT*=1+0.6*_ch; thrT=Math.max(thrT, 0.5+0.5*_ch); }
+if(b._feeding && !b._fturn){                                // eager: no hovering or gliding on the way, then it slows to take the pellet
+  if(b._bcMode>=2){ b._bcMode=1; b._bcT=_cT(); }
+  const nearF=(b._feedDist||0)<2.2*(b._visR||RADIUS);     // within about a body length and a half
+  fT=nearF ? 0.95 : 1.9; thrT=nearF ? 0.7 : 1.0;             // a rush across the tank, then a controlled approach
+}
 fT*=1+0.25*noise;
 if(st>0){ if(st>0.5 && b._bcMode!==0){ b._bcMode=0; b._bcT=0.5; } fT=Math.max(fT, 1.25+1.2*st); thrT=Math.max(thrT, st); }   // the dart
 // speed eases like a spring (no sudden lurch at the start of a burst): ~0.6 s to speed up, slower to glide down; bursts last 0.8–1.4 s so they still reach full speed
-[b._f, b._fv] = _spring(b._f, b._fv||0, fT, fT>b._f ? S.accel+8*st : 1.2); if(b._f<0){ b._f=0; b._fv=0; }   // a startle is the one sudden start
+[b._f, b._fv] = _spring(b._f, b._fv||0, fT, fT>b._f ? S.accel+8*st+(b._feeding?4:0) : (b._feeding?3:1.2)); if(b._f<0){ b._f=0; b._fv=0; }   // a startle is the one sudden start
 b._thrust+=(thrT-b._thrust)*(1-Math.exp(-dt/0.2));
 // move (per frame, like the rest of the engine)
 const sp=SPEED*b._f, cth=Math.cos(b._th);
@@ -7553,7 +7684,8 @@ drawBirthRings();
 updateCollisions();
 updatePredators(dt);
 
-if(_mic.clap){ _mic.clap=false; _fishStartleAll(); }   // a clap on the microphone: every fish startles
+if(_mic.clap){ _mic.clap=false; if(FEED_N>0) _feedDrop(FEED_N); else _fishStartleAll(); }   // a clap on the microphone: feeding time, or every fish startles
+_foodStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
@@ -7566,6 +7698,7 @@ if(!boid.dying){
 const _mx0=boid.x, _my0=boid.y;
 avoidWalls(boid); wander(boid); updateZ(boid); _ovGuardZ(boid,(boid.isSingle?RADIUS*0.7:RADIUS)*zScaleOf(boid)*_imgScaleShown); nearnessBehavior(boid); bondAttraction(boid);
 if(boid._fish){ if(_anem.on) _anemHome(boid,dt); else { boid._homeZ=undefined; boid._nearHome=false; } }   // clownfish keep to their anemone
+if(boid._fish) _feedFish(boid,dt); else boid._feeding=false;   // …unless there is food in the water
 if(DIFF_MODE) updateDifferentiation(boid,dt);
 if(NO_OVERLAP || DEPTH>0) separateBoid(boid); // 3D → non-interpenetration is intrinsic; 2D → only when "no overlap" is on
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
@@ -7666,8 +7799,10 @@ _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order a
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 _anemFrame();
-for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
+_foodFrame();
+for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
+_foodPlace(-Infinity);
 // overlay image sits at a mid-depth (BG_OVERLAY_DEPTH·DEPTH). _drawList is far→first, and each drawn
 // body took zIndex = its position in that order, so count the bodies farther than the overlay and
 // slot it in between. DEPTH<=0 → no meaningful z, put it behind every body.
@@ -7682,7 +7817,7 @@ if(_bgOverlayMesh && _bgOverlayMesh.visible){
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _anem.on || (_bgOverlayMesh && _bgOverlayMesh.visible);
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _anem.on || _foodOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
@@ -8093,7 +8228,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
