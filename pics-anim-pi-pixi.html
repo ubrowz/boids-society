@@ -3911,6 +3911,12 @@ function _micApply(){
   if(want && !_mic.timer) _mic.timer=setInterval(_micPoll, MIC_POLL_MS);
   else if(!want && _mic.timer){ clearInterval(_mic.timer); _mic.timer=null; Object.assign(_mic,{level:0,ambient:0,over:false,clap:false,noise:0}); }
 }
+// with an anemone: how many clownfish are at home right now (homing toward it), of all clownfish
+function _anemHint(){
+  if(!_anem.on) return '';
+  let h=0, n=0; for(const b of boids) if(b._fish && b._sp==='clown' && !b.dying){ n++; if(b._homing && ANEMONE_HOME>0) h++; }
+  return n ? ' · home '+h+'/'+n : '';
+}
 // what the tank overlay shows while the mic is on
 setTimeout(_micApply, 0);   // after load: an export or tank opened with a mic slider already up starts listening
 function _micHint(){
@@ -4640,7 +4646,7 @@ steerToward(boid,cx+Math.cos(boid.wanderAngle)*20,cy+Math.sin(boid.wanderAngle)*
 //    the speed, _thrust the tail beat (read by the swim shader through drawBoid).
 // boid.vx/vy keep the DESIRED heading so every steering helper keeps working; the fish's real screen
 // velocity is _fvx/_fvy. Gated by boid._fish, which drawBoid sets (side view on, image boid, not upright).
-const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 2.2, FISH_PITCH_RATE = 0.9, FISH_TURN_HOLD = 2.0;
+const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 3.5, FISH_PITCH_RATE = 0.9, FISH_TURN_HOLD = 2.0;
 // How each species swims (the image set says which species a fish is; drawBoid copies it to boid._sp).
 // Koi cruise on their tails: long strokes, slow unhurried turns. Clownfish row with their pectoral fins: a stiffer
 // body and smaller tail stroke, quick busy pectorals, a lot of hovering, short quick darts and snappier turns.
@@ -4649,7 +4655,7 @@ const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 2.2, FISH_PITCH_RATE = 0
 //   chance of each (the rest stays cruising) · hoverT/burstT/cruiseT: [min, spread] seconds
 const _SPECIES = {
   koi:   { grow:0.25, amp:1.00, fin:1.00, pecF:1.0, pecA:1.00, gillX:0.29, turn:FISH_TURN_SECS, hold:FISH_TURN_HOLD, accel:3.0, burst:0.35, glide:0.53, hover:0.12, hoverT:[2,2],   burstT:[0.8,0.6], cruiseT:[1.5,2.5] },
-  clown: { grow:0.20, amp:0.55, fin:0.75, pecF:1.8, pecA:1.35, gillX:0.21, turn:1.2, hold:1.0, accel:5.0, burst:0.30, glide:0.25, hover:0.45, hoverT:[1,1.5], burstT:[0.4,0.4], cruiseT:[0.6,1.2] },
+  clown: { grow:0.20, amp:0.55, fin:0.75, pecF:1.8, pecA:1.35, gillX:0.21, turn:2.2, hold:1.0, accel:5.0, burst:0.30, glide:0.25, hover:0.45, hoverT:[1,1.5], burstT:[0.4,0.4], cruiseT:[0.6,1.2] },
 };
 const _spOf = b => _SPECIES[b._sp] || _SPECIES.koi;
 function _fishStep(b, dt){
@@ -4674,12 +4680,17 @@ b._dsx+=(wR-b._dsx)*k; b._dsy+=(wD-b._dsy)*k;
 b._dsxSlow+=(wR-b._dsxSlow)*(1-Math.exp(-dt/1.2));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round
 // cruising depth angle: a slow wander, pushed back toward the middle near the front or back glass
 if((b._phiTimer-=dt)<=0){
-  if(DEPTH>0 && Math.random()<0.4){                        // a DEPTH RUN: swim mostly toward or away from the glass (you see its face or tail)
-    b._phiTimer=2+Math.random()*2.5; b._phiT=(b.z<DEPTH*0.5 ? 1 : -1)*(0.95+Math.random()*0.35);
-  } else { b._phiTimer=3+Math.random()*4; b._phiT=(Math.random()*2-1)*0.5; }
+  if(DEPTH>0 && Math.random()<0.5){                        // a DEPTH RUN: swim nearly straight toward or away from the glass (you see its face or tail)
+    b._phiTimer=3+Math.random()*3; b._phiT=(b.z<DEPTH*0.5 ? 1 : -1)*(1.13+Math.random()*0.35); b._run=true;   // 65–85°, long enough to get there
+  } else { b._phiTimer=3+Math.random()*4; b._phiT=(Math.random()*2-1)*0.5; b._run=false; }
 }
-if(DEPTH>0){ if(b.z<DEPTH*0.15) b._phiT=0.45; else if(b.z>DEPTH*0.85) b._phiT=-0.45; } else b._phiT=0;
-if(b._homeZ!==undefined && DEPTH>0 && _anem.Az>0) b._phiT=Math.max(-0.8,Math.min(0.8,(b._homeZ-b.z)/_anem.Az));   // a clownfish heads for its anemone's depth
+// near the front or back glass: head back toward the middle (a run goes on closer to the glass first)
+if(DEPTH>0){ const mg=b._run ? 0.08 : 0.15; if(b.z<DEPTH*mg){ b._phiT=0.45; b._run=false; } else if(b.z>DEPTH*(1-mg)){ b._phiT=-0.45; b._run=false; } } else { b._phiT=0; b._run=false; }
+// a clownfish at home keeps to its anemone's depth, but still makes short runs in and out around it
+if(b._homeZ!==undefined && DEPTH>0 && _anem.Az>0){
+  const e=(b._homeZ-b.z)/_anem.Az;
+  if(!b._run || Math.abs(e)>0.8){ b._run=false; b._phiT=Math.max(-0.8,Math.min(0.8,e)); }
+}
 // STARTLE (a clap on the microphone, like a knock on the glass): a fast-start — the fish swings round sharply
 // (its body curls with the turn) and darts off away from the front glass, then calms down over a few seconds
 let st=0;
@@ -4688,18 +4699,23 @@ if(st>0.3 && b._homeZ===undefined && DEPTH>0 && b.z<DEPTH*0.8) b._phiT=1.1;
 const noise=_mic.noise;                                     // a noisy room: restless (see the rhythm and speed below)
 // angles move like a critically damped spring (ease in AND out) — a plain rate limit starts and stops dead, which reads as mechanical
 const _spring=(x,v,tgt,w)=>{ const a=w*w*(tgt-x)-2*w*v; v+=a*dt; return [x+v*dt, v]; };
-[b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, 1.3+6*st);   // startled: the swing comes fast
+[b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, (b._run ? 2.6 : 1.3)+6*st);   // a depth run swings in within ~1.5 s; startled: fast
 // facing + turning round through depth
 if(b._fhold>0) b._fhold-=dt;
 if(!b._fturn){
   const want = b._dsxSlow>0.3 ? 1 : (b._dsxSlow<-0.3 ? -1 : b._fface);
   if(want!==b._fface && b._fhold<=0){
-    const away = DEPTH<=0 ? (Math.random()<0.5) : b.z < DEPTH*0.5;      // swing round on the side with room
-    // right→left via 'away' turns ψ positive (sinψ>0 = moving away); left→right via 'away' turns it negative
-    b._fturn = (b._fface>0 ? 1 : -1) * (away ? 1 : -1);
-    // the arc runs from here to the cruising heading on the other side, the long way round in the chosen direction
+    // the arc runs from here to the cruising heading on the other side, the SHORTER way round (a fish already
+    // angled into the tank just carries on round; it never loops). Only when both ways are about half a circle —
+    // a fish side-on to the glass — does the room decide: it swings round on the side with more depth to spare.
     const end = b._fface>0 ? Math.PI-b._phi : b._phi;
-    let span=(end-b._psi)*b._fturn; span=((span%(2*Math.PI))+2*Math.PI)%(2*Math.PI); if(span<0.5) span+=2*Math.PI;
+    const up=((end-b._psi)%(2*Math.PI)+2*Math.PI)%(2*Math.PI), down=2*Math.PI-up;   // ψ increasing / decreasing
+    if(Math.abs(up-down)<0.6){
+      const away = DEPTH<=0 ? (Math.random()<0.5) : b.z < DEPTH*0.5;
+      // right→left via 'away' turns ψ positive (sinψ>0 = moving away); left→right via 'away' turns it negative
+      b._fturn = (b._fface>0 ? 1 : -1) * (away ? 1 : -1);
+    } else b._fturn = up<down ? 1 : -1;
+    const span = b._fturn>0 ? up : down;
     b._fturnFrom=b._psi; b._fturnSpan=span; b._fturnP=0; b._psv=0;
   }
 }
@@ -4780,6 +4796,7 @@ function _fishArrive(b){
   const F=_roomFrame(), m=1.3*Math.max(_maxVisR,RADIUS);                  // start a body length or so below the floor
   const along=(Math.random()*1.6-0.8)*F.extR;
   b.x=F.cx+F.rx*along+F.dx*(F.extD+m); b.y=F.cy+F.ry*along+F.dy*(F.extD+m);
+  if(DEPTH>0) b.z=DEPTH*(0.45+0.5*Math.random());                        // from the back half: it arrives small and far, then comes forward
   b._drawX=b.x; b._drawY=b.y;
   const side=Math.random()<0.5?-1:1;                                      // up and a little sideways: it climbs at its steepest pitch
   b._sa=Math.atan2(F.ry*side*0.5-F.dy, F.rx*side*0.5-F.dx); b.vx=Math.cos(b._sa)*SPEED; b.vy=Math.sin(b._sa)*SPEED;
@@ -7508,7 +7525,7 @@ if(_fpsEl && ++_fpsThrottle>=5){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
   const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')
-            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_micHint()+_sndHint();
+            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_anemHint()+_micHint()+_sndHint();
   if(html!==_fpsLastHTML){ _fpsLastHTML=html; _fpsEl.innerHTML=html; }
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
