@@ -2044,7 +2044,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label title="Ten clownfish — ocellaris (Nemo), percula, black ocellaris, maroon, gold-stripe maroon, Clark's, tomato, pink skunk, orange skunk and the designer snowflake ocellaris — in side profile, facing right, each with its own 3D model and colours. Fills BOTH sex pools. Clownfish swim differently from koi: they row with busy pectoral fins, hover a lot, dart and turn quickly.">reef set</label>
-<button id="reefBtn" class="mini-btn" title="Load the clownfish into the ♂ and ♀ pools and make a reef tank: the koi pond's tank settings (side view and 3D on, Details and Event FX off, panel tilt 90°, trails off, immigration on, about 10 fish) with ocean-blue water, image size 0.40×, beat 1.8 Hz, a stiffer body wave 0.8, a close group that doesn't school (cohere 60, align 15)">load reef</button>
+<button id="reefBtn" class="mini-btn" title="Load the clownfish into the ♂ and ♀ pools and make a reef tank: the koi pond's tank settings (side view and 3D on, Details and Event FX off, panel tilt 90°, trails off, immigration on, about 10 fish) with ocean-blue water, image size 0.35×, beat 1 Hz, body wave 1.2, depth light 10, depth haze 30, boid shade 60%, boid waves 2.7, a close group that doesn't school (cohere 60, align 15), and the anemone at 20% height">load reef</button>
 <button id="reefClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="reefName" class="mini-note"></span>
 </div>
@@ -2096,6 +2096,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label title="How many wavelengths fit along the body. Low = the whole body sways like an eel's slow S; high = a tight ripple. Real fish are around 0.8–1.">body wave</label>
 <input type="range" id="swimWaveSlider" min="4" max="16" value="9" step="1">
 <span class="ctrl-val" id="swimWaveVal">0.9</span>
+</div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>microphone</b> (Pi: its mic server · Mac: mock_mic.py) —</div>
+<div class="ctrl-row">
+<label title="Listen for claps (or a knock, a door slam): a sudden jump of the sound level above the room's recent level, by at least this much. Every fish startles like at a knock on the glass — it flinches round and darts off away from the front, the shoal scatters, clownfish dive into their anemone — and calms down over a few seconds. 0 = off. The level comes from a small server on http://127.0.0.1:8080/ that answers with the microphone level 0–100: on the Pi its microphone server, on a Mac mock_mic.py (Panel-Animation; Enter = a clap, --real = the Mac's microphone). The tank overlay shows the level.">mic clap</label>
+<input type="range" id="micClapSlider" min="0" max="100" value="0" step="1">
+<span class="ctrl-val" id="micClapVal">off</span>
+</div>
+<div class="ctrl-row">
+<label title="How much the room's loudness unsettles the fish: in a noisy room they burst more, hover less, swim a little faster and keep closer together; when it is quiet again they settle. 0 = off. Uses the same microphone server as mic clap.">mic room</label>
+<input type="range" id="micRoomSlider" min="0" max="100" value="0" step="5">
+<span class="ctrl-val" id="micRoomVal">off</span>
 </div>
 </section>
 
@@ -2385,6 +2396,10 @@ let ANEMONE   = parseInt(document.getElementById('anemoneSlider').value)/100;   
 let ANEMONE_X = parseInt(document.getElementById('anemoneXSlider').value)/100;              // where from left to right
 let ANEMONE_Y = parseInt(document.getElementById('anemoneYSlider').value)/100;              // how high above the floor
 let ANEMONE_HOME = parseInt(document.getElementById('anemoneHomeSlider').value)/100;        // share of the time a clownfish spends at home
+let MIC_CLAP = parseInt(document.getElementById('micClapSlider').value);                     // rise above the room level (%) that counts as a clap; 0 = off
+let MIC_ROOM = parseInt(document.getElementById('micRoomSlider').value)/100;                 // how much the room's loudness unsettles the fish; 0 = off
+// microphone (see _micPoll): level / room level in % · clap waiting for the next frame · noise 0..1 (room loudness × MIC_ROOM)
+const _mic = { level:0, ambient:0, over:false, busy:false, lastClap:0, lastOk:0, timer:null, clap:false, noise:0 };
 let _k3From = 0, _k3Idx = 0;                                                           // first draw index allowed 3D (the nearest get it) / this frame's 3D count (depth slices)                                                                 // fish seen through the glass: face left/right, small pitch, swing round to turn (see drawBoid)
 let _drawIdx = 0, _swimFrom = 0;
 let _causT = 0, _causScale = 0.06;
@@ -2618,13 +2633,16 @@ document.getElementById('koiBtn').addEventListener('click', () => {
 document.getElementById('reefBtn').addEventListener('click', () => {
   const urls=_fishSetUrls('clown'); if(!urls.length) return;
   _fillFishPools(urls);
-  _setSlider('imgScaleSlider', 0.40);                                       // a little smaller than the koi, but deep-bodied: the bands still read on the panel
+  _setSlider('imgScaleSlider', 0.35);                                       // smaller than the koi, but deep-bodied: the bands still read on the panel
   _setSlider('speedSlider', 2); _setSlider('cohKSlider', 60); _setSlider('alignSlider', 15);   // clownfish keep close together (around their home) but don't school
-  _setSlider('swimBeatSlider', 18); _setSlider('swimWaveSlider', 8);                             // quick small tail beats, a stiff body
+  _setSlider('swimBeatSlider', 10); _setSlider('swimWaveSlider', 12);                            // 1 Hz beat, body wave 1.2 — tuned by eye on the Pi + panel
   _setSlider('waterTintSlider', 40); _setSlider('sizeVarSlider', 50);                              // clear reef water; a big female, smaller males
   _setSlider('waterColorInput', '#0060a0');                                                        // ocean blue, about as bright as the koi pond's teal (the panel)
   _setSlider('anemoneSlider', 100);                                                                // their bubble-tip anemone on the floor
   _setSlider('anemoneHomeSlider', 40);                                                             // about four of ten at home at a time
+  _setSlider('anemoneYSlider', 20);                                                                // a little above the floor
+  _setSlider('depthLightSlider', 10); _setSlider('depthHazeSlider', 30);                         // gentle depth cues (tuned on the panel)
+  _setSlider('shadeSlider', 60); _setSlider('waveSlider', 2.7);                                  // water light on the fish: stronger, finer pattern
   _fishTankSettings();
   document.getElementById('reefName').textContent=urls.length+' clownfish'; document.getElementById('koiName').textContent='';
 });
@@ -2813,6 +2831,8 @@ wire('anemoneSlider','anemoneVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'o
 wire('anemoneXSlider','anemoneXVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_X=v; });
 wire('anemoneYSlider','anemoneYVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_Y=v; });
 wire('anemoneHomeSlider','anemoneHomeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_HOME=v; });
+wire('micClapSlider','micClapVal',     v=>parseInt(v), v=>parseInt(v)===0?'off':'rise ≥ '+v+'%', v=>{ MIC_CLAP=v; _micApply(); });
+wire('micRoomSlider','micRoomVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ MIC_ROOM=v; _micApply(); });
 document.getElementById('koi3dBtn').addEventListener('click', function(){
   KOI3D=!KOI3D; this.textContent=KOI3D?'on':'off'; this.style.color=KOI3D?'#ffb142':''; this.style.borderColor=KOI3D?'#ffb142':'';
 });
@@ -3858,6 +3878,54 @@ if(P.used>=P.meshes.length){
 _koi3dUsed++;
 const m=P.meshes[P.used++]; m.visible=true; return m;
 }
+// ── microphone ───────────────────────────────────────────────────────────────
+// As in the panel carousel (Panel-Animation/carousel.html): the page polls a small local server that answers with
+// the microphone level 0–100 as plain text — on the Pi its microphone server, on a Mac mock_mic.py (Enter = a clap,
+// --real = the Mac's own microphone). It must send Access-Control-Allow-Origin, since the tank runs from file://.
+// A CLAP is a sudden jump above the room's recent level (the carousel's spike mode): the room level follows the
+// sound slowly upward, ignoring the spike itself, and drops quickly when it gets quieter. Rising edge, 1 s cooldown.
+// Polling runs only in the simulation (not the dashboard) and only while a mic slider is above 0, so a machine
+// without the server isn't spammed with failed requests.
+const MIC_URL = 'http://127.0.0.1:8080/', MIC_POLL_MS = 100, MIC_CLAP_COOLDOWN_MS = 1000;
+function _micPoll(){
+  if(_mic.busy) return;
+  _mic.busy=true;
+  fetch(MIC_URL, {cache:'no-store'})
+    .then(r=>r.text())
+    .then(v=>{ _mic.level=parseInt(v,10)||0; _mic.lastOk=performance.now(); })
+    .catch(()=>{ _mic.level=0; })
+    .then(()=>{
+      _mic.busy=false;
+      const rise=Math.max(1,MIC_CLAP||25), jump=_mic.level-_mic.ambient, over=MIC_CLAP>0 && jump>=rise;
+      // room level: down fast; up slowly within half a clap's rise; a bigger jump (a clap, or the room really getting
+      // louder) is followed only very slowly — a 0.5 s clap hardly moves it, a room that stays loud is caught up in ~20 s
+      _mic.ambient += (jump<0 ? 0.2 : jump<rise/2 ? 0.03 : 0.005)*jump;
+      const now=performance.now();
+      if(over && !_mic.over && now-_mic.lastClap>MIC_CLAP_COOLDOWN_MS){ _mic.lastClap=now; _mic.clap=true; }
+      _mic.over=over;
+      _mic.noise=MIC_ROOM*Math.max(0,Math.min(1,(_mic.ambient-10)/50));   // a quiet room (≤10%) leaves the fish alone; ~60% is as unsettling as it gets
+    });
+}
+function _micApply(){
+  const want = RUN_MODE!=='dash' && (MIC_CLAP>0 || MIC_ROOM>0);
+  if(want && !_mic.timer) _mic.timer=setInterval(_micPoll, MIC_POLL_MS);
+  else if(!want && _mic.timer){ clearInterval(_mic.timer); _mic.timer=null; Object.assign(_mic,{level:0,ambient:0,over:false,clap:false,noise:0}); }
+}
+// what the tank overlay shows while the mic is on
+setTimeout(_micApply, 0);   // after load: an export or tank opened with a mic slider already up starts listening
+function _micHint(){
+  if(!_mic.timer) return '';
+  return performance.now()-_mic.lastOk>2000 ? ' · mic: no server' : ' · mic '+_mic.level+'% (room '+Math.round(_mic.ambient)+')';
+}
+// A clap: every fish startles at once (a few tens of ms apart). Clownfish with an anemone dive into it.
+function _fishStartleAll(){
+  for(const b of boids){
+    if(!b._fish || !b.alive || b.dying || b._rising) continue;
+    b._startle=1; b._startleWait=Math.random()*0.10;
+    if(b._sp==='clown' && _anem.on && ANEMONE_HOME>0){ b._homing=true; b._homeT=6+Math.random()*6; }
+  }
+}
+
 // ── sea anemone (reef tank) ──────────────────────────────────────────────────
 // A bubble-tip anemone on the tank floor: the clownfish's home. Built in code like the fish: a squat column
 // under a crown of tentacles, each a short tube swelling into a bubble near its rose tip. Model units = one
@@ -4055,7 +4123,7 @@ function _anemHome(b, dt){
   }
   if(!b._homing){ b._homeZ=undefined; b._nearHome=false; return; }
   const A=_anem.A, d=Math.hypot(_anem.hx-b.x, _anem.hy-b.y), R0=0.8*A;
-  if(d>R0) steerToward(b, _anem.hx, _anem.hy, Math.min(2.5, 0.3+1.6*(d-R0)/A));
+  if(d>R0) steerToward(b, _anem.hx, _anem.hy, Math.min(2.5, 0.3+1.6*(d-R0)/A)*(1+2*(b._startle||0)));   // startled: straight home
   b._homeZ = d<3*A ? _anem.z : undefined;
   b._nearHome = d<1.3*A;
 }
@@ -4612,9 +4680,15 @@ if((b._phiTimer-=dt)<=0){
 }
 if(DEPTH>0){ if(b.z<DEPTH*0.15) b._phiT=0.45; else if(b.z>DEPTH*0.85) b._phiT=-0.45; } else b._phiT=0;
 if(b._homeZ!==undefined && DEPTH>0 && _anem.Az>0) b._phiT=Math.max(-0.8,Math.min(0.8,(b._homeZ-b.z)/_anem.Az));   // a clownfish heads for its anemone's depth
+// STARTLE (a clap on the microphone, like a knock on the glass): a fast-start — the fish swings round sharply
+// (its body curls with the turn) and darts off away from the front glass, then calms down over a few seconds
+let st=0;
+if(b._startle>0){ if(b._startleWait>0) b._startleWait-=dt; else { st=b._startle; b._startle=Math.max(0,b._startle-dt/2.5); } }
+if(st>0.3 && b._homeZ===undefined && DEPTH>0 && b.z<DEPTH*0.8) b._phiT=1.1;
+const noise=_mic.noise;                                     // a noisy room: restless (see the rhythm and speed below)
 // angles move like a critically damped spring (ease in AND out) — a plain rate limit starts and stops dead, which reads as mechanical
 const _spring=(x,v,tgt,w)=>{ const a=w*w*(tgt-x)-2*w*v; v+=a*dt; return [x+v*dt, v]; };
-[b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, 1.3);
+[b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, 1.3+6*st);   // startled: the swing comes fast
 // facing + turning round through depth
 if(b._fhold>0) b._fhold-=dt;
 if(!b._fturn){
@@ -4641,7 +4715,7 @@ if(b._fturn){
 } else {
   const tgt = b._fface>0 ? b._phi : Math.PI-b._phi;
   let d=tgt-b._psi; d=Math.atan2(Math.sin(d),Math.cos(d));
-  [b._psi, b._psv] = _spring(b._psi, b._psv||0, b._psi+d, 2.2);
+  [b._psi, b._psv] = _spring(b._psi, b._psv||0, b._psi+d, 2.2+6*st);
 }
 // yaw rate → sideways C-curl for the 3D koi (ψ increasing = nose swinging away from the glass; the body bows into the turn)
 if(b._psiPrev===undefined) b._psiPrev=b._psi;
@@ -4657,9 +4731,9 @@ b._fbend=Math.max(-1,Math.min(1,(thT-b._th)*3));
 // 0 burst · 1 cruise · 2 glide · 3 hover
 if((b._bcT-=dt)<=0){
   const r=Math.random();
-  const bu=S.burst*(b._nearHome?0.4:1);                   // at home in its anemone a clownfish bursts less and hangs about more
+  const bu=S.burst*(b._nearHome?0.4:1)*(1+1.5*noise);    // at home in its anemone a clownfish bursts less and hangs about more; noise: more bursts
   if(b._bcMode===1){ if(r<bu){ b._bcMode=0; b._bcT=_bT(); } else if(r<bu+S.glide){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; }
-                     else if(r<bu+S.glide+S.hover){ b._bcMode=3; b._bcT=S.hoverT[0]+Math.random()*S.hoverT[1]; } else b._bcT=_cT(); }
+                     else if(r<bu+S.glide+S.hover*(1-0.7*noise)){ b._bcMode=3; b._bcT=S.hoverT[0]+Math.random()*S.hoverT[1]; } else b._bcT=_cT(); }
   else if(b._bcMode===0){ if(r<0.6){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=1; b._bcT=_cT(); } }
   else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=_bT(); } else { b._bcMode=1; b._bcT=_cT(); } }
   else { b._bcMode=1; b._bcT=_cT(); }
@@ -4673,8 +4747,10 @@ else if(b._bcMode===1){ fT=0.75; thrT=0.5; }              // cruise
 else if(b._bcMode===2){ fT=0.45; thrT=0.12; }             // glide
 else { fT=0.08; thrT=0.25; }                              // hover — the tail still idles
 if(!b._fturn){ fT*=1+0.6*_ch; thrT=Math.max(thrT, 0.5+0.5*_ch); }
+fT*=1+0.25*noise;
+if(st>0){ if(st>0.5 && b._bcMode!==0){ b._bcMode=0; b._bcT=0.5; } fT=Math.max(fT, 1.25+1.2*st); thrT=Math.max(thrT, st); }   // the dart
 // speed eases like a spring (no sudden lurch at the start of a burst): ~0.6 s to speed up, slower to glide down; bursts last 0.8–1.4 s so they still reach full speed
-[b._f, b._fv] = _spring(b._f, b._fv||0, fT, fT>b._f ? S.accel : 1.2); if(b._f<0){ b._f=0; b._fv=0; }
+[b._f, b._fv] = _spring(b._f, b._fv||0, fT, fT>b._f ? S.accel+8*st : 1.2); if(b._f<0){ b._f=0; b._fv=0; }   // a startle is the one sudden start
 b._thrust+=(thrT-b._thrust)*(1-Math.exp(-dt/0.2));
 // move (per frame, like the rest of the engine)
 const sp=SPEED*b._f, cth=Math.cos(b._th);
@@ -4808,7 +4884,7 @@ const thresholdScale = 1.0+(BOND_THRESHOLD-1)*0.24;
 // when population > target, popPressure > 0, reducing/reversing attraction
 const combinedPressure = Math.min(boid.localPressure + Math.max(boid.popPressure,0), 1);
 const warmup = Math.min(simClock / WARMUP_DURATION, 1);
-const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup;
+const strength = (MIN_NEARNESS+(BASE_NEARNESS-MIN_NEARNESS)*(1-combinedPressure))*thresholdScale*warmup*(boid._fish ? 1+1.5*_mic.noise : 1);   // a noisy room: fish keep closer together
 
 // cohesion radius = BOND_DIST so nearness stays local
 const _cohR2=BOND_DIST*BOND_DIST;
@@ -7432,7 +7508,7 @@ if(_fpsEl && ++_fpsThrottle>=5){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
   const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')
-            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_sndHint();
+            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_micHint()+_sndHint();
   if(html!==_fpsLastHTML){ _fpsLastHTML=html; _fpsEl.innerHTML=html; }
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
@@ -7460,6 +7536,7 @@ drawBirthRings();
 updateCollisions();
 updatePredators(dt);
 
+if(_mic.clap){ _mic.clap=false; _fishStartleAll(); }   // a clap on the microphone: every fish startles
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
