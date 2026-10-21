@@ -4316,9 +4316,9 @@ b._fbend=Math.max(-1,Math.min(1,(thT-b._th)*3));
 // 0 burst · 1 cruise · 2 glide · 3 hover
 if((b._bcT-=dt)<=0){
   const r=Math.random();
-  if(b._bcMode===1){ if(r<0.35){ b._bcMode=0; b._bcT=0.4+Math.random()*0.4; } else if(r<0.88){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=3; b._bcT=2+Math.random()*2; } }
+  if(b._bcMode===1){ if(r<0.35){ b._bcMode=0; b._bcT=0.8+Math.random()*0.6; } else if(r<0.88){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=3; b._bcT=2+Math.random()*2; } }
   else if(b._bcMode===0){ if(r<0.6){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; } }
-  else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=0.4+Math.random()*0.4; } else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; } }
+  else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=0.8+Math.random()*0.6; } else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; } }
   else { b._bcMode=1; b._bcT=1.5+Math.random()*2.5; }
 }
 const _ch=b._chase||0;                                    // pulled toward its group (see _cohesionMove): no hovering, swim harder
@@ -4330,7 +4330,8 @@ else if(b._bcMode===1){ fT=0.75; thrT=0.5; }              // cruise
 else if(b._bcMode===2){ fT=0.45; thrT=0.12; }             // glide
 else { fT=0.08; thrT=0.25; }                              // hover — the tail still idles
 if(!b._fturn){ fT*=1+0.6*_ch; thrT=Math.max(thrT, 0.5+0.5*_ch); }
-b._f+=(fT-b._f)*(1-Math.exp(-dt/(fT>b._f?0.25:1.1)));    // quick to speed up, slow to glide down
+// speed eases like a spring (no sudden lurch at the start of a burst): ~0.6 s to speed up, slower to glide down; bursts last 0.8–1.4 s so they still reach full speed
+[b._f, b._fv] = _spring(b._f, b._fv||0, fT, fT>b._f ? 3.0 : 1.2); if(b._f<0){ b._f=0; b._fv=0; }
 b._thrust+=(thrT-b._thrust)*(1-Math.exp(-dt/0.2));
 // move (per frame, like the rest of the engine)
 const sp=SPEED*b._f, cth=Math.cos(b._th);
