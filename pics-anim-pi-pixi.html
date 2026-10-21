@@ -3146,10 +3146,22 @@ return (Math.round(ar+(cr-ar)*f)<<16)|(Math.round(ag+(cg-ag)*f)<<8)|Math.round(a
 // Body-size factor: each boid's own size (a fixed draw, roughly bell-shaped in -1..1) and growing up over the
 // first quarter of its life. 1 when the size variety slider is off.
 function _sizeK(b){
+if(b._fish) return _fishSizeK(b);
 if(SIZE_VAR<=0) return 1;
 if(b._sizeR===undefined) b._sizeR=(Math.random()+Math.random()+Math.random())/1.5-1;
 const g=Math.min(1,(b.age||0)/(0.25*(b.maxLifespan||BASE_LIFESPAN||60)));
 return (1+0.50*SIZE_VAR*b._sizeR)*(1-0.40*SIZE_VAR*(1-g));
+}
+// A fish hatches small and grows like a real one (von Bertalanffy: fast when young, slowing toward full size), on the
+// same clock as its life: it starts at FISH_BORN of adult length and reaches 95% by S.grow of its lifespan (clownfish
+// near adult size at maturity, ~1–1.5 of 10–20 years; koi a little later). Size variety then spreads the adults.
+const FISH_BORN = 0.30;   // newborn length ÷ adult (a real fry is smaller still, but would be a speck on the panel)
+function _fishSizeK(b){
+const grow=_spOf(b).grow*(b.maxLifespan||BASE_LIFESPAN||60), k=Math.log((1-FISH_BORN)/0.05)/grow;
+const g=1-(1-FISH_BORN)*Math.exp(-k*(b.age||0));
+if(SIZE_VAR<=0) return g;
+if(b._sizeR===undefined) b._sizeR=(Math.random()+Math.random()+Math.random())/1.5-1;
+return (1+0.50*SIZE_VAR*b._sizeR)*g;
 }
 function hexFromCSS(s){ return parseInt(s.replace('#',''),16); }
 
@@ -4538,8 +4550,8 @@ const FISH_PITCH_MAX = 25*Math.PI/180, FISH_TURN_SECS = 2.2, FISH_PITCH_RATE = 0
 //   turn/hold: turn-round time and the pause before the next · accel: speed spring (ω up) · burst/glide/hover: from cruising, the
 //   chance of each (the rest stays cruising) · hoverT/burstT/cruiseT: [min, spread] seconds
 const _SPECIES = {
-  koi:   { amp:1.00, fin:1.00, pecF:1.0, pecA:1.00, gillX:0.29, turn:FISH_TURN_SECS, hold:FISH_TURN_HOLD, accel:3.0, burst:0.35, glide:0.53, hover:0.12, hoverT:[2,2],   burstT:[0.8,0.6], cruiseT:[1.5,2.5] },
-  clown: { amp:0.55, fin:0.75, pecF:1.8, pecA:1.35, gillX:0.21, turn:1.2, hold:1.0, accel:5.0, burst:0.30, glide:0.25, hover:0.45, hoverT:[1,1.5], burstT:[0.4,0.4], cruiseT:[0.6,1.2] },
+  koi:   { grow:0.25, amp:1.00, fin:1.00, pecF:1.0, pecA:1.00, gillX:0.29, turn:FISH_TURN_SECS, hold:FISH_TURN_HOLD, accel:3.0, burst:0.35, glide:0.53, hover:0.12, hoverT:[2,2],   burstT:[0.8,0.6], cruiseT:[1.5,2.5] },
+  clown: { grow:0.20, amp:0.55, fin:0.75, pecF:1.8, pecA:1.35, gillX:0.21, turn:1.2, hold:1.0, accel:5.0, burst:0.30, glide:0.25, hover:0.45, hoverT:[1,1.5], burstT:[0.4,0.4], cruiseT:[0.6,1.2] },
 };
 const _spOf = b => _SPECIES[b._sp] || _SPECIES.koi;
 function _fishStep(b, dt){
