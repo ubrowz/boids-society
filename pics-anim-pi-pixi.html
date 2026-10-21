@@ -1946,6 +1946,21 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="reefName" class="mini-note"></span>
 </div>
 <div class="ctrl-row">
+<label title="A bubble-tip anemone on the tank floor, the clownfish's home: a 3D crown of swaying tentacles with rose tips that part around fish that come close. The clownfish stay near it most of the time, hanging in the tentacles, and now and then swim out. Fish can be in front of it, behind it or in among the tentacles. Size relative to an adult fish; 0 = no anemone. Shows in side view only (fish tanks). Load reef sets 100%.">anemone</label>
+<input type="range" id="anemoneSlider" min="0" max="200" value="0" step="5">
+<span class="ctrl-val" id="anemoneVal">off</span>
+</div>
+<div class="ctrl-row">
+<label title="How much of their time the clownfish spend at their anemone. 0% = they ignore it; 100% = they never leave. In the wild one anemone hosts a pair and a few young, so a tank of ten looks most natural with only some of them at home at any time.">anemone homing</label>
+<input type="range" id="anemoneHomeSlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="anemoneHomeVal">40%</span>
+</div>
+<div class="ctrl-row">
+<label title="Where the anemone sits along the tank floor: 0% = the left end, 100% = the right end (as the room sees it, panel tilt included).">anemone place</label>
+<input type="range" id="anemoneXSlider" min="0" max="100" value="30" step="1">
+<span class="ctrl-val" id="anemoneXVal">30%</span>
+</div>
+<div class="ctrl-row">
 <label>shape (both)</label>
 <input type="file" id="bodyImgFile" accept="image/*" style="display:none">
 <button id="bodyImgBtn" title="Load one PNG used by predators, and by either sex that has no images of its own" class="mini-btn">load</button>
@@ -2350,6 +2365,9 @@ const SIDE_TURN_SECS = 0.8, SIDE_TURN_HOLD = 1.0;                               
 let SIDE_VIEW = false;
 let KOI3D = false;                                                                      // draw the nearest koi as lit 3D models (see _getKoi3DMesh)
 let KOI3D_MAX = parseInt(document.getElementById('koi3dMaxSlider').value);
+let ANEMONE   = parseInt(document.getElementById('anemoneSlider').value)/100;               // anemone size (× an adult fish), 0 = none (see _anemFrame)
+let ANEMONE_X = parseInt(document.getElementById('anemoneXSlider').value)/100;              // where along the floor
+let ANEMONE_HOME = parseInt(document.getElementById('anemoneHomeSlider').value)/100;        // share of the time a clownfish spends at home
 let _k3From = 0, _k3Idx = 0;                                                           // first draw index allowed 3D (the nearest get it) / this frame's 3D count (depth slices)                                                                 // fish seen through the glass: face left/right, small pitch, swing round to turn (see drawBoid)
 let _drawIdx = 0, _swimFrom = 0;
 let _causT = 0, _causScale = 0.06;
@@ -2576,6 +2594,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   _setSlider('swimBeatSlider', 5); _setSlider('swimWaveSlider', 16);                             // 0.5 Hz beat, body wave 1.6 — tuned by eye on the Pi + panel
   _setSlider('waterTintSlider', 50); _setSlider('sizeVarSlider', 60);                              // far koi sink into the water; a pond of different sizes
   _setSlider('waterColorInput', '#008080');                                                        // teal water
+  _setSlider('anemoneSlider', 0);                                                                  // no anemone in a koi pond
   _fishTankSettings();
   document.getElementById('koiName').textContent=urls.length+' koi'; document.getElementById('reefName').textContent='';
 });
@@ -2587,6 +2606,8 @@ document.getElementById('reefBtn').addEventListener('click', () => {
   _setSlider('swimBeatSlider', 18); _setSlider('swimWaveSlider', 8);                             // quick small tail beats, a stiff body
   _setSlider('waterTintSlider', 40); _setSlider('sizeVarSlider', 50);                              // clear reef water; a big female, smaller males
   _setSlider('waterColorInput', '#0060a0');                                                        // ocean blue, about as bright as the koi pond's teal (the panel)
+  _setSlider('anemoneSlider', 100);                                                                // their bubble-tip anemone on the floor
+  _setSlider('anemoneHomeSlider', 40);                                                             // about four of ten at home at a time
   _fishTankSettings();
   document.getElementById('reefName').textContent=urls.length+' clownfish'; document.getElementById('koiName').textContent='';
 });
@@ -2771,6 +2792,9 @@ wire('swimSlider','swimVal',             v=>Math.pow(parseInt(v)/100,2)*0.16, v=
 wire('swimBeatSlider','swimBeatVal',     v=>parseInt(v)/10, v=>(parseInt(v)/10).toFixed(1)+' Hz', v=>{ SWIM_BEAT=v; });
 wire('swimWaveSlider','swimWaveVal',     v=>parseInt(v)/10, v=>(parseInt(v)/10).toFixed(1), v=>{ SWIM_WAVE=v; });
 wire('koi3dMaxSlider','koi3dMaxVal',   v=>parseInt(v), v=>v, v=>{ KOI3D_MAX=v; });
+wire('anemoneSlider','anemoneVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ ANEMONE=v; });
+wire('anemoneXSlider','anemoneXVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_X=v; });
+wire('anemoneHomeSlider','anemoneHomeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_HOME=v; });
 document.getElementById('koi3dBtn').addEventListener('click', function(){
   KOI3D=!KOI3D; this.textContent=KOI3D?'on':'off'; this.style.color=KOI3D?'#ffb142':''; this.style.borderColor=KOI3D?'#ffb142':'';
 });
@@ -3804,6 +3828,195 @@ if(P.used>=P.meshes.length){
 _koi3dUsed++;
 const m=P.meshes[P.used++]; m.visible=true; return m;
 }
+// ── sea anemone (reef tank) ──────────────────────────────────────────────────
+// A bubble-tip anemone on the tank floor: the clownfish's home. Built in code like the fish: a squat column
+// under a crown of tentacles, each a short tube swelling into a bubble near its rose tip. Model units = one
+// adult clownfish length; x = room right, y = up, z = away from the glass; origin at the foot. Two meshes:
+// the tentacles rooted behind the middle (with the column) and those in front of it, so a fish can sit IN the
+// anemone — the back half is drawn before it, the front half after. Each half takes its own depth slice in
+// draw order, like a 3D fish, so tentacles hide each other. The tentacles sway in the current and part
+// around fish that come close (uFish).
+function _anemBuild(){
+  const H=[0,1].map(()=>({pos:[],nrm:[],col:[],sw:[],ctr:[],idx:[]}));
+  let seed=11; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+  const SIDES=7, mix=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t), sm=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
+  // a tube along a centreline [{p,r,c,t}]: rings of SIDES around a parallel-transported frame (no twist)
+  function tube(h, pts, len, ph){
+    const G=H[h], base=G.pos.length/3;
+    let ux=0, uy=0, uz=0;
+    for(let i=0;i<pts.length;i++){
+      const A=pts[Math.max(0,i-1)].p, B=pts[Math.min(pts.length-1,i+1)].p;
+      let tx=B[0]-A[0], ty=B[1]-A[1], tz=B[2]-A[2]; const tl=Math.hypot(tx,ty,tz)||1; tx/=tl; ty/=tl; tz/=tl;
+      if(i===0){ if(Math.abs(tx)<0.9){ ux=1; uy=0; uz=0; } else { ux=0; uy=0; uz=1; } }
+      const dp=ux*tx+uy*ty+uz*tz; ux-=tx*dp; uy-=ty*dp; uz-=tz*dp; const ul=Math.hypot(ux,uy,uz)||1; ux/=ul; uy/=ul; uz/=ul;
+      const vx=ty*uz-tz*uy, vy=tz*ux-tx*uz, vz=tx*uy-ty*ux, P=pts[i];
+      for(let s=0;s<SIDES;s++){
+        const a=2*Math.PI*s/SIDES, ca=Math.cos(a), sa=Math.sin(a), nx=ux*ca+vx*sa, ny=uy*ca+vy*sa, nz=uz*ca+vz*sa;
+        G.pos.push(P.p[0]+nx*P.r, P.p[1]+ny*P.r, P.p[2]+nz*P.r); G.nrm.push(nx,ny,nz); G.col.push(...P.c); G.sw.push(P.t, len, ph); G.ctr.push(P.p[0],P.p[1],P.p[2]);
+      }
+    }
+    for(let i=0;i<pts.length-1;i++) for(let s=0;s<SIDES;s++){
+      const a=base+i*SIDES+s, b=base+i*SIDES+(s+1)%SIDES; G.idx.push(a,b,b+SIDES, a,b+SIDES,a+SIDES);
+    }
+  }
+  // column: a squat orange-tan foot flaring into the oral disc, closed on top (no sway)
+  const FOOT=[0.45,0.30,0.22,0], DISC=[0.30,0.42,0.22,0.05];
+  tube(0, [[-0.05,0.30],[0.06,0.30],[0.11,0.42],[0.14,0.58],[0.16,0.40],[0.17,0.002]].map(([y,r],i)=>({p:[0,y,0], r, c:i<2?FOOT:DISC, t:0})), 0, 0);
+  // tentacles: spread over the disc (golden angle), the outer ones leaning out and drooping
+  const NT=60, ROOT=[0.28,0.42,0.20,0.0], MID=[0.45,0.70,0.30,0.15], BAND=[0.80,0.88,0.70,0.30], TIP=[1.00,0.30,0.55,0.70];
+  const TS=[0,0.18,0.36,0.52,0.64,0.73,0.80,0.86,0.91,0.95,0.98,1.0];
+  for(let i=0;i<NT;i++){
+    const o=Math.sqrt((i+0.5)/NT), rr=0.06+0.52*o, a=i*2.39996+0.3*rnd();
+    const bx=Math.cos(a)*rr, bz=Math.sin(a)*rr, by=0.16+0.03*(1-o);
+    let dx=Math.cos(a)*(0.10+0.85*o), dy=1.0-0.2*o, dz=Math.sin(a)*(0.10+0.85*o); const dl=Math.hypot(dx,dy,dz); dx/=dl; dy/=dl; dz/=dl;
+    const len=(0.34+0.12*rnd())*(1.15-0.3*o), ph=6.2832*rnd(), fat=0.85+0.3*rnd();   // the middle stands tallest: a domed crown
+    const pts=TS.map(t=>{
+      // a slim stalk swelling into the bubble, closed by a rounded tip
+      let r=fat*(0.026*(1-0.3*t)+0.036*Math.exp(-Math.pow((t-0.80)/0.14,2)));
+      if(t>0.86) r*=Math.sqrt(Math.max(0,1-Math.pow((t-0.86)/0.14,2))); r=Math.max(r,0.002);
+      let c=mix(ROOT,MID,sm(0,0.6,t)); c=mix(c,BAND,sm(0.80,0.88,t)); c=mix(c,TIP,sm(0.88,0.95,t));
+      return { p:[bx+dx*len*t, by+dy*len*t-0.25*len*t*t*o, bz+dz*len*t], r, c, t };
+    });
+    tube(bz>0 ? 0 : 1, pts, len, ph);
+  }
+  return H.map(G=>({ pos:new Float32Array(G.pos), nrm:new Float32Array(G.nrm), col:new Float32Array(G.col), sw:new Float32Array(G.sw), ctr:new Float32Array(G.ctr),
+                     idx:(G.pos.length/3>65535 ? new Uint32Array(G.idx) : new Uint16Array(G.idx)) }));
+}
+const _ANEM_VERT = `
+precision highp float;
+attribute vec3 aPos; attribute vec3 aNorm; attribute vec4 aCol; attribute vec3 aSw;   // aSw: along the tentacle (0 root, 1 tip), its length, its phase
+attribute vec3 aCtr;   // the centre of this vertex's ring: a ring moves as a whole, so a tentacle bends but never swells
+uniform mat3 projectionMatrix;
+uniform vec2 uCenter; uniform float uScale; uniform float uTilt; uniform vec2 uDepth;
+uniform float uT;          // sway clock (s, wrapped at 20π: every frequency below is a multiple of 0.1)
+uniform float uSway;       // sway strength
+uniform vec4 uFish[4];     // nearby fish: centre (model units) and reach; reach 0 = none
+uniform float uCausScale; uniform vec2 uCausO;
+varying vec3 vN; varying vec4 vCol; varying vec2 vW;
+void main(void){
+  vec3 q = aPos;
+  float t = aSw.x, L = aSw.y;
+  if (L > 0.0) {
+    // the current: each tentacle wafts on its own phase, all of them on a slow common surge
+    float k = pow(t, 1.6) * L * uSway;
+    vec3 m = vec3(k * (0.55 * sin(uT * 1.1 + aSw.z) + 0.30 * sin(uT * 0.5 + aSw.z * 0.7 + aCtr.x * 2.0) + 0.40 * sin(uT * 0.3)),
+                  -k * 0.12 * (1.0 + sin(uT * 1.1 + aSw.z)),
+                  k * 0.45 * sin(uT * 0.9 + aSw.z * 1.7));
+    // a fish nestling in: the tentacles give way around it (measured from the ring's centre, so the whole ring moves)
+    for (int i = 0; i < 4; i++) {
+      vec3 d = aCtr + m - uFish[i].xyz; float dl = length(d) + 1e-4;
+      m += d / dl * min(max(0.0, uFish[i].w - dl), 0.6 * L) * 0.9 * t;
+    }
+    q += m;
+  }
+  vec2 s = vec2(q.x, -q.y) * uScale;
+  float ct = cos(uTilt), st = sin(uTilt);
+  vec2 c = uCenter + vec2(s.x * ct - s.y * st, s.x * st + s.y * ct);
+  vec3 clip = projectionMatrix * vec3(c, 1.0);
+  gl_Position = vec4(clip.xy, uDepth.x + clamp(q.z / 1.4, -1.0, 1.0) * uDepth.y, 1.0);
+  vN = aNorm; vCol = aCol; vW = (c - uCenter) * uCausScale + uCausO;
+}`;
+const _ANEM_FRAG = `
+precision mediump float;
+uniform vec3 uTint; uniform float uCaus; uniform float uCausT; uniform vec3 uWater; uniform float uWaterF;
+varying vec3 vN; varying vec4 vCol; varying vec2 vW;
+float caustic(vec2 p, float t){
+  float c = sin(p.x * 1.0 + t * 1.3 + 1.5 * sin(p.y * 0.8 + t * 0.7))
+          + sin(p.y * 1.1 - t * 1.1 + 1.5 * sin(p.x * 0.9 - t * 0.5))
+          + sin((p.x + p.y) * 0.7 + t * 0.9);
+  c = 0.5 + c / 6.0;
+  return c * c * c;
+}
+// Same light as the fish (from above in the room, a little toward the viewer), a wet glint on the bubbles and
+// a glow in the tips (vCol.a) — under reef lighting anemone tips fluoresce, and the glow keeps them readable on the panel.
+void main(void){
+  vec3 n = normalize(vN);
+  vec3 L = normalize(vec3(-0.25, 0.85, -0.45));
+  float d = dot(n, L);
+  vec3 H = normalize(L + vec3(0.0, 0.0, -1.0));
+  vec3 c = vCol.rgb * (0.40 + 0.62 * max(d, 0.0) + 0.55 * vCol.a) + 0.25 * pow(max(dot(n, H), 0.0), 20.0) + 0.15 * pow(1.0 - abs(n.z), 2.5) * vCol.rgb;
+  if (uCaus > 0.0) c *= 1.0 - 0.30 * uCaus + 1.2 * uCaus * caustic(vW, uCausT) * (0.35 + 0.65 * max(n.y, 0.0));
+  c *= uTint;
+  c = mix(c, uWater, uWaterF);
+  gl_FragColor = vec4(c, 1.0);
+}`;
+// on: drawn this frame · x,y: its foot (canvas px) · hx,hy: home point among the tentacles · z: its depth ·
+// A: model unit on screen (px) · Az: model unit in depth (z px) · L: smoothed adult fish length (px at scale 1),
+// summed by drawBoid (Lc/Nc clownfish, La/Na any fish) · zB/zF: fish nearer than these are drawn after the back/front half
+const _anem={ on:false, meshes:null, x:0, y:0, hx:0, hy:0, z:0, A:0, Az:0, L:0, Lc:0, Nc:0, La:0, Na:0, zB:0, zF:0, placedB:false, placedF:false,
+              fish:new Float32Array(16) };
+function _anemFrame(){
+  const Ln = _anem.Nc ? _anem.Lc/_anem.Nc : (_anem.Na ? _anem.La/_anem.Na : 0);
+  _anem.Lc=_anem.La=_anem.Nc=_anem.Na=0;
+  if(Ln>0) _anem.L = _anem.L>0 ? _anem.L+(Ln-_anem.L)*0.05 : Ln;   // sized by the fish, eased so it never jumps
+  _anem.on = ANEMONE>0 && _anem.L>0 && SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank();
+  if(!_anem.on){ if(_anem.meshes) for(const m of _anem.meshes) m.visible=false; return; }
+  if(!_anem.meshes){
+    const prog=PIXI.Program.from(_ANEM_VERT,_ANEM_FRAG);
+    _anem.meshes=_anemBuild().map(g=>{
+      const geom=new PIXI.Geometry().addAttribute('aPos',g.pos,3).addAttribute('aNorm',g.nrm,3).addAttribute('aCol',g.col,4).addAttribute('aSw',g.sw,3).addAttribute('aCtr',g.ctr,3).addIndex(g.idx);
+      const sh=new PIXI.Shader(prog,{ uCenter:new Float32Array(2), uScale:100, uTilt:0, uDepth:new Float32Array([0,0.05]), uT:0, uSway:0.35, uFish:_anem.fish,
+                                      uCausScale:0.06, uCausO:new Float32Array(2), uTint:new Float32Array([1,1,1]), uCaus:0, uCausT:0, uWater:new Float32Array(3), uWaterF:0 });
+      const m=new PIXI.Mesh(geom, sh); m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
+      _gfx.bodySprites.addChild(m); return m;
+    });
+  }
+  const F=_roomFrame(), za=DEPTH>0 ? 0.62*DEPTH : 0, zs=zScaleOf({z:za});
+  _anem.z=za; _anem.Az=_anem.L*ANEMONE; _anem.A=_anem.Az*zs;
+  const A=_anem.A, along=(ANEMONE_X*2-1)*Math.max(0, F.extR-1.1*A), down=F.extD+0.03*A;   // its foot just under the floor
+  _anem.x=F.cx+F.rx*along+F.dx*down; _anem.y=F.cy+F.ry*along+F.dy*down;
+  _anem.hx=_anem.x-F.dx*0.55*A; _anem.hy=_anem.y-F.dy*0.55*A;                             // home: in among the tentacles
+  _anem.zB = DEPTH>0 ? za : Infinity; _anem.zF = DEPTH>0 ? za-0.55*_anem.Az : Infinity;     // no depth → always behind the fish
+  _anem.placedB=_anem.placedF=false;
+  // the (up to) four nearest fish, in model units, part the tentacles
+  const near=[];
+  for(const b of boids){
+    if(!b._fish || !b.alive) continue;
+    const ex=(b._drawX!==undefined?b._drawX:b.x)-_anem.x, ey=(b._drawY!==undefined?b._drawY:b.y)-_anem.y;
+    const mx=(ex*F.rx+ey*F.ry)/A, my=-(ex*F.dx+ey*F.dy)/A, mz=DEPTH>0 ? ((b.z||0)-za)/_anem.Az : 0, d2=mx*mx+my*my+mz*mz;
+    if(d2<2.5) near.push([d2,mx,my,mz,Math.min(0.6,0.75*(b._visR||RADIUS)/A)]);
+  }
+  near.sort((a,b)=>a[0]-b[0]);
+  for(let i=0;i<4;i++){ const f=near[i]; _anem.fish[4*i]=f?f[1]:0; _anem.fish[4*i+1]=f?f[2]:0; _anem.fish[4*i+2]=f?f[3]:0; _anem.fish[4*i+3]=f?f[4]:0; }
+  const g=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL({z:za}))))&255)/255, wf=_waterF({z:za});
+  for(const m of _anem.meshes){
+    const u=m.shader.uniforms; m.visible=true;
+    u.uCenter[0]=_anem.x; u.uCenter[1]=_anem.y; u.uScale=A; u.uTilt=PANEL_TILT; u.uT=simClock%62.8318;
+    u.uTint[0]=u.uTint[1]=u.uTint[2]=g; u.uWater=_WATER_RGB; u.uWaterF=wf;
+    u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE : 0; u.uCausT=_causT; u.uCausScale=_causScale;
+    u.uCausO[0]=_wrap20pi(_anem.x*_causScale); u.uCausO[1]=_wrap20pi(_anem.y*_causScale);
+  }
+}
+// Called in the draw loop before each body (far → near) with its depth, and once after with −∞: the first body
+// nearer than a half's plane gets that half drawn just before it, in the next depth slice.
+function _anemPlace(z){
+  const N=Math.max(1,KOI3D_MAX)+2, half=0.95/N;
+  for(let h=0;h<2;h++){
+    if(h===0 ? (_anem.placedB || !(z<_anem.zB)) : (_anem.placedF || !(z<_anem.zF))) continue;
+    const m=_anem.meshes[h], k=_k3Idx++;
+    m.shader.uniforms.uDepth[0]=0.97-(2*k+1)*half; m.shader.uniforms.uDepth[1]=half*0.9;
+    m.zIndex=_zOrder-0.5;
+    if(h===0) _anem.placedB=true; else _anem.placedF=true;
+  }
+}
+// Clownfish live in their anemone: while "at home" a clownfish is pulled back whenever it strays more than about
+// a body length, toward the anemone's depth too (see _fishStep); then it goes out for a while. ANEMONE_HOME is the
+// share of the time at home (visits average 20 s, the outings fill the rest). Near home it bursts less, so it
+// hangs and hovers in the tentacles.
+function _anemHome(b, dt){
+  if(b._sp!=='clown' || b._rising){ b._homeZ=undefined; b._nearHome=false; return; }
+  const p=ANEMONE_HOME;
+  if(p<=0){ b._homing=false; b._homeT=undefined; } else if(p>=1){ b._homing=true; b._homeT=undefined; }
+  else {
+    if(b._homeT===undefined){ b._homing=Math.random()<p; b._homeT=Math.random()*10; }
+    if((b._homeT-=dt)<=0){ b._homing=!b._homing; b._homeT=(b._homing ? 20 : 20*(1-p)/p)*(0.5+Math.random()); }
+  }
+  if(!b._homing){ b._homeZ=undefined; b._nearHome=false; return; }
+  const A=_anem.A, d=Math.hypot(_anem.hx-b.x, _anem.hy-b.y), R0=0.8*A;
+  if(d>R0) steerToward(b, _anem.hx, _anem.hy, Math.min(2.5, 0.3+1.6*(d-R0)/A));
+  b._homeZ = d<3*A ? _anem.z : undefined;
+  b._nearHome = d<1.3*A;
+}
 // Hand the swim state to the shader. Pooled meshes are reused by different boids frame to frame, so
 // a mesh that is NOT swimming this frame must be zeroed or it would inherit the last swimmer's wave.
 function _swimUpdate(m, tex, boid, face, side){
@@ -4356,6 +4569,7 @@ if((b._phiTimer-=dt)<=0){
   } else { b._phiTimer=3+Math.random()*4; b._phiT=(Math.random()*2-1)*0.5; }
 }
 if(DEPTH>0){ if(b.z<DEPTH*0.15) b._phiT=0.45; else if(b.z>DEPTH*0.85) b._phiT=-0.45; } else b._phiT=0;
+if(b._homeZ!==undefined && DEPTH>0 && _anem.Az>0) b._phiT=Math.max(-0.8,Math.min(0.8,(b._homeZ-b.z)/_anem.Az));   // a clownfish heads for its anemone's depth
 // angles move like a critically damped spring (ease in AND out) — a plain rate limit starts and stops dead, which reads as mechanical
 const _spring=(x,v,tgt,w)=>{ const a=w*w*(tgt-x)-2*w*v; v+=a*dt; return [x+v*dt, v]; };
 [b._phi, b._phv] = _spring(b._phi, b._phv||0, b._phiT, 1.3);
@@ -4401,8 +4615,9 @@ b._fbend=Math.max(-1,Math.min(1,(thT-b._th)*3));
 // 0 burst · 1 cruise · 2 glide · 3 hover
 if((b._bcT-=dt)<=0){
   const r=Math.random();
-  if(b._bcMode===1){ if(r<S.burst){ b._bcMode=0; b._bcT=_bT(); } else if(r<S.burst+S.glide){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; }
-                     else if(r<S.burst+S.glide+S.hover){ b._bcMode=3; b._bcT=S.hoverT[0]+Math.random()*S.hoverT[1]; } else b._bcT=_cT(); }
+  const bu=S.burst*(b._nearHome?0.4:1);                   // at home in its anemone a clownfish bursts less and hangs about more
+  if(b._bcMode===1){ if(r<bu){ b._bcMode=0; b._bcT=_bT(); } else if(r<bu+S.glide){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; }
+                     else if(r<bu+S.glide+S.hover){ b._bcMode=3; b._bcT=S.hoverT[0]+Math.random()*S.hoverT[1]; } else b._bcT=_cT(); }
   else if(b._bcMode===0){ if(r<0.6){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=1; b._bcT=_cT(); } }
   else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=_bT(); } else { b._bcMode=1; b._bcT=_cT(); } }
   else { b._bcMode=1; b._bcT=_cT(); }
@@ -5922,10 +6137,14 @@ spr.zIndex=_zOrder++; // meshes are appended to the container wherever they are 
 boid._visR = 0.5 * Math.max(_bt.width, _bt.height) * _s; // from _s, not spr.scale.x — a mesh's scale already has the texture size folded in
 // what this boid was drawn WITH, so a click can map back into image space (see _hitBoid)
 boid._tex=_bt; boid._drawScale=_s; boid._drawRot=spr.rotation; boid._drawFlip=_flipX;
+if(_sideOn && _entry && _entry.natural && !boid.dying){                       // an adult fish's length at scale 1, which sizes the anemone
+  const _l=0.69*_bt.width*_s/(zs*_sizeK(boid)*(boid.isSingle?0.7:1));
+  if(_entry.species==='clown'){ _anem.Lc+=_l; _anem.Nc++; } else { _anem.La+=_l; _anem.Na++; }
+}
 const _k3 = KOI3D && _sideOn && _entry && _entry.natural && _entry.body3d && _entry.body3d.baseTexture.valid && boid._psi!==undefined && _drawIdx>=_k3From;
 // 3D koi: the 2D body is hidden and a lit 3D model takes its place, in the same draw-order slot.
 if(_k3){
-  const m=_getKoi3DMesh(boid._sp), u=m.shader.uniforms, N=Math.max(1,KOI3D_MAX), half=0.95/N, k=_k3Idx++;
+  const m=_getKoi3DMesh(boid._sp), u=m.shader.uniforms, N=Math.max(1,KOI3D_MAX)+(_anem.on?2:0), half=0.95/N, k=_k3Idx++;   // +2: the anemone's halves (_anemPlace)
   spr.visible=false;
   u.uTex=_entry.body3d; u.uFinCol=_entry.fincol||_KOI3D_FIN_DEFAULT;
   u.uCenter[0]=bx; u.uCenter[1]=by;
@@ -7210,6 +7429,7 @@ if(!boid.dying){
 // real tissue is near-stationary, but this is a constant-speed engine, so pin the cells.
 const _mx0=boid.x, _my0=boid.y;
 avoidWalls(boid); wander(boid); updateZ(boid); _ovGuardZ(boid,(boid.isSingle?RADIUS*0.7:RADIUS)*zScaleOf(boid)*_imgScaleShown); nearnessBehavior(boid); bondAttraction(boid);
+if(boid._fish){ if(_anem.on) _anemHome(boid,dt); else { boid._homeZ=undefined; boid._nearHome=false; } }   // clownfish keep to their anemone
 if(DIFF_MODE) updateDifferentiation(boid,dt);
 if(NO_OVERLAP || DEPTH>0) separateBoid(boid); // 3D → non-interpenetration is intrinsic; 2D → only when "no overlap" is on
 // Smooth-angle cap: all forces above produce a desired heading; the boid can
@@ -7309,7 +7529,9 @@ if(_predSeen) for(const p of predators) if(p.alive) _drawList.push(p);
 _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order always matches size (far first)
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
-for(const it of _drawList){ if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
+_anemFrame();
+for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
+if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
 // overlay image sits at a mid-depth (BG_OVERLAY_DEPTH·DEPTH). _drawList is far→first, and each drawn
 // body took zIndex = its position in that order, so count the bodies farther than the overlay and
 // slot it in between. DEPTH<=0 → no meaningful z, put it behind every body.
@@ -7324,7 +7546,7 @@ if(_bgOverlayMesh && _bgOverlayMesh.visible){
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _anem.on || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
