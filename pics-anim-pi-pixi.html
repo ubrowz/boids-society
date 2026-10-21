@@ -2064,7 +2064,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span class="ctrl-val" id="anemoneXVal">30%</span>
 </div>
 <div class="ctrl-row">
-<label title="How high the anemone sits: 0% = on the tank floor, 100% = as high as it fits (its crown just under the surface). Raise it onto a rock or reef ledge in your background image; off the floor it otherwise seems to float.">anemone place y</label>
+<label title="How high the anemone sits: 0% = its foot on the tank floor, 100% = its foot at the top edge (the crown then sticks out of view). Raise it onto a rock or reef ledge in your background image; off the floor it otherwise seems to float.">anemone place y</label>
 <input type="range" id="anemoneYSlider" min="0" max="100" value="0" step="1">
 <span class="ctrl-val" id="anemoneYVal">0%</span>
 </div>
@@ -3995,7 +3995,7 @@ function _anemFrame(){
   const F=_roomFrame(), za=DEPTH>0 ? 0.62*DEPTH : 0, zs=zScaleOf({z:za});
   _anem.z=za; _anem.Az=_anem.L*ANEMONE; _anem.A=_anem.Az*zs;
   const A=_anem.A, along=(ANEMONE_X*2-1)*Math.max(0, F.extR-1.1*A);
-  const down=F.extD+0.03*A-ANEMONE_Y*Math.max(0, 2*F.extD-0.73*A);   // 0: its foot just under the floor · 1: its crown just under the surface
+  const down=(F.extD+0.03*A)*(1-2*ANEMONE_Y);                          // 0: its foot just under the floor · 1: its foot at the top edge
   _anem.x=F.cx+F.rx*along+F.dx*down; _anem.y=F.cy+F.ry*along+F.dy*down;
   _anem.hx=_anem.x-F.dx*0.55*A; _anem.hy=_anem.y-F.dy*0.55*A;                             // home: in among the tentacles
   _anem.zB = DEPTH>0 ? za : Infinity; _anem.zF = DEPTH>0 ? za-0.55*_anem.Az : Infinity;     // no depth → always behind the fish
