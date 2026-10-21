@@ -1929,13 +1929,116 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label></label>
 <span id="bgImgTarget" class="mini-note" title="Pop-out canvas / Pi pop-out open at this size (1:6). Crop the background image to match for a clean 'cover' fit; author the overlay PNG at the same size.">strip pop-out target: —</span>
 </div>
+<div class="mini-note" style="margin-bottom:2px;">— rippling of the <b>background image</b> —</div>
+<div class="ctrl-row" style="gap:8px;">
+<label>bg style</label>
+<button id="rippleStyleBtn" title="Cycle the BACKGROUND ripple: cloth (a travelling wave, like a flag in water) → pond (concentric rings spreading from points that appear at random, like rain on water). Boid images always use cloth. The bg ripple / shade / waves sliders below drive it — for pond, waves is the ring spacing." style="
+width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
+background:#555;position:relative;transition:background 0.2s;outline:none;">
+<span id="rippleStyleKnob" style="
+position:absolute;top:3px;left:3px;
+width:16px;height:16px;border-radius:50%;
+background:#fff;transition:left 0.2s;display:block;"></span>
+</button>
+<span id="rippleStyleLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">cloth</span>
+</div>
+<div class="ctrl-row">
+<label title="Ripple amplitude on the BACKGROUND image only. 0 = off (static wallpaper). Independent of the boid-ripple sliders above. The background mesh is 48 quads across, so it carries the full waves range smoothly.">bg ripple</label>
+<input type="range" id="bgRippleSlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="bgRippleVal">40%</span>
+</div>
+<div class="ctrl-row">
+<label title="Rolling-shadow depth on the BACKGROUND image. Only ever DARKENS. Works with bg ripple at 0 too (a moving shadow, no geometry) — unlike the boid version.">bg shade</label>
+<input type="range" id="bgShadeSlider" min="0" max="100" value="30" step="5">
+<span class="ctrl-val" id="bgShadeVal">30%</span>
+</div>
+<div class="ctrl-row">
+<label title="For cloth: wave crests across the BACKGROUND image. For pond: the spacing of the concentric rings. The background mesh is dense enough for the whole range.">bg waves</label>
+<input type="range" id="bgWaveSlider" min="0.4" max="4" value="1.3" step="0.1">
+<span class="ctrl-val" id="bgWaveVal">1.3</span>
+</div>
 </section>
 
 <section class="panel">
 <h2>Body image</h2>
+<div class="mini-note" style="margin-bottom:2px;">The default boid: its shape, and how any image is fitted to a boid.</div>
+<div class="ctrl-row">
+<label>shape (both)</label>
+<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
+<button id="bodyImgBtn" title="Load one PNG used by predators, and by either sex that has no images of its own" class="mini-btn">load</button>
+<span id="bodyImgName" class="mini-note">default</span>
+</div>
+<div class="ctrl-row">
+<label title="Pixels from image centre to nose tip">nose px</label>
+<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1">
+</div>
+<div class="ctrl-row">
+<label title="Sprite scale = r ÷ this value">body scale</label>
+<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5">
+</div>
+</section>
+
+<section class="panel">
+<h2>Image boids</h2>
+<div class="mini-note" style="margin-bottom:2px;">Boids that wear your own pictures.</div>
+<div class="ctrl-row">
+<label>♂ images</label>
+<input type="file" id="bodyImgMFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgMBtn" title="Add one or more PNGs to the male pool — each male picks one at random at birth" class="mini-btn">add</button>
+<button id="bodyImgMClear" title="Clear the male image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgMName" class="mini-note">0 imgs</span>
+</div>
+<div class="ctrl-row">
+<label>♀ images</label>
+<input type="file" id="bodyImgFFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgFBtn" title="Add one or more PNGs to the female pool — each female picks one at random at birth" class="mini-btn">add</button>
+<button id="bodyImgFClear" title="Clear the female image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgFName" class="mini-note">0 imgs</span>
+</div>
+<div class="ctrl-row">
+<label title="Male images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♂ upright</label>
+<input type="file" id="bodyImgMUFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgMUBtn" title="Add one or more PNGs to the male pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
+<button id="bodyImgMUClear" title="Clear the male always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgMUName" class="mini-note">0 imgs</span>
+</div>
+<div class="ctrl-row">
+<label title="Female images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♀ upright</label>
+<input type="file" id="bodyImgFUFile" accept="image/*" multiple style="display:none">
+<button id="bodyImgFUBtn" title="Add one or more PNGs to the female pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
+<button id="bodyImgFUClear" title="Clear the female always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
+<span id="bodyImgFUName" class="mini-note">0 imgs</span>
+</div>
+<div class="mini-note">The ↑ rows are <b>unique</b>: one boid wears each at a time, released when its wearer dies and picked up by the next boid to look. They are claimed ahead of ordinary images. Once any ↑ image is loaded, boids with nothing to wear are not drawn at all — so an ↑-only pool shows just these images, while uploading ordinary images alongside clothes everyone again. <b>Boid ripple</b> waves ↑ images always, and ordinary images too whenever the Upright switch is on — one mesh each, so keep the population small.</div>
+<div class="ctrl-row">
+<label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
+<input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
+<span class="ctrl-val" id="imgScaleVal">0.40×</span>
+</div>
+<div class="mini-note" style="margin-bottom:2px;">— rippling of <b>boid images</b> (upright uploaded images only) —</div>
+<div class="ctrl-row">
+<label title="A travelling wave through a BOID's uploaded image, like cloth in water — constant rate, with a per-boid phase so they never pulse together. 0 = off. Amplitude is a fraction of image width. Applies to any boid wearing an UPLOADED image (never the plain body) that is rendered upright: either its image came from a ↑ row above, or the Upright switch under Appearance is on. Costs one mesh per rippling boid and meshes do not batch, so run this look with a small population — beyond 120 at once the surplus quietly stop rippling to protect the frame rate. Independent of the bg-ripple sliders below.">boid ripple</label>
+<input type="range" id="rippleSlider" min="0" max="100" value="40" step="5">
+<span class="ctrl-val" id="rippleVal">40%</span>
+</div>
+<div class="ctrl-row">
+<label title="How dark the light wave gets on a BOID image — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved. Only ever DARKENS. Needs boid ripple above 0, since the shading rides on the same mesh. SWIMMING KOI (2D and 3D) instead get WATER LIGHT: bright streaks from the rippling surface, fixed in the room so the fish swims through them, without changing its shape. This slider sets how strong that light is, and boid waves how fine the pattern is.">boid shade</label>
+<input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
+<span class="ctrl-val" id="shadeVal">30%</span>
+</div>
+<div class="ctrl-row">
+<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 16 quads across — beyond about 8 crests a grid that coarse breaks into facets. For swimming koi it sets how fine the water-light pattern is.">boid waves</label>
+<input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
+<span class="ctrl-val" id="waveVal">1.3</span>
+</div>
+</section>
+
+<section class="panel">
+<h2>Fish tanks</h2>
+<div class="mini-note" style="margin-bottom:2px;">Ready-made koi pond and reef tank (3D fish), and how fish swim.</div>
 <div class="ctrl-row">
 <label title="Five hand-drawn koi — kohaku, sanke, showa, ogon, asagi — in side profile, facing right (the swim wave and the side view both expect that). Fills BOTH sex pools, sets the image size to suit and turns swimming on. (A tank where every boid wears an image hides the predator — it still hunts, you just hear it.)">koi set</label>
-<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: swim 50%, side view and 3D koi on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50% toward teal, size variety 60%, image size 0.45×, trails off, immigration on, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
+<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: swim 50%, side view and 3D fish on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50% toward teal, size variety 60%, image size 0.45×, trails off, immigration on, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
 <button id="koiClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="koiName" class="mini-note"></span>
 </div>
@@ -1965,67 +2068,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="anemoneYSlider" min="0" max="100" value="0" step="1">
 <span class="ctrl-val" id="anemoneYVal">0%</span>
 </div>
-<div class="ctrl-row">
-<label>shape (both)</label>
-<input type="file" id="bodyImgFile" accept="image/*" style="display:none">
-<button id="bodyImgBtn" title="Load one PNG used by predators, and by either sex that has no images of its own" class="mini-btn">load</button>
-<span id="bodyImgName" class="mini-note">default</span>
-</div>
-<div class="ctrl-row">
-<label>♂ images</label>
-<input type="file" id="bodyImgMFile" accept="image/*" multiple style="display:none">
-<button id="bodyImgMBtn" title="Add one or more PNGs to the male pool — each male picks one at random at birth" class="mini-btn">add</button>
-<button id="bodyImgMClear" title="Clear the male image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
-<span id="bodyImgMName" class="mini-note">0 imgs</span>
-</div>
-<div class="ctrl-row">
-<label>♀ images</label>
-<input type="file" id="bodyImgFFile" accept="image/*" multiple style="display:none">
-<button id="bodyImgFBtn" title="Add one or more PNGs to the female pool — each female picks one at random at birth" class="mini-btn">add</button>
-<button id="bodyImgFClear" title="Clear the female image pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
-<span id="bodyImgFName" class="mini-note">0 imgs</span>
-</div>
-<div class="ctrl-row">
-<label title="Male images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♂ upright</label>
-<input type="file" id="bodyImgMUFile" accept="image/*" multiple style="display:none">
-<button id="bodyImgMUBtn" title="Add one or more PNGs to the male pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
-<button id="bodyImgMUClear" title="Clear the male always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
-<span id="bodyImgMUName" class="mini-note">0 imgs</span>
-</div>
-<div class="ctrl-row">
-<label title="Female images that always render upright, regardless of the Upright toggle — and that are UNIQUE: at most one boid wears each at a time.">♀ upright</label>
-<input type="file" id="bodyImgFUFile" accept="image/*" multiple style="display:none">
-<button id="bodyImgFUBtn" title="Add one or more PNGs to the female pool that ALWAYS stay upright (ignore the Upright toggle). Each is also UNIQUE — only one boid can wear it at a time." class="mini-btn">add ↑</button>
-<button id="bodyImgFUClear" title="Clear the female always-upright pool" class="mini-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
-<span id="bodyImgFUName" class="mini-note">0 imgs</span>
-</div>
-<div class="mini-note" style="margin-bottom:2px;">— rippling of <b>boid images</b> (upright uploaded images only) —</div>
-<div class="ctrl-row">
-<label title="A travelling wave through a BOID's uploaded image, like cloth in water — constant rate, with a per-boid phase so they never pulse together. 0 = off. Amplitude is a fraction of image width. Applies to any boid wearing an UPLOADED image (never the plain body) that is rendered upright: either its image came from a ↑ row above, or the Upright switch under Appearance is on. Costs one mesh per rippling boid and meshes do not batch, so run this look with a small population — beyond 120 at once the surplus quietly stop rippling to protect the frame rate. Independent of the bg-ripple sliders below.">boid ripple</label>
-<input type="range" id="rippleSlider" min="0" max="100" value="40" step="5">
-<span class="ctrl-val" id="rippleVal">40%</span>
-</div>
-<div class="ctrl-row">
-<label title="How dark the light wave gets on a BOID image — a shadow rolling over the image in step with the ripple, shading the slope of the wave so the surface reads as curved. Only ever DARKENS. Needs boid ripple above 0, since the shading rides on the same mesh. SWIMMING KOI (2D and 3D) instead get WATER LIGHT: bright streaks from the rippling surface, fixed in the room so the fish swims through them, without changing its shape. This slider sets how strong that light is, and boid waves how fine the pattern is.">boid shade</label>
-<input type="range" id="shadeSlider" min="0" max="100" value="30" step="5">
-<span class="ctrl-val" id="shadeVal">30%</span>
-</div>
-<div class="ctrl-row">
-<label title="How many wave crests fit across a BOID image. Low = one long slow swell; high = tight ripples. Drives the geometric wave and the light wave together. The boid mesh is 16 quads across — beyond about 8 crests a grid that coarse breaks into facets. For swimming koi it sets how fine the water-light pattern is.">boid waves</label>
-<input type="range" id="waveSlider" min="0.4" max="4" value="1.3" step="0.1">
-<span class="ctrl-val" id="waveVal">1.3</span>
-</div>
-<div class="mini-note" style="margin-bottom:2px;">— <b>swimming</b> of boid images (not the ↑ upright ones) —</div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>swimming</b> (side view and 3D; also for your own images, not the ↑ upright ones) —</div>
 <div class="ctrl-row" style="gap:8px;">
 <label title="Draw image boids the way you see fish through the glass of an aquarium: in SIDE PROFILE. Instead of spinning to face every direction, a boid keeps its back up, faces left or right, tilts a little to climb or dive, and when it changes direction it swings round — foreshortening through a head-on or tail-on view — instead of flipping upside down. For images drawn side-on, facing RIGHT (the koi set is). Off = images rotate to point along the heading, as before.">side view</label>
 <button id="sideViewBtn" class="mini-btn" title="Side-profile fish, swinging round to turn">off</button>
 </div>
 <div class="ctrl-row" style="gap:8px;">
-<label title="Draw the koi as real 3D fish: a lit model built in code, turned by the fish motion, so they swing round, swim toward and away from you and climb or dive as solid bodies instead of flat drawings. Needs side view on and the koi set loaded. Only the nearest few koi are 3D (see 3D koi max); the rest stay 2D. It swims with the same beat, rhythm and sliders as the 2D koi: a side-to-side wave down the body into a cupping tail fin, a curl into turns, sculling pectoral fins.">3D koi</label>
-<button id="koi3dBtn" class="mini-btn" title="3D koi on/off">off</button>
+<label title="Draw the fish (koi and clownfish) as real 3D fish: a lit model built in code, turned by the fish motion, so they swing round, swim toward and away from you and climb or dive as solid bodies instead of flat drawings. Needs side view on and the koi or reef set loaded. Only the nearest few fish are 3D (see 3D fish max); the rest stay 2D. It swims with the same beat, rhythm and sliders as the 2D fish: a side-to-side wave down the body into a cupping tail fin, a curl into turns, sculling pectoral fins.">3D fish</label>
+<button id="koi3dBtn" class="mini-btn" title="3D fish on/off">off</button>
 </div>
 <div class="ctrl-row">
-<label title="How many of the nearest koi are drawn in 3D. About 10 is the target for the Raspberry Pi; a desktop can take more.">3D koi max</label>
+<label title="How many of the nearest fish are drawn in 3D. About 10 is the target for the Raspberry Pi; a desktop can take more.">3D fish max</label>
 <input type="range" id="koi3dMaxSlider" min="1" max="40" value="10" step="1">
 <span class="ctrl-val" id="koi3dMaxVal">10</span>
 </div>
@@ -2043,48 +2096,6 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label title="How many wavelengths fit along the body. Low = the whole body sways like an eel's slow S; high = a tight ripple. Real fish are around 0.8–1.">body wave</label>
 <input type="range" id="swimWaveSlider" min="4" max="16" value="9" step="1">
 <span class="ctrl-val" id="swimWaveVal">0.9</span>
-</div>
-<div class="mini-note" style="margin-bottom:2px;">— rippling of the <b>background image</b> —</div>
-<div class="ctrl-row" style="gap:8px;">
-<label>bg style</label>
-<button id="rippleStyleBtn" title="Cycle the BACKGROUND ripple: cloth (a travelling wave, like a flag in water) → pond (concentric rings spreading from points that appear at random, like rain on water). Boid images always use cloth. The bg ripple / shade / waves sliders below drive it — for pond, waves is the ring spacing." style="
-width:44px;height:22px;border-radius:11px;border:none;cursor:pointer;
-background:#555;position:relative;transition:background 0.2s;outline:none;">
-<span id="rippleStyleKnob" style="
-position:absolute;top:3px;left:3px;
-width:16px;height:16px;border-radius:50%;
-background:#fff;transition:left 0.2s;display:block;"></span>
-</button>
-<span id="rippleStyleLabel" style="font-size:10px;font-weight:700;color:#555;letter-spacing:0.5px;text-transform:uppercase;">cloth</span>
-</div>
-<div class="ctrl-row">
-<label title="Ripple amplitude on the BACKGROUND image only. 0 = off (static wallpaper). Independent of the boid-ripple sliders above. The background mesh is 48 quads across, so it carries the full waves range smoothly.">bg ripple</label>
-<input type="range" id="bgRippleSlider" min="0" max="100" value="40" step="5">
-<span class="ctrl-val" id="bgRippleVal">40%</span>
-</div>
-<div class="ctrl-row">
-<label title="Rolling-shadow depth on the BACKGROUND image. Only ever DARKENS. Works with bg ripple at 0 too (a moving shadow, no geometry) — unlike the boid version.">bg shade</label>
-<input type="range" id="bgShadeSlider" min="0" max="100" value="30" step="5">
-<span class="ctrl-val" id="bgShadeVal">30%</span>
-</div>
-<div class="ctrl-row">
-<label title="For cloth: wave crests across the BACKGROUND image. For pond: the spacing of the concentric rings. The background mesh is dense enough for the whole range.">bg waves</label>
-<input type="range" id="bgWaveSlider" min="0.4" max="4" value="1.3" step="0.1">
-<span class="ctrl-val" id="bgWaveVal">1.3</span>
-</div>
-<div class="mini-note">The ↑ rows are <b>unique</b>: one boid wears each at a time, released when its wearer dies and picked up by the next boid to look. They are claimed ahead of ordinary images. Once any ↑ image is loaded, boids with nothing to wear are not drawn at all — so an ↑-only pool shows just these images, while uploading ordinary images alongside clothes everyone again. <b>Boid ripple</b> waves ↑ images always, and ordinary images too whenever the Upright switch is on — one mesh each, so keep the population small.</div>
-<div class="ctrl-row">
-<label title="Resize the loaded images: 0.5 = half, 1.0 = unchanged, 2.0 = double">image scale</label>
-<input type="range" id="imgScaleSlider" min="0.1" max="3" value="0.4" step="0.05">
-<span class="ctrl-val" id="imgScaleVal">0.40×</span>
-</div>
-<div class="ctrl-row">
-<label title="Pixels from image centre to nose tip">nose px</label>
-<input type="number" id="noseOffsetInput" min="1" max="500" value="32" step="1">
-</div>
-<div class="ctrl-row">
-<label title="Sprite scale = r ÷ this value">body scale</label>
-<input type="number" id="bodyScaleInput" min="0.5" max="200" value="13" step="0.5">
 </div>
 </section>
 
