@@ -2068,6 +2068,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="anemoneYSlider" min="0" max="100" value="0" step="1">
 <span class="ctrl-val" id="anemoneYVal">0%</span>
 </div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>day and night</b> (fish tanks) —</div>
+<div class="ctrl-row">
+<label title="A day-and-night cycle in the tank: daylight with the shifting water light, a warm dusk, a dim blue moonlit night, a warm dawn. At night the fish rest: they slow down, hover a lot, sink toward the lower part of the tank, and clownfish sleep in their anemone; at dawn they wake up. The slider sets how long one whole day lasts (in minutes; about 55% day, 10% dusk, 25% night, 10% dawn). All the way right = follow the real clock (dawn 6:30–7:30, dusk 20:30–21:30). 0 = always day.">day cycle</label>
+<input type="range" id="dayCycleSlider" min="0" max="61" value="0" step="1">
+<span class="ctrl-val" id="dayCycleVal">off</span>
+</div>
+<div class="ctrl-row">
+<label title="How bright the night is (moonlight), as a share of daylight. Low = a dark tank with the fish barely glimmering; on the LED panel very low levels may lose colour or flicker, so check it there.">night light</label>
+<input type="range" id="nightLightSlider" min="5" max="80" value="30" step="1">
+<span class="ctrl-val" id="nightLightVal">30%</span>
+</div>
 <div class="mini-note" style="margin-bottom:2px;">— <b>swimming</b> (side view and 3D; also for your own images, not the ↑ upright ones) —</div>
 <div class="ctrl-row" style="gap:8px;">
 <label title="Draw image boids the way you see fish through the glass of an aquarium: in SIDE PROFILE. Instead of spinning to face every direction, a boid keeps its back up, faces left or right, tilts a little to climb or dive, and when it changes direction it swings round — foreshortening through a head-on or tail-on view — instead of flipping upside down. For images drawn side-on, facing RIGHT (the koi set is). Off = images rotate to point along the heading, as before.">side view</label>
@@ -2405,6 +2416,10 @@ let ANEMONE_HOME = parseInt(document.getElementById('anemoneHomeSlider').value)/
 let MIC_CLAP = parseInt(document.getElementById('micClapSlider').value);                     // rise above the room level (%) that counts as a clap; 0 = off
 let MIC_ROOM = parseInt(document.getElementById('micRoomSlider').value)/100;                 // how much the room's loudness unsettles the fish; 0 = off
 let FEED_N = parseInt(document.getElementById('feedSlider').value);                           // pellets a clap drops (feeding time); 0 = a clap startles instead
+let DAY_CYCLE = parseInt(document.getElementById('dayCycleSlider').value);                    // minutes per day-and-night; 0 = always day; 61 = the real clock
+let NIGHT_LIGHT = parseInt(document.getElementById('nightLightSlider').value)/100;            // brightness at night, share of daylight
+// day and night (see _dayStep): s = sunlight 1 day … 0 night · sleep = how much the fish rest · rgb = the light's colour (multiplies the scene)
+const _day = { s:1, sleep:0, warm:0, rgb:[1,1,1], name:'' };
 // microphone (see _micPoll): level / room level in % · clap waiting for the next frame · noise 0..1 (room loudness × MIC_ROOM)
 const _mic = { level:0, ambient:0, over:false, busy:false, lastClap:0, lastOk:0, timer:null, clap:false, noise:0 };
 let _k3From = 0, _k3Idx = 0;                                                           // first draw index allowed 3D (the nearest get it) / this frame's 3D count (depth slices)                                                                 // fish seen through the glass: face left/right, small pitch, swing round to turn (see drawBoid)
@@ -2840,6 +2855,8 @@ wire('anemoneYSlider','anemoneYVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMON
 wire('anemoneHomeSlider','anemoneHomeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ ANEMONE_HOME=v; });
 wire('micClapSlider','micClapVal',     v=>parseInt(v), v=>parseInt(v)===0?'off':'rise ≥ '+v+'%', v=>{ MIC_CLAP=v; _micApply(); });
 wire('micRoomSlider','micRoomVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ MIC_ROOM=v; _micApply(); });
+wire('dayCycleSlider','dayCycleVal',   v=>parseInt(v), v=>{ v=parseInt(v); return v===0 ? 'off' : v>=61 ? 'clock' : v+' min'; }, v=>{ DAY_CYCLE=v; });
+wire('nightLightSlider','nightLightVal', v=>parseInt(v)/100, v=>v+'%', v=>{ NIGHT_LIGHT=v; });
 wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
 document.getElementById('feedBtn').addEventListener('click', () => _feedDrop(FEED_N>0 ? FEED_N : 8));   // the slider's pinch (8 when it is off)
 document.getElementById('koi3dBtn').addEventListener('click', function(){
@@ -2972,6 +2989,8 @@ app.stage.addChild(_gfx.bodySprites);
 _gfx.boids     = new PIXI.Graphics(); app.stage.addChild(_gfx.boids);
 _gfx.predators = new PIXI.Graphics(); app.stage.addChild(_gfx.predators);
 _gfx.splashes  = new PIXI.Graphics(); app.stage.addChild(_gfx.splashes);
+// day and night: one full-canvas quad over everything, MULTIPLIED onto the scene (see _dayStep) — no filter pass
+_gfx.light     = new PIXI.Graphics(); _gfx.light.blendMode = PIXI.BLEND_MODES.MULTIPLY; app.stage.addChild(_gfx.light);
 // Body sprite texture embedded as base64 — no file loading needed
 _defaultTex = PIXI.Texture.from(_BOID_PNG);
 _maskWhenReady(_defaultTex); // the teardrop has transparent corners too, so mask it as well
@@ -4023,6 +4042,37 @@ function _feedFish(b, dt){
   // at its mouth (within about a fifth of a body length, in 3D): it opens up and sucks the pellet in
   if(Math.hypot(b._feedDist, (f.z-mz)*zs) < 0.45*half){ f.suck=b; f.sk=0; b._gulpS=simClock; }
 }
+// ── day and night ────────────────────────────────────────────────────────────
+// DAY_CYCLE minutes per day (about 55% day, 10% dusk, 25% night, 10% dawn), or the real clock. The light is one
+// multiply quad over the whole scene: white by day, warm orange through dusk and dawn, a dim moonlight blue at night
+// (NIGHT_LIGHT of daylight). The water light (caustics) fades with the sun. The fish rest at night (_day.sleep,
+// read in _fishStep and _anemHome): slower, hovering, low in the tank; clownfish sleep in their anemone.
+const _ss = x => { x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
+function _daySun(){
+  if(DAY_CYCLE<=0) return [1,''];
+  if(DAY_CYCLE>=61){
+    const d=new Date(), h=d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;
+    return h<6.5 ? [0,'night'] : h<7.5 ? [_ss(h-6.5),'dawn'] : h<20.5 ? [1,'day'] : h<21.5 ? [1-_ss(h-20.5),'dusk'] : [0,'night'];
+  }
+  const u=(simClock/(DAY_CYCLE*60))%1;
+  return u<0.55 ? [1,'day'] : u<0.65 ? [1-_ss((u-0.55)/0.1),'dusk'] : u<0.90 ? [0,'night'] : [_ss((u-0.90)/0.1),'dawn'];
+}
+function _dayStep(dt){
+  dt=Math.min(Math.max(dt||0,0),0.1);
+  const [sun,name]=_daySun();
+  _day.s+=(sun-_day.s)*(1-Math.exp(-dt/1.0)); _day.name=name;            // eased, so moving the slider never snaps the light
+  const sleepT=_ss((0.6-_day.s)/0.6);                                      // the fish settle once the light is going, wake as it comes
+  _day.sleep+=(sleepT-_day.sleep)*(1-Math.exp(-dt/3));
+  const s=_day.s, w=4*s*(1-s)*0.7, n=NIGHT_LIGHT;                          // warm: strongest halfway through dusk or dawn
+  const N=[0.55*n, 0.70*n, 1.0*n], W=[1.0, 0.78, 0.55];
+  for(let i=0;i<3;i++) _day.rgb[i]=(N[i]+(1-N[i])*s)*(1+(W[i]-1)*w);
+  const g=_gfx.light; g.clear();
+  if(_day.rgb[0]<0.995 || _day.rgb[1]<0.995 || _day.rgb[2]<0.995){
+    const c=(Math.round(255*_day.rgb[0])<<16)|(Math.round(255*_day.rgb[1])<<8)|Math.round(255*_day.rgb[2]);
+    g.beginFill(c); g.drawRect(0,0,canvas.width,canvas.height); g.endFill();
+  }
+}
+function _dayHint(){ return DAY_CYCLE>0 && _day.name ? ' · '+_day.name+(_day.name==='day'?'':' '+Math.round(100*_day.s)+'%') : ''; }
 // draw: pellets in far→near order, each slotted in front of the bodies farther than it (call before every body, then with −∞)
 function _foodFrame(){
   for(const s of _foodSprites) s.visible=false;
@@ -4220,7 +4270,7 @@ function _anemFrame(){
     const u=m.shader.uniforms; m.visible=true;
     u.uCenter[0]=_anem.x; u.uCenter[1]=_anem.y; u.uScale=A; u.uTilt=PANEL_TILT; u.uT=simClock%62.8318;
     u.uTint[0]=u.uTint[1]=u.uTint[2]=g; u.uWater=_WATER_RGB; u.uWaterF=wf;
-    u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE : 0; u.uCausT=_causT; u.uCausScale=_causScale;
+    u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE*_day.s : 0; u.uCausT=_causT; u.uCausScale=_causScale;
     u.uCausO[0]=_wrap20pi(_anem.x*_causScale); u.uCausO[1]=_wrap20pi(_anem.y*_causScale);
   }
 }
@@ -4242,7 +4292,7 @@ function _anemPlace(z){
 // hangs and hovers in the tentacles.
 function _anemHome(b, dt){
   if(b._sp!=='clown' || b._rising){ b._homeZ=undefined; b._nearHome=false; return; }
-  const p=ANEMONE_HOME;
+  const p=_day.sleep>0.5 ? 1 : ANEMONE_HOME;                             // at night every clownfish sleeps in its anemone
   if(p<=0){ b._homing=false; b._homeT=undefined; } else if(p>=1){ b._homing=true; b._homeT=undefined; }
   else {
     if(b._homeT===undefined){ b._homing=Math.random()<p; b._homeT=Math.random()*10; }
@@ -4790,7 +4840,12 @@ const hx=Math.cos(PANEL_TILT), hy=Math.sin(PANEL_TILT);
 const _ft=b._feeding && b._feedTgt;                        // after food: it wants the pellet itself (its mouth onto it), not the flock's turn-capped wish
 let wX=Math.cos(b._sa), wY=Math.sin(b._sa);
 if(_ft){ const ex=b._feedAimX-b.x, ey=b._feedAimY-b.y, el=Math.hypot(ex,ey); if(el>1e-3){ wX=ex/el; wY=ey/el; } }
-const wR=wX*hx+wY*hy, wD=-wX*hy+wY*hx;                     // the flock's wish along room-right / room-down
+const wR=wX*hx+wY*hy; let wD=-wX*hy+wY*hx;                 // the flock's wish along room-right / room-down
+const sl=_day.sleep;                                        // night: the fish rest (see _dayStep)
+if(sl>0.02 && !_ft){                                        // …settling into the lower part of the tank (a third of the way up from the floor)
+  const F=_roomFrame(), dp=((b.x-F.cx)*F.dx+(b.y-F.cy)*F.dy)/Math.max(1,F.extD);
+  wD+=sl*Math.max(-0.6,Math.min(0.6,(0.35-dp)*1.5));
+}
 if(b._psi===undefined){                                    // first frame as a fish: start from the current heading
   const c=wR;
   b._fface=c<0?-1:1; b._psi=c<0?Math.PI:0; b._th=0; b._phi=0; b._phiT=0; b._phiTimer=0;
@@ -4803,7 +4858,7 @@ b._dsx+=(wR-b._dsx)*k; b._dsy+=(wD-b._dsy)*k;
 b._dsxSlow+=(wR-b._dsxSlow)*(1-Math.exp(-dt/(_ft ? 0.25 : 1.2)));   // facing is decided on a much slower wish, so a jittery flock doesn't keep turning it round (food: it whips round at once)
 // cruising depth angle: a slow wander, pushed back toward the middle near the front or back glass
 if((b._phiTimer-=dt)<=0){
-  if(DEPTH>0 && Math.random()<0.5){                        // a DEPTH RUN: swim nearly straight toward or away from the glass (you see its face or tail)
+  if(DEPTH>0 && Math.random()<0.5*(1-sl)){                 // a DEPTH RUN (none at night): swim nearly straight toward or away from the glass (you see its face or tail)
     b._phiTimer=3+Math.random()*3; b._phiT=(b.z<DEPTH*0.5 ? 1 : -1)*(1.13+Math.random()*0.35); b._run=true;   // 65–85°, long enough to get there
   } else { b._phiTimer=3+Math.random()*4; b._phiT=(Math.random()*2-1)*0.5; b._run=false; }
 }
@@ -4873,9 +4928,9 @@ b._fbend=Math.max(-1,Math.min(1,(thT-b._th)*3));
 // 0 burst · 1 cruise · 2 glide · 3 hover
 if((b._bcT-=dt)<=0){
   const r=Math.random();
-  const bu=S.burst*(b._nearHome?0.4:1)*(1+1.5*noise);    // at home in its anemone a clownfish bursts less and hangs about more; noise: more bursts
+  const bu=S.burst*(b._nearHome?0.4:1)*(1+1.5*noise)*(1-0.85*sl);   // resting at night: hardly any bursts, a lot of hovering    // at home in its anemone a clownfish bursts less and hangs about more; noise: more bursts
   if(b._bcMode===1){ if(r<bu){ b._bcMode=0; b._bcT=_bT(); } else if(r<bu+S.glide){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; }
-                     else if(r<bu+S.glide+S.hover*(1-0.7*noise)){ b._bcMode=3; b._bcT=S.hoverT[0]+Math.random()*S.hoverT[1]; } else b._bcT=_cT(); }
+                     else if(r<bu+S.glide+S.hover*(1-0.7*noise)*(1+3*sl)){ b._bcMode=3; b._bcT=(S.hoverT[0]+Math.random()*S.hoverT[1])*(1+2*sl); } else b._bcT=_cT(); }
   else if(b._bcMode===0){ if(r<0.6){ b._bcMode=2; b._bcT=0.5+Math.random()*0.7; } else { b._bcMode=1; b._bcT=_cT(); } }
   else if(b._bcMode===2){ if(r<0.3){ b._bcMode=0; b._bcT=_bT(); } else { b._bcMode=1; b._bcT=_cT(); } }
   else { b._bcMode=1; b._bcT=_cT(); }
@@ -4895,6 +4950,7 @@ if(b._feeding && !b._fturn){                                // eager: no hoverin
   fT=nearF ? 0.95 : 1.9; thrT=nearF ? 0.7 : 1.0;             // a rush across the tank, then a controlled approach
 }
 fT*=1+0.25*noise;
+if(!b._feeding) fT*=1-0.6*sl;                                // asleep: a slow drift
 if(st>0){ if(st>0.5 && b._bcMode!==0){ b._bcMode=0; b._bcT=0.5; } fT=Math.max(fT, 1.25+1.2*st); thrT=Math.max(thrT, st); }   // the dart
 // speed eases like a spring (no sudden lurch at the start of a burst): ~0.6 s to speed up, slower to glide down; bursts last 0.8–1.4 s so they still reach full speed
 [b._f, b._fv] = _spring(b._f, b._fv||0, fT, fT>b._f ? S.accel+8*st+(b._feeding?4:0) : (b._feeding?3:1.2)); if(b._f<0){ b._f=0; b._fv=0; }   // a startle is the one sudden start
@@ -6364,7 +6420,7 @@ if(_rip){
   if(!_pondActive && !(RIPPLE_AMT>0 && (_forceUpright || UPRIGHT_SPRITE))){ const _u=spr.shader.uniforms; _u.uAmpX=0; _u.uAmpY=0; _u.uAmt=0; }
   // …but a swimming koi does get the WATER LIGHT (boid shade = strength, boid waves = pattern size), fixed in the room
   { const _u=spr.shader.uniforms;
-    if(_swimOn && !_pondActive && RIPPLE_SHADE>0){ _u.uCaus=RIPPLE_SHADE; _u.uCausT=_causT; _u.uCausScale=_causScale;
+    if(_swimOn && !_pondActive && RIPPLE_SHADE>0){ _u.uCaus=RIPPLE_SHADE*_day.s; _u.uCausT=_causT; _u.uCausScale=_causScale;
       _u.uCausC[0]=bx; _u.uCausC[1]=by; _u.uCausO[0]=_wrap20pi(bx*_causScale); _u.uCausO[1]=_wrap20pi(by*_causScale); } else _u.uCaus=0; }
   _swimUpdate(spr, _bt, _swimOn ? boid : null, _flipX<0 ? -1 : 1, _sideOn);
   { const _u=spr.shader.uniforms;                          // pooled meshes are reused, so switch the pectoral off explicitly when not wanted
@@ -6445,7 +6501,7 @@ if(_k3){
   }
   u.uMouth=_live ? Math.max(_gm, 0.12*(0.5+0.5*Math.sin(boid._brPh))) : 0.3;   // the steady breathing stays small, so it doesn't flicker; dead: mouth a little open
   u.uGill =_live ? Math.max(_gg, 0.20*(0.5+0.5*Math.sin(boid._brPh-1.6))) : 0;
-  u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE : 0; u.uCausT=_causT; u.uCausScale=_causScale;   // water light
+  u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE*_day.s : 0; u.uCausT=_causT; u.uCausScale=_causScale;   // water light
   u.uCausO[0]=_wrap20pi(bx*_causScale); u.uCausO[1]=_wrap20pi(by*_causScale);
   m.zIndex=spr.zIndex;
 }
@@ -7656,7 +7712,7 @@ if(_fpsEl && ++_fpsThrottle>=5){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
   const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')
-            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_anemHint()+_micHint()+_sndHint();
+            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_anemHint()+_dayHint()+_micHint()+_sndHint();
   if(html!==_fpsLastHTML){ _fpsLastHTML=html; _fpsEl.innerHTML=html; }
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
@@ -7686,6 +7742,7 @@ updatePredators(dt);
 
 if(_mic.clap){ _mic.clap=false; if(FEED_N>0) _feedDrop(FEED_N); else _fishStartleAll(); }   // a clap on the microphone: feeding time, or every fish startles
 _foodStep(dt);
+_dayStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
