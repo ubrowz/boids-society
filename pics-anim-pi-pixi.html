@@ -1561,7 +1561,7 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 <div class="ctrl-row">
 <label>base lifespan</label>
-<input type="range" id="lifeSlider" min="5" max="80" value="80">
+<input type="range" id="lifeSlider" min="5" max="600" value="80" data-cond-max="80">
 <span class="ctrl-val" id="lifeVal">80 s</span>
 </div>
 <div class="ctrl-row">
@@ -2561,6 +2561,8 @@ function _fishTankSettings(){
   // about 10 fish, every one of them 3D (the Pi + 192×32 panel target). The ceiling culls the surplus right away (one
   // fading out per frame); target and start size keep it there through births and restarts.
   _setSlider('popCeilSlider', 10); _setSlider('targetSlider', 9); _setSlider('initPopSlider', 10);
+  _setSlider('predatorSlider', 0);                                  // a predator hunts unseen in a fish tank and takes fish without warning
+  _setSlider('lifeSlider', 300);                                    // fish live minutes, not the society's 80 s
   // 3D max above the ceiling: fish that are dying (or culled) keep drawing while they fade, so the tank briefly holds
   // 11–13; with max = 10 the farthest fish would flip to the flat 2D drawing for a moment, which reads as a jump.
   if(parseInt(document.getElementById('koi3dMaxSlider').value)<14) _setSlider('koi3dMaxSlider', 14);
@@ -2972,9 +2974,8 @@ const FADE_DURATION = 2.0;
 const BIRTH_DURATION = 2.0; // matched to FADE_DURATION so arriving and leaving take the same time
 const BASE_NEARNESS = 4.0;
 const MIN_NEARNESS = 0.05;
-const LIFESPAN_SCALE_MAX = 1.25; // at base 80s → ceiling of 100s
+const LIFESPAN_SCALE_MAX = 1.25; // the ceiling: base × 1.25 (100 s at the default 80 s)
 const LIFESPAN_SCALE_MIN = 0.4;
-const MAX_LIFESPAN = 100; // hard biological ceiling in seconds
 const WARMUP_DURATION = 15.0;    // seconds to ramp nearness from 0 to full strength
 let DISEASE_DURATION = 20.0;     // seconds a boid stays infectious
 let DISEASE_THRESHOLD = 3;       // exposure hits from infected boids to catch disease
@@ -4789,7 +4790,7 @@ return alpha * Math.exp(beta * boid.age) * inbreedingHazardMultiplier() * smallP
 }
 
 function effectiveLifespanFor(boid){
-return Math.min(BASE_LIFESPAN * lifespanScale(boid.globalPressure), MAX_LIFESPAN);
+return BASE_LIFESPAN * lifespanScale(boid.globalPressure);   // at most base × LIFESPAN_SCALE_MAX
 }
 
 function updateLifespan(boid,dt){
@@ -7000,7 +7001,7 @@ const pc = document.getElementById('popPyramid');
 if (!pc) return;
 const pctx = pc.getContext('2d');
 const W = pc.width, H = pc.height;
-const BAND = 5;
+const BAND = 5 * Math.max(1, Math.round(BASE_LIFESPAN / 80));   // about 16–20 rows whatever the lifespan
 
 const alive = boids.filter(b => b.alive && !b.dying);
 
@@ -7249,9 +7250,15 @@ if(POP_CEILING>0){
 let livingCount=0;
 for(const b of boids) if(!b.dying) livingCount++;
 if(livingCount>POP_CEILING){
+  if(SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank()){
+    // a fish tank: the fish nearest the end of its life goes, so a young fish never dies of a newcomer overfilling the tank
+    let old=null; for(const b of boids) if(!b.dying && (!old || b.age/b.maxLifespan>old.age/old.maxLifespan)) old=b;
+    if(old) old.dying=true;
+  } else {
   // pick a random living boid to cull
   let skip=Math.floor(Math.random()*livingCount);
   for(const b of boids){ if(!b.dying){ if(skip===0){b.dying=true;break;} skip--; } }
+  }
 }
 }
 updateDivorce(dt);
@@ -8015,9 +8022,9 @@ function _condContrast(){ return 0.70 + 0.40*Math.min(1,(performance.now()-_cond
 function _condHoldFor(mv){ return _condRnd(mv.hold[0],mv.hold[1])*_condPaceMul; }
 function _condTargetPop(){ return parseFloat(document.getElementById('targetSlider').value)||300; } // the user's anchor
 function _condFracToVal(id, frac){ const el=document.getElementById(id); if(!el) return 0;
-  const lo=parseFloat(el.min), hi=parseFloat(el.max); return lo+Math.max(0,Math.min(1,frac))*(hi-lo); }
+  const lo=parseFloat(el.min), hi=parseFloat(el.dataset.condMax||el.max); return lo+Math.max(0,Math.min(1,frac))*(hi-lo); }
 function _condSet(id, val){ const el=document.getElementById(id); if(!el) return;
-  const lo=parseFloat(el.min), hi=parseFloat(el.max), st=parseFloat(el.step)||1;
+  const lo=parseFloat(el.min), hi=parseFloat(el.dataset.condMax||el.max), st=parseFloat(el.step)||1;   // data-cond-max: the conductor's own upper limit
   let v=Math.max(lo, Math.min(hi, val)); v=Math.round(v/st)*st;
   if(parseFloat(el.value)!==v){ el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); } } // same event the bridge + recorder use
 // growth drive [-1..1] from the population error (PI). Integral defeats the steady-state offset that
