@@ -4950,9 +4950,18 @@ let wX=Math.cos(b._sa), wY=Math.sin(b._sa);
 if(_ft){ const ex=b._feedAimX-b.x, ey=b._feedAimY-b.y, el=Math.hypot(ex,ey); if(el>1e-3){ wX=ex/el; wY=ey/el; } }
 const wR=wX*hx+wY*hy; let wD=-wX*hy+wY*hx;                 // the flock's wish along room-right / room-down
 const sl=_day.sleep;                                        // night: the fish rest (see _dayStep)
+const _RF=_roomFrame(), dp=((b.x-_RF.cx)*_RF.dx+(b.y-_RF.cy)*_RF.dy)/Math.max(1,_RF.extD);   // height in the tank: −1 surface … +1 floor
 if(sl>0.02 && !_ft){                                        // …settling into the lower part of the tank (a third of the way up from the floor)
-  const F=_roomFrame(), dp=((b.x-F.cx)*F.dx+(b.y-F.cy)*F.dy)/Math.max(1,F.extD);
   wD+=sl*Math.max(-0.6,Math.min(0.6,(0.35-dp)*1.5));
+}
+// a TALL tank (the panel hanging upright, PANEL_TILT 0): the side walls are close, so the flock's wish is nearly
+// always "turn round" and never "go up" — and every fish enters from below the floor — so on its own the shoal stays
+// at the bottom. Each fish picks a level to roam to every 10–25 s (anywhere from just under the surface to just above
+// the floor) and climbs or dives toward it, a little steeper than in a wide tank. Off in a wide (landscape) tank.
+const tall=Math.max(0,Math.min(1,(_RF.extD/Math.max(1,_RF.extR)-0.6)/0.9));
+if(tall>0 && !_ft && b._homeZ===undefined){
+  if((b._lvlT=(b._lvlT||0)-dt)<=0){ b._lvl=-0.8+1.6*Math.random(); b._lvlT=10+Math.random()*15; }
+  wD+=tall*(1-sl)*Math.max(-0.8,Math.min(0.8,(b._lvl-dp)*2.5));
 }
 if(b._psi===undefined){                                    // first frame as a fish: start from the current heading
   const c=wR;
@@ -5026,7 +5035,7 @@ if(b._psiPrev===undefined) b._psiPrev=b._psi;
 { let dpsi=b._psi-b._psiPrev; dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi)); b._psiPrev=b._psi;
   const tgtB=dt>0 ? Math.max(-1,Math.min(1,dpsi/dt*0.45)) : 0; b._yawBend=(b._yawBend||0)+(tgtB-(b._yawBend||0))*(1-Math.exp(-dt/0.15)); }
 // pitch: limited climb/dive, rate-limited; its rate also curls the body (read in drawBoid)
-const pmax=FISH_PITCH_MAX*(b._feeding?1.6:1);                // after food a fish climbs and dives steeper (40°)
+const pmax=FISH_PITCH_MAX*(b._feeding?1.6:1+0.5*tall);       // after food a fish climbs and dives steeper (40°); a tall tank: up to 37°
 let thT=Math.max(-pmax,Math.min(pmax,Math.atan2(b._dsy,Math.abs(b._dsx)+0.15)));
 if(b._fturn) thT*=0.5;
 [b._th, b._thv] = _spring(b._th, b._thv||0, thT, 2.6);
@@ -5298,11 +5307,14 @@ boid.sat=0.12+0.88*boid.commitment; // grey (undecided) → vivid (committed)
 
 function avoidWalls(boid){
 const w=canvas.width,h=canvas.height;
+// a fish in a narrow tank: the margin is at most a fifth of the short side, or both side margins overlap and the
+// whole tank is "near a wall" (its wish is pushed sideways everywhere)
+const mx=boid._fish ? Math.min(WALL_MARGIN,0.2*w) : WALL_MARGIN, my=boid._fish ? Math.min(WALL_MARGIN,0.2*h) : WALL_MARGIN;
 let px=0,py=0;
-if(boid.x<WALL_MARGIN) px+=(WALL_MARGIN-boid.x)/WALL_MARGIN;
-if(boid.x>w-WALL_MARGIN) px-=(boid.x-(w-WALL_MARGIN))/WALL_MARGIN;
-if(boid.y<WALL_MARGIN) py+=(WALL_MARGIN-boid.y)/WALL_MARGIN;
-if(boid.y>h-WALL_MARGIN) py-=(boid.y-(h-WALL_MARGIN))/WALL_MARGIN;
+if(boid.x<mx) px+=(mx-boid.x)/mx;
+if(boid.x>w-mx) px-=(boid.x-(w-mx))/mx;
+if(boid.y<my) py+=(my-boid.y)/my;
+if(boid.y>h-my) py-=(boid.y-(h-my))/my;
 if(px===0&&py===0) return;
 steerToward(boid,boid.x+px*100,boid.y+py*100,2.0);
 }
