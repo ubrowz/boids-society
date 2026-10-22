@@ -2041,13 +2041,13 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <div class="mini-note" style="margin-bottom:2px;">Ready-made koi pond and reef tank (3D fish), and how fish swim.</div>
 <div class="ctrl-row">
 <label title="Five hand-drawn koi — kohaku, sanke, showa, ogon, asagi — in side profile, facing right (the swim wave and the side view both expect that). Fills BOTH sex pools, sets the image size to suit and turns swimming on. (A tank where every boid wears an image hides the predator — it still hunts, you just hear it.)">koi set</label>
-<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: swim 50%, side view and 3D fish on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50% toward teal, size variety 60%, image size 0.45×, trails off, immigration on, and about 10 koi (pop ceiling 10, target 9, start 10)">load koi</button>
+<button id="koiBtn" class="mini-btn" title="Load the koi into the ♂ and ♀ pools and make a koi pond: swim 50%, side view and 3D fish on, speed 2, beat 0.5 Hz, body wave 1.6, looser shoaling, Details and Event FX off, panel tilt 90°, water tint 50% toward teal, size variety 60%, image size 0.45×, trails off, immigration on, and about 10 koi (pop ceiling 10, target 9, start 10) Sliders you have changed yourself (or loaded from a settings file) are kept.">load koi</button>
 <button id="koiClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="koiName" class="mini-note"></span>
 </div>
 <div class="ctrl-row">
 <label title="Ten clownfish — ocellaris (Nemo), percula, black ocellaris, maroon, gold-stripe maroon, Clark's, tomato, pink skunk, orange skunk and the designer snowflake ocellaris — in side profile, facing right, each with its own 3D model and colours. Fills BOTH sex pools. Clownfish swim differently from koi: they row with busy pectoral fins, hover a lot, dart and turn quickly. Load reef mixes them with the other reef fish ticked in the row below, each with its own 3D body and swimming style: the emperor angelfish (a big, stately fish that changes its pattern as it grows up: a young one is dark navy with white and blue rings, an adult has yellow and blue stripes, a black mask and a yellow tail; the stripes spread over it from the tail forward), the blue tang (royal blue with the black palette and a yellow tail; busy and darting), the royal gramma (small, purple front and yellow back; hovers), the Moorish idol (white with broad black bands, a yellow saddle and a long white streamer that sways behind it; glides) and the clown triggerfish (black with big white belly spots and a yellow leopard saddle; it rows with waving dorsal and anal fins and keeps its tail for darting). With all of them ticked, about 3 of the 10 fish are clownfish, 2 each are blue tangs and angelfish, and 1 each the others; births and newcomers keep that mix. Each species shoals and pairs only with its own kind, and only the clownfish live in the anemone.">reef set</label>
-<button id="reefBtn" class="mini-btn" title="Load the reef fish ticked below (clownfish, blue tangs, emperor angelfish, royal grammas, Moorish idols, clown triggerfish) into the ♂ and ♀ pools and make a reef tank: the koi pond's tank settings (side view and 3D on, Details and Event FX off, panel tilt 90°, trails off, immigration on, about 10 fish) with ocean-blue water, image size 0.35×, beat 1 Hz, body wave 1.2, depth light 10, depth haze 30, boid shade 60%, boid waves 2.7, a close group that doesn't school (cohere 60, align 15), and the anemone at 20% height">load reef</button>
+<button id="reefBtn" class="mini-btn" title="Load the reef fish ticked below (clownfish, blue tangs, emperor angelfish, royal grammas, Moorish idols, clown triggerfish) into the ♂ and ♀ pools and make a reef tank: the koi pond's tank settings (side view and 3D on, Details and Event FX off, panel tilt 90°, trails off, immigration on, about 10 fish) with ocean-blue water, image size 0.35×, beat 1 Hz, body wave 1.2, depth light 10, depth haze 30, boid shade 60%, boid waves 2.7, a close group that doesn't school (cohere 60, align 15), and the anemone at 20% height. Sliders you have changed yourself (or loaded from a settings file) are kept.">load reef</button>
 <button id="reefClear" class="mini-btn" title="Clear both ordinary image pools" style="color:#ff6b6b;border-color:rgba(255,107,107,0.4);">✕</button>
 <span id="reefName" class="mini-note"></span>
 </div>
@@ -2115,6 +2115,23 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <label title="Where the airstone sits from left to right: 0% = the left end, 100% = the right end (as the room sees it, panel tilt included).">bubbles place x</label>
 <input type="range" id="bubbleXSlider" min="0" max="100" value="80" step="1">
 <span class="ctrl-val" id="bubbleXVal">80%</span>
+</div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>barracuda</b> (fish tanks, 3D on) —</div>
+<div class="ctrl-row">
+<label title="Now and then a great barracuda glides by in the open water behind the reef: a long silver fish with dark bars, entering at one side, crossing the tank with slow tail beats and leaving at the other. It is a visitor, not one of the tank's fish (it doesn't count, breed or stay). The slider sets roughly how many minutes between passes (each wait is random, from half to one and a half times this); 0 = never. Load reef sets 5 min, Load koi off. Needs side view and 3D.">barracuda</label>
+<input type="range" id="cudaSlider" min="0" max="30" value="0" step="1">
+<span class="ctrl-val" id="cudaVal">off</span>
+<button id="cudaBtn" class="mini-btn" title="Send the barracuda past now">pass</button>
+</div>
+<div class="ctrl-row">
+<label title="How long the barracuda is, as a share of an adult fish in the tank (it swims at the back, so it looks a little smaller than this). A real one is many times longer than a clownfish; 300% keeps it big but still on the panel.">barracuda size</label>
+<input type="range" id="cudaSizeSlider" min="150" max="1200" value="300" step="25">
+<span class="ctrl-val" id="cudaSizeVal">300%</span>
+</div>
+<div class="ctrl-row">
+<label title="How strongly the reef fish react to the barracuda: as it comes near, they dart off, dive toward the floor and toward the front glass, and clownfish hide in their anemone; a few seconds after it has gone they come back out. 0% = they ignore it.">barracuda fear</label>
+<input type="range" id="cudaFearSlider" min="0" max="100" value="60" step="5">
+<span class="ctrl-val" id="cudaFearVal">60%</span>
 </div>
 <div class="mini-note" style="margin-bottom:2px;">— <b>day and night</b> (fish tanks) —</div>
 <div class="ctrl-row">
@@ -2468,6 +2485,12 @@ let DAY_CYCLE = parseInt(document.getElementById('dayCycleSlider').value);      
 let NIGHT_LIGHT = parseInt(document.getElementById('nightLightSlider').value)/100;            // brightness at night, share of daylight
 let BUBBLES = parseInt(document.getElementById('bubbleSlider').value)/100;                    // how much air the airstone gives; 0 = off
 let BUBBLE_X = parseInt(document.getElementById('bubbleXSlider').value)/100;                  // airstone position, left → right
+let CUDA_MIN  = parseInt(document.getElementById('cudaSlider').value);                        // minutes between barracuda passes (about); 0 = never
+let CUDA_SIZE = parseInt(document.getElementById('cudaSizeSlider').value)/100;                // barracuda length ÷ an adult tank fish
+let CUDA_FEAR = parseInt(document.getElementById('cudaFearSlider').value)/100;                // how strongly the fish react to it
+// the barracuda (see _cudaStep): wait = s until the next pass · on = passing · r,d = body centre in the room frame · dir ±1 ·
+// v = px/s · ph = tail-beat phase · pass = count, so each fish reacts once per pass · vis = drawn this frame
+const _cuda = { wait:-1, on:false, r:0, d:0, d0:0, z:0, dir:1, v:0, t:0, T:1, ph:0, wob:0, pass:0, vis:false, tex:null };
 // day and night (see _dayStep): s = sunlight 1 day … 0 night · sleep = how much the fish rest · rgb = the light's colour (multiplies the scene)
 const _day = { s:1, sleep:0, warm:0, rgb:[1,1,1], name:'' };
 // microphone (see _micPoll): level / room level in % · clap waiting for the next frame · noise 0..1 (room loudness × MIC_ROOM)
@@ -2669,6 +2692,19 @@ function _fillFishPools(urls){
     document.getElementById('bodyImg'+sex+'Name').textContent=urls.length+' imgs';
   }
 }
+// Load koi / Load reef keep the sliders you have tuned yourself: every slider you move by hand is remembered
+// (_userTuned, saved in the settings file) and a preset leaves it alone. A preset also leaves a slider alone that
+// shows neither its starting value nor the value a preset last put there (_presetVals) — a value loaded from an
+// older settings file. Scene-defining switches — no predator in a fish tank, no anemone or barracuda in a koi
+// pond — are always set.
+const _sliderDefaults = {}, _presetVals = {}, _userTuned = new Set();
+document.querySelectorAll('input[type="range"],input[type="color"],input[type="number"]').forEach(el=>{ if(el.id) _sliderDefaults[el.id]=el.value; });
+document.addEventListener('input', e=>{ if(e.isTrusted && e.target.id && e.target.matches('input[type=range],input[type=color],input[type=number]')) _userTuned.add(e.target.id); });   // a real drag, not a preset, the conductor or a loaded file
+function _presetSlider(id,val){
+  const el=document.getElementById(id); if(!el) return;
+  if(_userTuned.has(id) || (el.value!==_sliderDefaults[id] && el.value!==_presetVals[id])) return;   // tuned by hand: keep it
+  _setSlider(id,val); _presetVals[id]=el.value;
+}
 // What every fish tank shares (tuned by eye on the Pi + panel with the koi): swimming in side view, the panel's look
 // (no drawn decorations or event effects over the fish, panel hung landscape, no trails), immigration on and a
 // population of about 10, every one of them 3D.
@@ -2677,14 +2713,14 @@ function _fishTankSettings(){
   if(!SIDE_VIEW) document.getElementById('sideViewBtn').click();
   if(SHOW_DETAILS) document.getElementById('detailsBtn').click();
   for(let i=((EVENT_FX%3)+3)%3; i>0; i--) document.getElementById('bondLinesBtn').click();      // the button cycles backward (all → bonds → none), so EVENT_FX clicks reach 0 = off
-  _setSlider('tiltSlider', 90);
-  _setSlider('trailLengthSlider', 0);                                                              // no trails behind fish
+  _presetSlider('tiltSlider', 90);
+  _presetSlider('trailLengthSlider', 0);                                                              // no trails behind fish
   if(!immigrationEnabled) document.getElementById('immigrationBtn').click();                       // newcomers keep the small tank's gene pool fresh
   // about 10 fish, every one of them 3D (the Pi + 192×32 panel target). The ceiling culls the surplus right away (one
   // fading out per frame); target and start size keep it there through births and restarts.
-  _setSlider('popCeilSlider', 10); _setSlider('targetSlider', 9); _setSlider('initPopSlider', 10);
+  _presetSlider('popCeilSlider', 10); _presetSlider('targetSlider', 9); _presetSlider('initPopSlider', 10);
   _setSlider('predatorSlider', 0);                                  // a predator hunts unseen in a fish tank and takes fish without warning
-  _setSlider('lifeSlider', 300);                                    // fish live minutes, not the society's 80 s
+  _presetSlider('lifeSlider', 300);                                    // fish live minutes, not the society's 80 s
   // 3D max above the ceiling: fish that are dying (or culled) keep drawing while they fade, so the tank briefly holds
   // 11–13; with max = 10 the farthest fish would flip to the flat 2D drawing for a moment, which reads as a jump.
   if(parseInt(document.getElementById('koi3dMaxSlider').value)<14) _setSlider('koi3dMaxSlider', 14);
@@ -2693,13 +2729,14 @@ function _fishTankSettings(){
 document.getElementById('koiBtn').addEventListener('click', () => {
   const urls=_fishSetUrls('koi'); if(!urls.length) return;
   _fillFishPools(urls);
-  _setSlider('imgScaleSlider', 0.45);                                       // koi size tuned by eye on the Pi + panel (a pond of ~10 big koi)
-  _setSlider('speedSlider', 2); _setSlider('cohKSlider', 45); _setSlider('alignSlider', 30);   // koi pond: slow, looser shoaling, less schooling
-  _setSlider('swimBeatSlider', 5); _setSlider('swimWaveSlider', 16);                             // 0.5 Hz beat, body wave 1.6 — tuned by eye on the Pi + panel
-  _setSlider('waterTintSlider', 50); _setSlider('sizeVarSlider', 60);                              // far koi sink into the water; a pond of different sizes
-  _setSlider('waterColorInput', '#008080');                                                        // teal water
+  _presetSlider('imgScaleSlider', 0.45);                                       // koi size tuned by eye on the Pi + panel (a pond of ~10 big koi)
+  _presetSlider('speedSlider', 2); _presetSlider('cohKSlider', 45); _presetSlider('alignSlider', 30);   // koi pond: slow, looser shoaling, less schooling
+  _presetSlider('swimBeatSlider', 5); _presetSlider('swimWaveSlider', 16);                             // 0.5 Hz beat, body wave 1.6 — tuned by eye on the Pi + panel
+  _presetSlider('waterTintSlider', 50); _presetSlider('sizeVarSlider', 60);                              // far koi sink into the water; a pond of different sizes
+  _presetSlider('waterColorInput', '#008080');                                                        // teal water
   _setSlider('anemoneSlider', 0);                                                                  // no anemone in a koi pond
-  _setSlider('bubbleSlider', 50); _setSlider('bubbleXSlider', 80);                                 // an airstone at the right end
+  _presetSlider('bubbleSlider', 50); _presetSlider('bubbleXSlider', 80);                                 // an airstone at the right end
+  _setSlider('cudaSlider', 0);                                                                     // no barracuda in a koi pond
   _fishTankSettings();
   document.getElementById('koiName').textContent=urls.length+' koi'; document.getElementById('reefName').textContent='';
 });
@@ -2712,17 +2749,18 @@ document.getElementById('reefBtn').addEventListener('click', () => {
   // the reef species ticked in the "reef fish" row (all of them if none is), shared out by _SPECIES_MIX
   const urls=_reefSpecies().flatMap(_fishSetUrls); if(!urls.length) return;
   _fillFishPools(urls);
-  _setSlider('imgScaleSlider', 0.35);                                       // smaller than the koi, but deep-bodied: the bands still read on the panel
-  _setSlider('speedSlider', 2); _setSlider('cohKSlider', 60); _setSlider('alignSlider', 15);   // clownfish keep close together (around their home) but don't school
-  _setSlider('swimBeatSlider', 10); _setSlider('swimWaveSlider', 12);                            // 1 Hz beat, body wave 1.2 — tuned by eye on the Pi + panel
-  _setSlider('waterTintSlider', 40); _setSlider('sizeVarSlider', 50);                              // clear reef water; a big female, smaller males
-  _setSlider('waterColorInput', '#0060a0');                                                        // ocean blue, about as bright as the koi pond's teal (the panel)
-  _setSlider('anemoneSlider', 100);                                                                // their bubble-tip anemone on the floor
-  _setSlider('anemoneHomeSlider', 50);                                                             // about half the clownfish at home at a time
-  _setSlider('anemoneYSlider', 20);                                                                // a little above the floor
-  _setSlider('bubbleSlider', 50); _setSlider('bubbleXSlider', 85);                                 // an airstone away from the anemone
-  _setSlider('depthLightSlider', 10); _setSlider('depthHazeSlider', 30);                         // gentle depth cues (tuned on the panel)
-  _setSlider('shadeSlider', 60); _setSlider('waveSlider', 2.7);                                  // water light on the fish: stronger, finer pattern
+  _presetSlider('imgScaleSlider', 0.35);                                       // smaller than the koi, but deep-bodied: the bands still read on the panel
+  _presetSlider('speedSlider', 2); _presetSlider('cohKSlider', 60); _presetSlider('alignSlider', 15);   // clownfish keep close together (around their home) but don't school
+  _presetSlider('swimBeatSlider', 10); _presetSlider('swimWaveSlider', 12);                            // 1 Hz beat, body wave 1.2 — tuned by eye on the Pi + panel
+  _presetSlider('waterTintSlider', 40); _presetSlider('sizeVarSlider', 50);                              // clear reef water; a big female, smaller males
+  _presetSlider('waterColorInput', '#0060a0');                                                        // ocean blue, about as bright as the koi pond's teal (the panel)
+  _presetSlider('anemoneSlider', 100);                                                                // their bubble-tip anemone on the floor
+  _presetSlider('anemoneHomeSlider', 50);                                                             // about half the clownfish at home at a time
+  _presetSlider('anemoneYSlider', 20);                                                                // a little above the floor
+  _presetSlider('bubbleSlider', 50); _presetSlider('bubbleXSlider', 85);                                 // an airstone away from the anemone
+  _presetSlider('cudaSlider', 5);                                                                     // a barracuda goes by every five minutes or so
+  _presetSlider('depthLightSlider', 10); _presetSlider('depthHazeSlider', 30);                         // gentle depth cues (tuned on the panel)
+  _presetSlider('shadeSlider', 60); _presetSlider('waveSlider', 2.7);                                  // water light on the fish: stronger, finer pattern
   _fishTankSettings();
   { const n=_reefSpecies().length; document.getElementById('reefName').textContent=n===1 ? document.querySelector('#reefPick .sp-chip.on').textContent : n+' species'; } document.getElementById('koiName').textContent='';
 });
@@ -2918,6 +2956,10 @@ wire('dayCycleSlider','dayCycleVal',   v=>parseInt(v), v=>{ v=parseInt(v); retur
 wire('nightLightSlider','nightLightVal', v=>parseInt(v)/100, v=>v+'%', v=>{ NIGHT_LIGHT=v; });
 wire('bubbleSlider','bubbleVal',       v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ BUBBLES=v; });
 wire('bubbleXSlider','bubbleXVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ BUBBLE_X=v; });
+wire('cudaSlider','cudaVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v+' min', v=>{ CUDA_MIN=v; _cuda.wait=-1; });   // new timing: pick a fresh wait
+wire('cudaSizeSlider','cudaSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ CUDA_SIZE=v; });
+wire('cudaFearSlider','cudaFearVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ CUDA_FEAR=v; });
+document.getElementById('cudaBtn').addEventListener('click', () => { if(!_cuda.on) _cuda.wait=0; });   // a pass right away
 wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
 document.getElementById('feedBtn').addEventListener('click', () => _feedDrop(FEED_N>0 ? FEED_N : 8));   // the slider's pinch (8 when it is off)
 document.getElementById('koi3dBtn').addEventListener('click', function(){
@@ -3710,6 +3752,9 @@ const _FISH_SHAPES = {
   // clown triggerfish: a big head with the eye set far back, an oval body and a narrow tail stalk
   trigger:{ D:0.25,  WZ:0.46, DORS:[[0,.24],[.10,.34],[.22,.62],[.36,.88],[.50,1.0],[.64,1.0],[.76,.92],[.86,.74],[.93,.50],[.975,.28],[1.0,.08]],
                               VENT:[[0,.22],[.10,.32],[.22,.60],[.36,.86],[.50,.96],[.64,.94],[.76,.82],[.86,.62],[.93,.40],[.975,.22],[1.0,.07]] },
+  // great barracuda (a visitor, not a tank fish): long and slender, a pointed head with the lower jaw jutting past the upper
+  cuda:   { D:0.085, WZ:0.75, DORS:[[0,.30],[.10,.42],[.25,.70],[.45,.95],[.60,1.0],[.72,.94],[.82,.80],[.90,.58],[.95,.38],[.985,.18],[1.0,.04]],
+                              VENT:[[0,.28],[.10,.40],[.25,.66],[.45,.92],[.60,.96],[.72,.90],[.82,.78],[.90,.62],[.95,.48],[.985,.30],[1.0,.12]] },
   // royal gramma: a small, slim basslet
   gramma: { D:0.16,  WZ:0.55, DORS:[[0,.46],[.10,.56],[.22,.72],[.36,.90],[.50,1.0],[.65,.96],[.80,.84],[.90,.64],[.95,.46],[.985,.25],[1.0,.07]],
                               VENT:[[0,.42],[.10,.50],[.22,.64],[.36,.80],[.50,.88],[.65,.84],[.80,.72],[.90,.54],[.95,.38],[.985,.20],[1.0,.06]] },
@@ -3889,6 +3934,28 @@ if(CL){
     leaf([0.21,-0.020,sg*0.95*wz],[-0.80,-0.25,sg*0.50],0.12,0.035,6, sg<0?4:5, true, mix(PU,[1,1,1],0.4), 0.55);
     const uq=0.70, wq=WZ*(prof(DORS,uq)+prof(VENT,uq))/2*D;
     leaf([0.20,-0.115,sg*0.35*wq],[-0.55,-0.80,sg*0.20],0.20,0.024,5, sg<0?6:7, true, PU, 0.92);   // long trailing pelvic fins
+  }
+} else if(sp==='cuda'){
+  // GREAT BARRACUDA (vertex colours; the fin colour is white): a big, deeply forked dark tail with pale tips; two small
+  // dorsal fins far apart (a spiny one mid-back, a soft one over the anal fin), small pelvic and pectoral fins
+  const DK=[0.20,0.24,0.30], WH=[0.85,0.88,0.90];
+  const mix=(a,b,k)=>[a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k];
+  fin(10,8,(t,s)=>{ const r=s*2-1, span=0.022+0.150*Math.pow(Math.sin(t*Math.PI/2),1.1);
+    const notch=1-0.62*(1-Math.abs(r))*sm(0.25,1,t); return [-0.47-0.26*t*notch, r*span, 0]; },
+    (t,s)=>mix(DK,WH,0.8*sm(0.75,1,t)*Math.pow(Math.abs(s*2-1),4)), ()=>0.95, 1);
+  fin(8,3,(t,s)=>{ const x=0.06-0.14*t, u=x+0.5, yb=prof(DORS,u)*D-0.004;            // spiny first dorsal: a small triangle
+    const h=0.060*Math.pow(1-t,0.8)*Math.pow(Math.sin(Math.PI/2*Math.min(1,t/0.15+0.05)),0.5)*s; return [x-0.45*h, yb+h, 0]; }, DK, ()=>0.92, 2);
+  fin(6,3,(t,s)=>{ const x=-0.20-0.10*t, u=x+0.5, yb=prof(DORS,u)*D-0.004;            // soft second dorsal
+    const h=0.045*Math.pow(1-t,0.7)*Math.pow(Math.sin(Math.PI/2*Math.min(1,t/0.2+0.05)),0.5)*s; return [x-0.50*h, yb+h, 0]; },
+    (t,s)=>mix(DK,WH,0.6*sm(0.6,1,s)), ()=>0.92, 2);
+  fin(6,3,(t,s)=>{ const x=-0.20-0.10*t, u=x+0.5, yb=-prof(VENT,u)*D+0.004;           // anal fin, under the second dorsal
+    const h=0.042*Math.pow(1-t,0.7)*Math.pow(Math.sin(Math.PI/2*Math.min(1,t/0.2+0.05)),0.5)*s; return [x-0.50*h, yb-h, 0]; },
+    (t,s)=>mix(DK,WH,0.5*sm(0.6,1,s)), ()=>0.92, 3);
+  for(const sg of [-1,1]){
+    const up=0.78, wz=WZ*(prof(DORS,up)+prof(VENT,up))/2*D;
+    leaf([0.27,-0.022,sg*0.90*wz],[-0.80,-0.30,sg*0.50],0.10,0.024,5, sg<0?4:5, false, mix(DK,WH,0.4), 0.75);   // pectoral
+    const uq=0.52, wq=WZ*(prof(DORS,uq)+prof(VENT,uq))/2*D;
+    leaf([0.02,-0.065,sg*0.40*wq],[-0.65,-0.60,sg*0.25],0.07,0.018,4, sg<0?6:7, false, DK, 0.85);              // pelvic
   }
 } else {
 // caudal fin: vertical fan behind the tail root, soft fork
@@ -4089,7 +4156,7 @@ void main(void){
 let _koi3dProg = null, _koi3dUsed = 0;                         // _koi3dUsed: 3D fish drawn this frame, all species
 const _koi3dMeshes = [];                                       // every 3D mesh, all species (hidden at the start of a frame)
 const _koi3dPools = {};                                        // species → { geom, meshes, used }: one shared model per species
-const _KOI3D_FIN_DEFAULT = new Float32Array([1.0, 0.93, 0.88]);
+const _KOI3D_FIN_DEFAULT = new Float32Array([1.0, 0.93, 0.88]), _KOI3D_WHITE = new Float32Array([1, 1, 1]);
 function _getKoi3DMesh(sp){
 if(!_koi3dProg) _koi3dProg=PIXI.Program.from(_KOI3D_VERT,_KOI3D_FRAG);
 let P=_koi3dPools[sp];
@@ -4367,6 +4434,92 @@ function _bubblePlace(z){
     s.alpha = pk>0 ? (pk<0.4 ? 1 : 1-(pk-0.4)/0.6) : Math.min(1, b.v/(0.3*b.vt)+0.3);   // fades in as it leaves the stone
     s.zIndex=_zOrder-0.5;
   }
+}
+// ── the barracuda ────────────────────────────────────────────────────────────
+// Now and then (CUDA_MIN minutes, randomised ×0.5–1.5) a great barracuda glides past in the open water behind the
+// reef: a 3D fish on the same program as the tank fish, but not a boid — it enters past one side, crosses at the back
+// glass with slow tail beats and a gentle rise and fall, and leaves at the other. Drawn first (behind everything), in
+// its own depth slice beyond the fish slices. As its nose comes within reach of a fish, that fish takes fright once
+// per pass (b._fear, read in _fishStep): it darts, dives toward the floor and the front, and a clownfish hides in its anemone.
+function _cudaTexture(){
+  // colour map, u (x) tail root → nose, v (y) round the body; height on the flank up = −cos 2πv (−1 belly … 1 back),
+  // so it is the same on both sides: a dark slate back, silver flanks, a white belly, dark oblique bars on the upper
+  // flank, scattered black blotches on the rear lower flank, an eye with a pale ring
+  const W=256, H=64, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'), im=g.createImageData(W,H);
+  const sm=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
+  const SH=_FISH_SHAPES.cuda, prof=(tab,u)=>{ let i=0; while(i<tab.length-2 && u>tab[i+1][0]) i++;
+    let t=(u-tab[i][0])/(tab[i+1][0]-tab[i][0]); t=(1-Math.cos(t*Math.PI))/2; return tab[i][1]*(1-t)+tab[i+1][1]*t; };
+  const blot=[[0.12,-0.25],[0.20,-0.45],[0.27,-0.15],[0.33,-0.50],[0.17,0.0],[0.40,-0.30],[0.08,-0.05]];
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const u=(x+0.5)/W, v=(y+0.5)/H, up=-Math.cos(2*Math.PI*v), hh=(prof(SH.DORS,u)+prof(SH.VENT,u))/2*SH.D;
+    const back=sm(0.30,0.80,up), belly=sm(-0.20,-0.75,up);
+    let r=0.74+0.08*belly-0.50*back, gg=0.79+0.08*belly-0.49*back, b=0.83+0.07*belly-0.44*back;
+    const bar=sm(0.35,0.85,0.5+0.5*Math.sin(2*Math.PI*(u*10-up*0.35)))*sm(0.05,0.30,up)*(1-sm(0.75,0.95,up))*sm(0.14,0.24,u)*(1-sm(0.78,0.86,u));
+    let k=1-0.55*bar;
+    for(const [bu,bv] of blot){ const dd=Math.hypot(u-bu, (up-bv)*hh); if(dd<0.024) k*=0.25+0.75*sm(0.012,0.024,dd); }   // round in model units
+    if(u>0.86){ k*=1-0.25*sm(0.0,0.6,up); }                                             // a darker snout on top
+    const de=Math.hypot(u-0.885, (up-0.30)*hh);                                         // the eye (round in model units)
+    if(de<0.018){ const ring=sm(0.009,0.012,de); r=0.05+0.75*ring; gg=0.05+0.72*ring; b=0.05+0.45*ring; k=1; }
+    if(u>0.90 && Math.abs(up+0.15)<0.12) k*=0.45;                                       // the long gape
+    const i=4*(y*W+x); im.data[i]=255*Math.min(1,r*k); im.data[i+1]=255*Math.min(1,gg*k); im.data[i+2]=255*Math.min(1,b*k); im.data[i+3]=255;
+  }
+  g.putImageData(im,0,0); return PIXI.Texture.from(c);
+}
+function _cudaStep(dt){
+  dt=Math.min(Math.max(dt||0,0),0.1);
+  const can = KOI3D && SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank();
+  if(!can || (CUDA_MIN<=0 && !_cuda.on && _cuda.wait!==0)){ _cuda.on=false; if(CUDA_MIN<=0 && _cuda.wait!==0) _cuda.wait=-1; return; }
+  if(!_cuda.on){
+    if(_cuda.wait<0) _cuda.wait=Math.max(1,CUDA_MIN)*60*(0.5+Math.random());       // a fresh wait (the first one too)
+    if((_cuda.wait-=dt)>0) return;
+    const F=_roomFrame(), L=Math.min((_anem.L>0 ? _anem.L : 4*RADIUS)*CUDA_SIZE, 2.2*F.extR);
+    _cuda.on=true; _cuda.pass++; _cuda.wait=-1;
+    _cuda.dir=Math.random()<0.5 ? 1 : -1; _cuda.z=DEPTH>0 ? 0.75*DEPTH : 0;   // drawn behind every fish anyway; not at the very back, or the water swallows it
+    _cuda.d0=(-0.50+0.60*Math.random())*F.extD; _cuda.d=_cuda.d0;                  // the upper and middle water
+    _cuda.T=8+4*Math.random(); _cuda.t=0; _cuda.wob=Math.random()*6.2832; _cuda.ph=Math.random()*6.2832;
+    _cuda.r=-_cuda.dir*(F.extR+0.95*L);
+  }
+  const F=_roomFrame(), zs=zScaleOf(_cuda), L=Math.min((_anem.L>0 ? _anem.L : 4*RADIUS)*CUDA_SIZE, 2.2*F.extR), span=2*(F.extR+0.95*L);
+  _cuda.t+=dt; _cuda.v=span/_cuda.T;
+  _cuda.r+=_cuda.dir*_cuda.v*dt;
+  _cuda.d=_cuda.d0+0.08*F.extD*Math.sin(2*Math.PI*_cuda.t/_cuda.T*0.8+_cuda.wob);    // a slow rise and fall
+  _cuda.ph=(_cuda.ph+2*Math.PI*1.0*dt)%(2*Math.PI);                                  // unhurried tail beats
+  if(_cuda.dir*_cuda.r > F.extR+L){ _cuda.on=false; return; }                         // gone past the far side
+  // the fish take fright as its nose comes within reach (ahead of it, or level with it)
+  if(CUDA_FEAR>0){
+    const nose=_cuda.r+_cuda.dir*0.55*L*zs;
+    if(_cuda.dir*nose > -F.extR){                                                     // only once it is in view
+      for(const b of boids){
+        if(!b._fish || !b.alive || b.dying || b._rising || b._fearPass===_cuda.pass) continue;
+        const fr=(b.x-F.cx)*F.rx+(b.y-F.cy)*F.ry, ahead=(fr-nose)*_cuda.dir;
+        if(ahead < 0.55*F.extR){
+          b._fearPass=_cuda.pass; b._fear=CUDA_FEAR; b._fearR=ahead>0 ? _cuda.dir : -_cuda.dir;   // flee away from it
+          b._startle=Math.max(b._startle||0, 0.75*CUDA_FEAR); b._startleWait=Math.random()*0.25;
+          if(b._sp==='clown' && _anem.on && ANEMONE_HOME>0){ b._homing=true; b._homeT=8+Math.random()*6; }
+        }
+      }
+    }
+  }
+}
+function _cudaDraw(){
+  _cuda.vis=false;
+  if(!_cuda.on) return;
+  if(!_cuda.tex) _cuda.tex=_cudaTexture();
+  const F=_roomFrame(), zs=zScaleOf(_cuda), L=Math.min((_anem.L>0 ? _anem.L : 4*RADIUS)*CUDA_SIZE, 2.2*F.extR)*zs;
+  const m=_getKoi3DMesh('cuda'), u=m.shader.uniforms;
+  const x=F.cx+F.rx*_cuda.r+F.dx*_cuda.d, y=F.cy+F.ry*_cuda.r+F.dy*_cuda.d;
+  const ddr=0.08*F.extD*Math.cos(2*Math.PI*_cuda.t/_cuda.T*0.8+_cuda.wob)*2*Math.PI*0.8/_cuda.T/Math.max(1,_cuda.v);   // slope of the rise and fall
+  u.uTex=_cuda.tex; u.uFinCol=_KOI3D_WHITE; u.uMature=-1; u.uFW=0;
+  u.uCenter[0]=x; u.uCenter[1]=y; u.uScale=L;
+  u.uYaw=(_cuda.dir>0 ? 0 : Math.PI)+0.10*Math.sin(0.7*_cuda.t+_cuda.wob); u.uPitch=Math.atan(ddr); u.uRoll=0; u.uTilt=PANEL_TILT;
+  u.uDepth[0]=0.983; u.uDepth[1]=0.011;                                              // beyond every fish's slice (those run from 0.97 down)
+  const gr=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(_cuda))))&255)/255;
+  u.uTint[0]=u.uTint[1]=u.uTint[2]=gr; u.uWater=_WATER_RGB; u.uWaterF=_waterF(_cuda); u.uAlpha=1;
+  u.uAmp=0.035; u.uPh=_cuda.ph; u.uK=1.0; u.uLobe=0.6; u.uBendZ=0.15*Math.cos(0.7*_cuda.t+_cuda.wob)*0.7; u.uBendY=0;
+  u.uPecB=0.15; u.uFin=0.35; u.uMouth=0.15; u.uGill=0; u.uGillX=0.22;
+  u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE*_day.s : 0; u.uCausT=_causT; u.uCausScale=_causScale;
+  u.uCausO[0]=_wrap20pi(x*_causScale); u.uCausO[1]=_wrap20pi(y*_causScale);
+  m.zIndex=-1; _cuda.vis=true;                                                       // behind everything in the tank
 }
 function _dayHint(){ return DAY_CYCLE>0 && _day.name ? ' · '+_day.name+(_day.name==='day'?'':' '+Math.round(100*_day.s)+'%') : ''; }
 // draw: pellets in far→near order, each slotted in front of the bodies farther than it (call before every body, then with −∞)
@@ -5167,7 +5320,7 @@ const hx=Math.cos(PANEL_TILT), hy=Math.sin(PANEL_TILT);
 const _ft=b._feeding && b._feedTgt;                        // after food: it wants the pellet itself (its mouth onto it), not the flock's turn-capped wish
 let wX=Math.cos(b._sa), wY=Math.sin(b._sa);
 if(_ft){ const ex=b._feedAimX-b.x, ey=b._feedAimY-b.y, el=Math.hypot(ex,ey); if(el>1e-3){ wX=ex/el; wY=ey/el; } }
-const wR=wX*hx+wY*hy; let wD=-wX*hy+wY*hx;                 // the flock's wish along room-right / room-down
+let wR=wX*hx+wY*hy, wD=-wX*hy+wY*hx;                 // the flock's wish along room-right / room-down
 const sl=_day.sleep;                                        // night: the fish rest (see _dayStep)
 const _RF=_roomFrame(), dp=((b.x-_RF.cx)*_RF.dx+(b.y-_RF.cy)*_RF.dy)/Math.max(1,_RF.extD);   // height in the tank: −1 surface … +1 floor
 if(sl>0.02 && !_ft){                                        // …settling into the lower part of the tank (a third of the way up from the floor)
@@ -5181,6 +5334,11 @@ const tall=Math.max(0,Math.min(1,(_RF.extD/Math.max(1,_RF.extR)-0.6)/0.9));
 if(tall>0 && !_ft && b._homeZ===undefined){
   if((b._lvlT=(b._lvlT||0)-dt)<=0){ b._lvl=-0.8+1.6*Math.random(); b._lvlT=10+Math.random()*15; }
   wD+=tall*(1-sl)*Math.max(-0.8,Math.min(0.8,(b._lvl-dp)*2.5));
+}
+// FEAR of the passing barracuda (see _cudaStep): it flees away from it and dives toward the floor; fades in ~7 s
+if(b._fear>0){
+  const fr=b._fear; b._fear=Math.max(0,fr-dt/7);
+  if(!_ft){ wD+=1.2*fr*Math.max(0,Math.min(1,(0.65-dp)*1.5)); if(fr>0.5*CUDA_FEAR) wR+=0.8*fr*(b._fearR||0); }
 }
 if(b._psi===undefined){                                    // first frame as a fish: start from the current heading
   const c=wR;
@@ -5211,7 +5369,10 @@ if(b._feeding && DEPTH>0){ b._run=false; b._phiT=Math.max(-1.2,Math.min(1.2,Math
 // (its body curls with the turn) and darts off away from the front glass, then calms down over a few seconds
 let st=0;
 if(b._startle>0){ if(b._startleWait>0) b._startleWait-=dt; else { st=b._startle; b._startle=Math.max(0,b._startle-dt/2.5); } }
-if(st>0.3 && b._homeZ===undefined && DEPTH>0 && b.z<DEPTH*0.8) b._phiT=1.1;
+if(st>0.3 && b._homeZ===undefined && DEPTH>0){
+  if(b._fear>0.1){ if(b.z>DEPTH*0.25) b._phiT=-0.9; }           // the barracuda is at the back: away from it, toward the front
+  else if(b.z<DEPTH*0.8) b._phiT=1.1;
+}
 const noise=_mic.noise;                                     // a noisy room: restless (see the rhythm and speed below)
 // angles move like a critically damped spring (ease in AND out) — a plain rate limit starts and stops dead, which reads as mechanical
 const _spring=(x,v,tgt,w)=>{ const a=w*w*(tgt-x)-2*w*v; v+=a*dt; return [x+v*dt, v]; };
@@ -7838,13 +7999,15 @@ document.querySelectorAll('input[type="range"],input[type="number"],input[type="
 const out={ app:'boid-world', v:1, inputs,
   toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, SIDE_VIEW, KOI3D, immigrationEnabled, HUNT_MODE, HUE_LOCK, RIPPLE_STYLE } };
 const fish=_fishPoolRefs(); if(fish) out.fish=fish;
-out.reefSpecies=_reefSpecies();
+out.reefSpecies=_reefSpecies(); out.presetVals=_presetVals; out.tuned=[..._userTuned];
 return out;
 }
 function _applySettings(s){
 if(!s || typeof s!=='object') return;
 if(s.fish && typeof s.fish==='object') _applyFishRefs(s.fish);   // the fish first, so the sliders below act on them
 if(Array.isArray(s.reefSpecies)) _setReefSpecies(s.reefSpecies);
+if(s.presetVals && typeof s.presetVals==='object') Object.assign(_presetVals, s.presetVals);
+if(Array.isArray(s.tuned)) for(const id of s.tuned) _userTuned.add(id);   // which values a preset set (Load koi / Load reef keep the rest)
 if(s.inputs) for(const id in s.inputs){
   const el=document.getElementById(id);
   if(el && (el.type==='range'||el.type==='number'||el.type==='color')){
@@ -8127,6 +8290,7 @@ if(_mic.clap){ _mic.clap=false; if(FEED_N>0) _feedDrop(FEED_N); else _fishStartl
 _foodStep(dt);
 _dayStep(dt);
 _bubbleStep(dt);
+_cudaStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
@@ -8240,7 +8404,7 @@ _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order a
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 _anemFrame();
-_foodFrame(); _bubbleFrame();
+_foodFrame(); _bubbleFrame(); _cudaDraw();
 for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); _bubblePlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
 _foodPlace(-Infinity); _bubblePlace(-Infinity);
@@ -8258,7 +8422,7 @@ if(_bgOverlayMesh && _bgOverlayMesh.visible){
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _cuda.vis || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
@@ -8669,7 +8833,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
