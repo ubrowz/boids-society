@@ -2056,6 +2056,36 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <span id="reefPick" style="display:flex;flex-wrap:wrap;"><button class="sp-chip on" data-sp="clown">clownfish</button><button class="sp-chip on" data-sp="btang">blue tang</button><button class="sp-chip on" data-sp="angel">angelfish</button><button class="sp-chip on" data-sp="gramma">gramma</button><button class="sp-chip on" data-sp="idol">idol</button><button class="sp-chip on" data-sp="trigger">trigger</button></span>
 </div>
 <div class="ctrl-row">
+<label title="Adult size of the clownfish, relative to the size the reef was made for (100% = clownfish size). Young fish grow up to it, and size variety still spreads the adults around it.">size clownfish</label>
+<input type="range" id="spSize_clown" min="40" max="200" value="100" step="5">
+<span class="ctrl-val" id="spSize_clownVal">100%</span>
+</div>
+<div class="ctrl-row">
+<label title="Adult size of the blue tang, relative to the size the reef was made for (100% = clownfish size). Young fish grow up to it, and size variety still spreads the adults around it.">size blue tang</label>
+<input type="range" id="spSize_btang" min="40" max="200" value="120" step="5">
+<span class="ctrl-val" id="spSize_btangVal">120%</span>
+</div>
+<div class="ctrl-row">
+<label title="Adult size of the angelfish, relative to the size the reef was made for (100% = clownfish size). Young fish grow up to it, and size variety still spreads the adults around it.">size angelfish</label>
+<input type="range" id="spSize_angel" min="40" max="200" value="125" step="5">
+<span class="ctrl-val" id="spSize_angelVal">125%</span>
+</div>
+<div class="ctrl-row">
+<label title="Adult size of the gramma, relative to the size the reef was made for (100% = clownfish size). Young fish grow up to it, and size variety still spreads the adults around it.">size gramma</label>
+<input type="range" id="spSize_gramma" min="40" max="200" value="80" step="5">
+<span class="ctrl-val" id="spSize_grammaVal">80%</span>
+</div>
+<div class="ctrl-row">
+<label title="Adult size of the idol, relative to the size the reef was made for (100% = clownfish size). Young fish grow up to it, and size variety still spreads the adults around it.">size idol</label>
+<input type="range" id="spSize_idol" min="40" max="200" value="115" step="5">
+<span class="ctrl-val" id="spSize_idolVal">115%</span>
+</div>
+<div class="ctrl-row">
+<label title="Adult size of the trigger, relative to the size the reef was made for (100% = clownfish size). Young fish grow up to it, and size variety still spreads the adults around it.">size trigger</label>
+<input type="range" id="spSize_trigger" min="40" max="200" value="115" step="5">
+<span class="ctrl-val" id="spSize_triggerVal">115%</span>
+</div>
+<div class="ctrl-row">
 <label title="A bubble-tip anemone on the tank floor, the clownfish's home: a 3D crown of swaying tentacles with rose tips that part around fish that come close. The clownfish stay near it most of the time, hanging in the tentacles, and now and then swim out. Fish can be in front of it, behind it or in among the tentacles. Size relative to an adult fish; 0 = no anemone. Shows in side view only (fish tanks). Load reef sets 100%.">anemone</label>
 <input type="range" id="anemoneSlider" min="0" max="200" value="0" step="5">
 <span class="ctrl-val" id="anemoneVal">off</span>
@@ -2862,6 +2892,7 @@ wire('popCeilSlider',   'popCeilVal',   v=>parseInt(v), v=>parseInt(v)===0?'off'
 wire('spriteLSlider', 'spriteLVal', v=>parseInt(v), v=>v, v=>{ SPRITE_L=v; });
 wire('depthLightSlider','depthLightVal', v=>parseInt(v), v=>parseInt(v)===0?'off':'±'+v, v=>{ DEPTH_LIGHT=v; });
 wire('waterTintSlider','waterTintVal', v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ WATER_TINT=v; });
+for(const sp of ['clown','btang','angel','gramma','idol','trigger']) wire('spSize_'+sp,'spSize_'+sp+'Val', v=>parseInt(v)/100, v=>v+'%', v=>{ _SPECIES_SIZE[sp]=v; });   // per-species adult size (runs only on input, so _SPECIES_SIZE further down is ready)
 wire('sizeVarSlider','sizeVarVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ SIZE_VAR=v; });
 document.getElementById('waterColorInput').addEventListener('input', e=>{
   WATER_HEX=parseInt(e.target.value.slice(1),16); _WATER_RGB[0]=((WATER_HEX>>16)&255)/255; _WATER_RGB[1]=((WATER_HEX>>8)&255)/255; _WATER_RGB[2]=(WATER_HEX&255)/255;
@@ -5122,7 +5153,7 @@ const _SPECIES = {
 };
 // In a tank of several species: how big each grows next to a clownfish (size), and its share of the fish (mix, a
 // weight: births and newcomers wear whichever species is furthest below its share, see _pickLeastUsedImg).
-const _SPECIES_SIZE = { koi:1, clown:1, angel:1.55, btang:1.45, gramma:0.80, idol:1.40, trigger:1.40 };
+const _SPECIES_SIZE = { koi:1, clown:1, angel:1.25, btang:1.20, gramma:0.80, idol:1.15, trigger:1.15 };   // defaults; the size sliders set them
 const _SPECIES_MIX  = { koi:1, clown:3, angel:2, btang:2, gramma:1, idol:1, trigger:1 };   // all six ticked: exactly 10
 const _spOf = b => _SPECIES[b._sp] || _SPECIES.koi;
 function _fishStep(b, dt){
