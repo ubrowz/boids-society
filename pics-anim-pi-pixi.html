@@ -2145,6 +2145,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="raySizeSlider" min="100" max="1000" value="350" step="25">
 <span class="ctrl-val" id="raySizeVal">350%</span>
 </div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>sea turtle</b> (fish tanks, 3D on) —</div>
+<div class="ctrl-row">
+<label title="Now and then a green sea turtle swims by behind the reef: an olive-brown shell of plates with pale seams and a cream belly, a blunt head and long front flippers. It 'flies' with slow, deep strokes of the front flippers, steering with the small back ones, glides between strokes and turns a little toward you so you see its shell. A harmless visitor: the fish don't mind it. The slider sets roughly how many minutes between passes (each wait is random, from half to one and a half times this); 0 = never. Load reef sets 11 min, Load koi off. Needs side view and 3D.">sea turtle</label>
+<input type="range" id="turtleSlider" min="0" max="30" value="0" step="1">
+<span class="ctrl-val" id="turtleVal">off</span>
+<button id="turtleBtn" class="mini-btn" title="Send the sea turtle past now">pass</button>
+</div>
+<div class="ctrl-row">
+<label title="The sea turtle's length (head to the back of the shell), as a share of an adult fish in the tank (it swims at the back, so it looks a little smaller than this).">sea turtle size</label>
+<input type="range" id="turtleSizeSlider" min="100" max="1000" value="350" step="25">
+<span class="ctrl-val" id="turtleSizeVal">350%</span>
+</div>
 <div class="mini-note" style="margin-bottom:2px;">— <b>day and night</b> (fish tanks) —</div>
 <div class="ctrl-row">
 <label title="A day-and-night cycle in the tank: daylight with the shifting water light, a warm dusk, a dim blue moonlit night, a warm dawn. At night the fish rest: they slow down, hover a lot, sink toward the lower part of the tank, and clownfish sleep in their anemone; at dawn they wake up. The slider sets how long one whole day lasts (in minutes; about 55% day, 10% dusk, 25% night, 10% dawn). All the way right = follow the real clock (dawn 6:30–7:30, dusk 20:30–21:30). 0 = always day.">day cycle</label>
@@ -2504,6 +2516,9 @@ let CUDA_FEAR = parseInt(document.getElementById('cudaFearSlider').value)/100;  
 // v = px/s · ph = tail-beat phase · pass = count, so each fish reacts once per pass · vis = drawn this frame
 let RAY_MIN  = parseInt(document.getElementById('raySlider').value);                          // minutes between eagle ray passes (about); 0 = never
 let RAY_SIZE = parseInt(document.getElementById('raySizeSlider').value)/100;                  // eagle ray wingspan ÷ an adult tank fish
+let TURTLE_MIN  = parseInt(document.getElementById('turtleSlider').value);                    // minutes between sea turtle passes (about); 0 = never
+let TURTLE_SIZE = parseInt(document.getElementById('turtleSizeSlider').value)/100;            // sea turtle length ÷ an adult tank fish
+const _turtle = { wait:-1, on:false, r:0, d:0, d0:0, z:0, dir:1, v:0, t:0, T:1, ph:0, amp:0, stroke:1, strokeT:0, wob:0, vis:false, tex:null, mesh:null, g:null };
 const _ray = { wait:-1, on:false, r:0, d:0, d0:0, z:0, dir:1, v:0, t:0, T:1, ph:0, flap:1, flapT:0, wob:0, vis:false, tex:null, mesh:null, g:null };
 const _cuda = { wait:-1, on:false, r:0, d:0, d0:0, z:0, dir:1, v:0, t:0, T:1, ph:0, wob:0, pass:0, vis:false, tex:null };
 // day and night (see _dayStep): s = sunlight 1 day … 0 night · sleep = how much the fish rest · rgb = the light's colour (multiplies the scene)
@@ -2751,7 +2766,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   _presetSlider('waterColorInput', '#008080');                                                        // teal water
   _setSlider('anemoneSlider', 0);                                                                  // no anemone in a koi pond
   _presetSlider('bubbleSlider', 50); _presetSlider('bubbleXSlider', 80);                                 // an airstone at the right end
-  _setSlider('cudaSlider', 0); _setSlider('raySlider', 0);                                         // no barracuda or eagle ray in a koi pond
+  _setSlider('cudaSlider', 0); _setSlider('raySlider', 0); _setSlider('turtleSlider', 0);           // no barracuda, eagle ray or sea turtle in a koi pond
   _fishTankSettings();
   document.getElementById('koiName').textContent=urls.length+' koi'; document.getElementById('reefName').textContent='';
 });
@@ -2773,6 +2788,7 @@ document.getElementById('reefBtn').addEventListener('click', () => {
   _presetSlider('anemoneHomeSlider', 50);                                                             // about half the clownfish at home at a time
   _presetSlider('anemoneYSlider', 20);                                                                // a little above the floor
   _presetSlider('bubbleSlider', 50); _presetSlider('bubbleXSlider', 85);                                 // an airstone away from the anemone
+  _presetSlider('turtleSlider', 11);                                                               // a sea turtle now and then
   _presetSlider('raySlider', 8);                                                                   // and an eagle ray every eight or so
   _presetSlider('cudaSlider', 5);                                                                     // a barracuda goes by every five minutes or so
   _presetSlider('depthLightSlider', 10); _presetSlider('depthHazeSlider', 30);                         // gentle depth cues (tuned on the panel)
@@ -2977,6 +2993,9 @@ wire('cudaSizeSlider','cudaSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ CUDA_S
 wire('cudaFearSlider','cudaFearVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ CUDA_FEAR=v; });
 wire('raySlider','rayVal',             v=>parseInt(v), v=>parseInt(v)===0?'off':v+' min', v=>{ RAY_MIN=v; _ray.wait=-1; });
 wire('raySizeSlider','raySizeVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ RAY_SIZE=v; });
+wire('turtleSlider','turtleVal',       v=>parseInt(v), v=>parseInt(v)===0?'off':v+' min', v=>{ TURTLE_MIN=v; _turtle.wait=-1; });
+wire('turtleSizeSlider','turtleSizeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ TURTLE_SIZE=v; });
+document.getElementById('turtleBtn').addEventListener('click', () => { if(!_turtle.on) _turtle.wait=0; });   // a pass right away
 document.getElementById('rayBtn').addEventListener('click', () => { if(!_ray.on) _ray.wait=0; });     // a pass right away
 document.getElementById('cudaBtn').addEventListener('click', () => { if(!_cuda.on) _cuda.wait=0; });   // a pass right away
 wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
@@ -4454,6 +4473,170 @@ function _bubblePlace(z){
     s.zIndex=_zOrder-0.5;
   }
 }
+// ── the sea turtle ───────────────────────────────────────────────────────────
+// A green sea turtle swims past behind the reef now and then (TURTLE_MIN minutes, ×0.5–1.5), harmless like the ray.
+// Its own model on the tank fish's program, posed on the CPU like the ray: a domed shell (carapace + plastron, the
+// colour map: plates with pale seams / a cream belly), a blunt head on a short neck and four flippers (vertex
+// colours, the fin path: lit from both sides). It "flies": the long front flippers beat down and back in slow, deep
+// strokes, the small back ones paddle to steer; between bouts it glides with the front flippers swept back.
+// Model x forward (nose ~+0.50, back of the shell −0.40), y up, z to its left; banked toward the viewer.
+const _TS_X0=-0.40, _TS_X1=0.30, _TS_NU=16, _TS_NZ=12;
+function _tsW(u){ return 0.27*Math.pow(Math.sin(Math.PI*(0.02+0.96*u)),0.6)*(0.82+0.25*u); }   // shell half-width, u 0 back → 1 front
+function _tsHt(u){ return 0.13*Math.pow(Math.sin(Math.PI*(0.02+0.96*u)),0.8); }              // dome height
+function _tsHb(u){ return 0.045*Math.pow(Math.sin(Math.PI*(0.02+0.96*u)),0.6); }             // plastron depth
+function _turtleBuild(){
+  const pos=[], uv=[], col=[], idx=[], fid=[], base=[], kind=[], root=[], top=[];
+  // kind: 0 shell/head (rigid) · 1 front flipper · 2 back flipper; root: the flipper's shoulder; top: ±1 shell side for the normals
+  const V=(x,y,z,u,v,c,k,rt,tp)=>{ pos.push(x,y,z); uv.push(u,v); col.push(c[0],c[1],c[2],1); fid.push(0); base.push(0,0,0); kind.push(k); root.push(rt[0],rt[1],rt[2]); top.push(tp); return pos.length/3-1; };
+  const O=[0,0,0], W=[1,1,1];
+  // shell: a top and a bottom grid over (u along the body, zf across), meeting at the rim
+  for(const tp of [1,-1]){
+    const g=[];
+    for(let i=0;i<=_TS_NU;i++){ const u=i/_TS_NU, x=_TS_X0+(_TS_X1-_TS_X0)*u, row=[];
+      for(let j=0;j<=_TS_NZ;j++){ const zf=j/_TS_NZ*2-1, z=_tsW(u)*zf, e=1-zf*zf;
+        const y=tp>0 ? _tsHt(u)*Math.pow(e,0.5)+0.004 : -_tsHb(u)*Math.pow(e,0.6);
+        row.push(V(x,y,z, u, (tp>0 ? 0.02 : 0.52)+0.46*(zf+1)/2, W, 0, O, tp)); }
+      g.push(row); }
+    for(let i=0;i<_TS_NU;i++) for(let j=0;j<_TS_NZ;j++){ const a=g[i][j], b=g[i+1][j], c=g[i][j+1], d=g[i+1][j+1]; idx.push(a,b,c, b,d,c); }
+  }
+  // skin colours: a dark olive-brown back with pale scale edges (mottled per vertex), a pale underside
+  let seed=7; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+  const skin=(y,k)=>{ const m=rnd()<0.35 ? 0.35 : 0, up=y>0 ? 1 : 0; const c=up ? [0.30,0.27,0.16] : [0.78,0.74,0.55];
+    return [c[0]+(0.80-c[0])*m*up, c[1]+(0.72-c[1])*m*up, c[2]+(0.48-c[2])*m*up]; };
+  // head + neck: a rounded, blunt-nosed tube from inside the shell's front to the beak
+  { const NR=10, NA=12, g=[];
+    for(let i=0;i<=NR;i++){ const t=i/NR, x=0.22+0.28*t, prof=Math.pow(Math.sin(Math.PI*Math.min(1,0.08+0.92*t)),0.45), ry=0.052*prof*(0.85+0.3*t*(1-t)), rz=0.058*prof, yc=0.012+0.010*t, row=[];
+      for(let a=0;a<=NA;a++){ const an=a/NA*2*Math.PI, y=yc+ry*Math.cos(an), z=rz*Math.sin(an);
+        let c=skin(y-yc,0); if(t>0.70 && t<0.80 && Math.cos(an)>0.25 && Math.abs(Math.sin(an))>0.55) c=[0.03,0.03,0.03];   // the eyes
+        row.push(V(x,y,z,-1,-1,c,0,O,0)); }
+      g.push(row); }
+    for(let i=0;i<NR;i++) for(let a=0;a<NA;a++){ const p=g[i][a], q=g[i+1][a], r=g[i][a+1], s=g[i+1][a+1]; idx.push(p,q,r, q,s,r); }
+  }
+  // flippers: a flat paddle grid from the shoulder, swept back; the front ones long and curved, the back ones short
+  const flipper=(rt,len,ch,sweep,k,curve)=>{
+    const sg=Math.sign(rt[2]), NS=8, NCh=3, g=[], dx=-sweep, dz=sg, dl=Math.hypot(dx,dz), sx=dx/dl, sz=dz/dl;
+    for(let i=0;i<=NS;i++){ const t=i/NS, cw=ch*(1-0.75*t)*Math.pow(Math.sin(Math.PI*Math.min(1,0.25+0.75*t)),0.3), row=[];
+      for(let j=0;j<=NCh;j++){ const s=j/NCh-0.35, x=rt[0]+sx*len*t-curve*t*t+s*cw, z=rt[2]+sz*len*t+s*cw*0.35*sg*0, y=rt[1]-0.01*t;
+        const m=rnd()<0.3 ? 0.4 : 0, c=[0.30+0.45*m,0.27+0.40*m,0.16+0.28*m];
+        row.push(V(x,y,z,-1,-1,(j===NCh||i===NS) ? [0.70,0.64,0.42] : c,k,rt,0)); }
+      g.push(row); }
+    for(let i=0;i<NS;i++) for(let j=0;j<NCh;j++){ const a=g[i][j], b=g[i+1][j], c=g[i][j+1], d=g[i+1][j+1]; idx.push(a,b,c, b,d,c); }
+  };
+  for(const sg of [-1,1]){
+    flipper([0.16,-0.010,sg*0.20], 0.50, 0.15, 0.55, 1, 0.12);
+    flipper([-0.30,-0.012,sg*0.13], 0.17, 0.10, 1.4, 2, 0.0);
+  }
+  return { pos:new Float32Array(pos), rest:new Float32Array(pos), nrm:new Float32Array(pos.length), uv:new Float32Array(uv), col:new Float32Array(col),
+           fid:new Float32Array(fid), base:new Float32Array(base), idx:new Uint16Array(idx), kind:new Int8Array(kind), root:new Float32Array(root), top:new Int8Array(top) };
+}
+function _turtleTexture(){
+  // top half: the carapace in planform (x along, z across): a row of five plates down the middle, four each side,
+  // small ones round the rim; olive to amber plates with pale seams and streaks fanning from each plate's back edge.
+  // Bottom half: the cream plastron with faint seams.
+  const W=256, H=128, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'), im=g.createImageData(W,H);
+  const sm=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
+  const hash=(a,b)=>{ const n=Math.sin(a*127.1+b*311.7)*43758.5453; return n-Math.floor(n); };
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const u=(x+0.5)/W, v=(y+0.5)/H, topSide=v<0.5, zf=Math.max(-1,Math.min(1,((topSide ? v-0.02 : v-0.52)/0.46)*2-1));
+    const w=_tsW(u), az=Math.abs(zf);
+    let r,gg,b;
+    if(topSide){
+      let id, f, seam;                                                   // which plate, position within it (0 back … 1 front), distance to a seam
+      if(az>0.86){ const k=u*11; id=100+Math.floor(k); f=k-Math.floor(k); seam=Math.min(f,1-f,(az-0.86)*2.2); }
+      else if(az<0.34){ const k=u*5; id=Math.floor(k); f=k-Math.floor(k); seam=Math.min(f,1-f,(0.34-az)*1.6); }
+      else { const k=u*4+0.5; id=10+Math.floor(k)+(zf>0?20:0); f=k-Math.floor(k); seam=Math.min(f,1-f,(az-0.34)*1.6,(0.86-az)*1.6); }
+      const hv=hash(id,3), base=[0.36+0.18*hv,0.30+0.10*hv,0.12+0.02*hv];
+      const streak=sm(0.55,0.95,0.5+0.5*Math.sin(zf*w*160+id))*(1-f)*0.5;   // pale streaks fanning forward from the back edge
+      r=base[0]+streak*0.40; gg=base[1]+streak*0.32; b=base[2]+streak*0.15;
+      const sl=1-sm(0.0,0.07,seam); r+=sl*(0.78-r); gg+=sl*(0.70-gg); b+=sl*(0.46-b);        // pale seams
+    } else {
+      r=0.86; gg=0.80; b=0.56;
+      const k=u*5, f=k-Math.floor(k), seam=Math.min(f,1-f,Math.abs(zf)*3); r*=1-0.25*(1-sm(0,0.05,seam)); gg*=1-0.25*(1-sm(0,0.05,seam)); b*=1-0.25*(1-sm(0,0.05,seam));
+    }
+    const i=4*(y*W+x); im.data[i]=255*Math.min(1,r); im.data[i+1]=255*Math.min(1,gg); im.data[i+2]=255*Math.min(1,b); im.data[i+3]=255;
+  }
+  g.putImageData(im,0,0); return PIXI.Texture.from(c);
+}
+// pose: front flippers stroke (theta: + up) with a lag toward the tip and sweep back on the down-stroke; in a glide they
+// are held swept back and a little down. Back flippers paddle slowly. The head nods with the strokes.
+function _turtlePose(G, ph, amp, tt){
+  const P=G.pos, R=G.rest, N=G.nrm, n=P.length/3, A=amp;
+  for(let i=0;i<n;i++){
+    const k=G.kind[i]; let x=R[3*i], y=R[3*i+1], z=R[3*i+2];
+    if(k===0){ if(x>0.30){ const t=(x-0.30)/0.20; y+=0.012*t*Math.sin(ph-0.8); } }   // the head nods
+    else {
+      const rx=G.root[3*i], ry=G.root[3*i+1], rz=G.root[3*i+2], sg=Math.sign(rz);
+      let dx=x-rx, dy=y-ry, dz=z-rz; const sp=Math.min(1,Math.hypot(dx,dz)/(k===1?0.50:0.17));
+      let th, sw;
+      if(k===1){ th=A*0.85*Math.sin(ph-0.7*sp)*(1+0.3*sp)-0.12*(1-A)-0.05; sw=0.45*(1-A)+0.25*A*Math.max(0,-Math.sin(ph-0.4)); }   // glide: swept back
+      else { th=0.25*Math.sin(0.8*tt+(sg>0?0:Math.PI)); sw=0.1*Math.sin(0.5*tt); }
+      const cb=Math.cos(sg*sw), sb=Math.sin(sg*sw), ndx=dx*cb-dz*sb, ndz=dx*sb+dz*cb; dx=ndx; dz=ndz;   // sweep back about the shoulder
+      const out=dz*sg, co=Math.cos(th), so=Math.sin(th), nout=out*co-dy*so, ndy=out*so+dy*co;   // stroke up/down about the body axis
+      x=rx+dx; y=ry+ndy; z=rz+sg*nout;
+    }
+    P[3*i]=x; P[3*i+1]=y; P[3*i+2]=z;
+  }
+  N.fill(0); const I=G.idx;
+  for(let q=0;q<I.length;q+=3){
+    const a=3*I[q], b=3*I[q+1], c=3*I[q+2];
+    const ux=P[b]-P[a], uy=P[b+1]-P[a+1], uz=P[b+2]-P[a+2], vx=P[c]-P[a], vy=P[c+1]-P[a+1], vz=P[c+2]-P[a+2];
+    const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    for(const m of [a,b,c]){ N[m]+=nx; N[m+1]+=ny; N[m+2]+=nz; }
+  }
+  for(let i=0;i<n;i++){ const tp=G.top[i]; let nx=N[3*i], ny=N[3*i+1], nz=N[3*i+2];
+    if(tp!==0){ const ox=0, oy=P[3*i+1]-(tp>0?0:0), oz=P[3*i+2]; if(nx*ox+ny*oy+nz*oz<0 || (tp>0 && ny<0 && Math.abs(oz)<1e-6)){ nx=-nx; ny=-ny; nz=-nz; } }   // the shell's normals point outward
+    const l=Math.hypot(nx,ny,nz)||1; N[3*i]=nx/l; N[3*i+1]=ny/l; N[3*i+2]=nz/l; }
+}
+function _turtleLen(F){ return Math.min((_anem.L>0 ? _anem.L : 4*RADIUS)*TURTLE_SIZE, 2.2*F.extR); }   // head to the back of the shell, px at scale 1
+function _turtleStep(dt){
+  dt=Math.min(Math.max(dt||0,0),0.1);
+  const T=_turtle, can = KOI3D && SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank();
+  if(!can || (TURTLE_MIN<=0 && !T.on && T.wait!==0)){ T.on=false; if(TURTLE_MIN<=0 && T.wait!==0) T.wait=-1; return; }
+  const F=_roomFrame(), L=_turtleLen(F), reach=0.9*L;
+  if(!T.on){
+    if(T.wait<0) T.wait=Math.max(1,TURTLE_MIN)*60*(0.5+Math.random());
+    if((T.wait-=dt)>0) return;
+    T.on=true; T.wait=-1; T.dir=Math.random()<0.5 ? 1 : -1; T.z=DEPTH>0 ? 0.78*DEPTH : 0;
+    T.d0=(-0.45+0.60*Math.random())*F.extD; T.d=T.d0; T.T=16+8*Math.random(); T.t=0; T.wob=Math.random()*6.2832;
+    T.ph=0; T.amp=1; T.stroke=1; T.strokeT=4+3*Math.random(); T.r=-T.dir*(F.extR+reach);
+  }
+  T.t+=dt; T.v=2*(F.extR+reach)/T.T; T.r+=T.dir*T.v*dt;
+  if((T.strokeT-=dt)<=0){ T.stroke=T.stroke ? 0 : 1; T.strokeT=T.stroke ? 4+4*Math.random() : 2+2*Math.random(); }   // bouts of strokes and glides
+  T.amp+=(T.stroke-T.amp)*(1-Math.exp(-dt/0.8));
+  T.ph+=2*Math.PI*0.42*dt*(0.25+0.75*T.amp);
+  T.d=T.d0+0.08*F.extD*Math.sin(2*Math.PI*T.t/T.T*0.6+T.wob)+0.012*F.extD*T.amp*Math.sin(T.ph+1.2);   // drifting, lifted a little by each stroke
+  if(T.dir*T.r > F.extR+reach) T.on=false;
+}
+function _turtleDraw(){
+  const T=_turtle; T.vis=false;
+  if(!T.on) return;
+  if(!_koi3dProg) _koi3dProg=PIXI.Program.from(_KOI3D_VERT,_KOI3D_FRAG);
+  if(!T.mesh){
+    const G=T.g=_turtleBuild(); _turtlePose(G,0,1,0);
+    const geom=new PIXI.Geometry().addAttribute('aPos',G.pos,3).addAttribute('aNorm',G.nrm,3).addAttribute('aUV',G.uv,2).addAttribute('aCol',G.col,4)
+                                  .addAttribute('aFin',G.fid,1).addAttribute('aBase',G.base,3).addIndex(G.idx);
+    T.tex=_turtleTexture();
+    const sh=new PIXI.Shader(_koi3dProg,{ uTex:T.tex, uCenter:new Float32Array(2), uScale:100, uYaw:0, uPitch:0, uRoll:0, uTilt:0,
+      uDepth:new Float32Array([0.9855,0.0030]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_WHITE, uAlpha:1,
+      uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uMouth:0, uGill:0, uGillX:0.29, uTex2:PIXI.Texture.WHITE, uMature:-1, uFW:0, uFWPh:0,
+      uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0 });
+    const m=T.mesh=new PIXI.Mesh(geom, sh); m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
+    _gfx.bodySprites.addChild(m); _koi3dMeshes.push(m);
+  }
+  const G=T.g; _turtlePose(G, T.ph, T.amp, T.t);
+  const geom=T.mesh.geometry; geom.getBuffer('aPos').update(G.pos); geom.getBuffer('aNorm').update(G.nrm);
+  const F=_roomFrame(), zs=zScaleOf(T), u=T.mesh.shader.uniforms;
+  const x=F.cx+F.rx*T.r+F.dx*T.d, y=F.cy+F.ry*T.r+F.dy*T.d;
+  u.uCenter[0]=x; u.uCenter[1]=y; u.uScale=_turtleLen(F)*zs/0.90;      // model length head → back of the shell ≈ 0.90
+  u.uYaw=T.dir>0 ? 0 : Math.PI;
+  u.uRoll=-T.dir*(0.38+0.08*Math.sin(0.4*T.t+T.wob));                   // turned a little toward the viewer: the shell shows
+  u.uPitch=-0.06+0.05*Math.sin(T.ph+0.5)*T.amp; u.uTilt=PANEL_TILT;
+  const gr=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(T))))&255)/255;
+  u.uTint[0]=u.uTint[1]=u.uTint[2]=gr; u.uWater=_WATER_RGB; u.uWaterF=_waterF(T);
+  u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE*_day.s : 0; u.uCausT=_causT; u.uCausScale=_causScale;
+  u.uCausO[0]=_wrap20pi(x*_causScale); u.uCausO[1]=_wrap20pi(y*_causScale);
+  T.mesh.visible=true; T.mesh.zIndex=-1.5; T.vis=true;                    // between the eagle ray and the barracuda
+}
 // ── the eagle ray ────────────────────────────────────────────────────────────
 // A spotted eagle ray flies past behind the reef now and then (RAY_MIN minutes, randomised ×0.5–1.5), like the
 // barracuda but harmless: the fish ignore it. Its own model on the tank fish's program — model x forward, y up, z
@@ -4668,7 +4851,7 @@ function _cudaDraw(){
   u.uTex=_cuda.tex; u.uFinCol=_KOI3D_WHITE; u.uMature=-1; u.uFW=0;
   u.uCenter[0]=x; u.uCenter[1]=y; u.uScale=L;
   u.uYaw=(_cuda.dir>0 ? 0 : Math.PI)+0.10*Math.sin(0.7*_cuda.t+_cuda.wob); u.uPitch=Math.atan(ddr); u.uRoll=0; u.uTilt=PANEL_TILT;
-  u.uDepth[0]=0.980; u.uDepth[1]=0.008;                                              // beyond every fish's slice (those run from 0.97 down); the eagle ray's is farther still
+  u.uDepth[0]=0.977; u.uDepth[1]=0.005;                                              // beyond every fish's slice (those run from 0.97 down); the eagle ray's is farther still
   const gr=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(_cuda))))&255)/255;
   u.uTint[0]=u.uTint[1]=u.uTint[2]=gr; u.uWater=_WATER_RGB; u.uWaterF=_waterF(_cuda); u.uAlpha=1;
   u.uAmp=0.035; u.uPh=_cuda.ph; u.uK=1.0; u.uLobe=0.6; u.uBendZ=0.15*Math.cos(0.7*_cuda.t+_cuda.wob)*0.7; u.uBendY=0;
@@ -8448,6 +8631,7 @@ _dayStep(dt);
 _bubbleStep(dt);
 _cudaStep(dt);
 _rayStep(dt);
+_turtleStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
@@ -8561,7 +8745,7 @@ _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order a
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 _anemFrame();
-_foodFrame(); _bubbleFrame(); _cudaDraw(); _rayDraw();
+_foodFrame(); _bubbleFrame(); _cudaDraw(); _rayDraw(); _turtleDraw();
 for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); _bubblePlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
 _foodPlace(-Infinity); _bubblePlace(-Infinity);
@@ -8579,7 +8763,7 @@ if(_bgOverlayMesh && _bgOverlayMesh.visible){
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _cuda.vis || _ray.vis || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _cuda.vis || _ray.vis || _turtle.vis || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
@@ -8990,7 +9174,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn','rayBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn','rayBtn','turtleBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
