@@ -2068,6 +2068,17 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="anemoneYSlider" min="0" max="100" value="0" step="1">
 <span class="ctrl-val" id="anemoneYVal">0%</span>
 </div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>bubbles</b> (fish tanks) —</div>
+<div class="ctrl-row">
+<label title="An airstone on the tank floor sends up a stream of air bubbles, in uneven pulses: small round ones that rise fairly straight with a slight zigzag, and bigger flattened ones that wobble and rock as they go. They speed up and swell a little on the way up and pop at the surface. Each bubble is clear with a bright rim and a highlight, so it adds light to the water instead of covering it. The stream sits at a fixed depth behind the middle of the tank, so fish swim in front of and behind it. The slider sets how much air: 0 = off.">bubbles</label>
+<input type="range" id="bubbleSlider" min="0" max="100" value="0" step="5">
+<span class="ctrl-val" id="bubbleVal">off</span>
+</div>
+<div class="ctrl-row">
+<label title="Where the airstone sits from left to right: 0% = the left end, 100% = the right end (as the room sees it, panel tilt included).">bubbles place x</label>
+<input type="range" id="bubbleXSlider" min="0" max="100" value="80" step="1">
+<span class="ctrl-val" id="bubbleXVal">80%</span>
+</div>
 <div class="mini-note" style="margin-bottom:2px;">— <b>day and night</b> (fish tanks) —</div>
 <div class="ctrl-row">
 <label title="A day-and-night cycle in the tank: daylight with the shifting water light, a warm dusk, a dim blue moonlit night, a warm dawn. At night the fish rest: they slow down, hover a lot, sink toward the lower part of the tank, and clownfish sleep in their anemone; at dawn they wake up. The slider sets how long one whole day lasts (in minutes; about 55% day, 10% dusk, 25% night, 10% dawn). All the way right = follow the real clock (dawn 6:30–7:30, dusk 20:30–21:30). 0 = always day.">day cycle</label>
@@ -2418,6 +2429,8 @@ let MIC_ROOM = parseInt(document.getElementById('micRoomSlider').value)/100;    
 let FEED_N = parseInt(document.getElementById('feedSlider').value);                           // pellets a clap drops (feeding time); 0 = a clap startles instead
 let DAY_CYCLE = parseInt(document.getElementById('dayCycleSlider').value);                    // minutes per day-and-night; 0 = always day; 61 = the real clock
 let NIGHT_LIGHT = parseInt(document.getElementById('nightLightSlider').value)/100;            // brightness at night, share of daylight
+let BUBBLES = parseInt(document.getElementById('bubbleSlider').value)/100;                    // how much air the airstone gives; 0 = off
+let BUBBLE_X = parseInt(document.getElementById('bubbleXSlider').value)/100;                  // airstone position, left → right
 // day and night (see _dayStep): s = sunlight 1 day … 0 night · sleep = how much the fish rest · rgb = the light's colour (multiplies the scene)
 const _day = { s:1, sleep:0, warm:0, rgb:[1,1,1], name:'' };
 // microphone (see _micPoll): level / room level in % · clap waiting for the next frame · noise 0..1 (room loudness × MIC_ROOM)
@@ -2649,6 +2662,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   _setSlider('waterTintSlider', 50); _setSlider('sizeVarSlider', 60);                              // far koi sink into the water; a pond of different sizes
   _setSlider('waterColorInput', '#008080');                                                        // teal water
   _setSlider('anemoneSlider', 0);                                                                  // no anemone in a koi pond
+  _setSlider('bubbleSlider', 50); _setSlider('bubbleXSlider', 80);                                 // an airstone at the right end
   _fishTankSettings();
   document.getElementById('koiName').textContent=urls.length+' koi'; document.getElementById('reefName').textContent='';
 });
@@ -2663,6 +2677,7 @@ document.getElementById('reefBtn').addEventListener('click', () => {
   _setSlider('anemoneSlider', 100);                                                                // their bubble-tip anemone on the floor
   _setSlider('anemoneHomeSlider', 40);                                                             // about four of ten at home at a time
   _setSlider('anemoneYSlider', 20);                                                                // a little above the floor
+  _setSlider('bubbleSlider', 50); _setSlider('bubbleXSlider', 85);                                 // an airstone away from the anemone
   _setSlider('depthLightSlider', 10); _setSlider('depthHazeSlider', 30);                         // gentle depth cues (tuned on the panel)
   _setSlider('shadeSlider', 60); _setSlider('waveSlider', 2.7);                                  // water light on the fish: stronger, finer pattern
   _fishTankSettings();
@@ -2857,6 +2872,8 @@ wire('micClapSlider','micClapVal',     v=>parseInt(v), v=>parseInt(v)===0?'off':
 wire('micRoomSlider','micRoomVal',     v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ MIC_ROOM=v; _micApply(); });
 wire('dayCycleSlider','dayCycleVal',   v=>parseInt(v), v=>{ v=parseInt(v); return v===0 ? 'off' : v>=61 ? 'clock' : v+' min'; }, v=>{ DAY_CYCLE=v; });
 wire('nightLightSlider','nightLightVal', v=>parseInt(v)/100, v=>v+'%', v=>{ NIGHT_LIGHT=v; });
+wire('bubbleSlider','bubbleVal',       v=>parseInt(v)/100, v=>parseInt(v)===0?'off':v+'%', v=>{ BUBBLES=v; });
+wire('bubbleXSlider','bubbleXVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ BUBBLE_X=v; });
 wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
 document.getElementById('feedBtn').addEventListener('click', () => _feedDrop(FEED_N>0 ? FEED_N : 8));   // the slider's pinch (8 when it is off)
 document.getElementById('koi3dBtn').addEventListener('click', function(){
@@ -4070,6 +4087,97 @@ function _dayStep(dt){
   if(_day.rgb[0]<0.995 || _day.rgb[1]<0.995 || _day.rgb[2]<0.995){
     const c=(Math.round(255*_day.rgb[0])<<16)|(Math.round(255*_day.rgb[1])<<8)|Math.round(255*_day.rgb[2]);
     g.beginFill(c); g.drawRect(0,0,canvas.width,canvas.height); g.endFill();
+  }
+}
+// ── air bubbles ──────────────────────────────────────────────────────────────
+// An airstone on the floor at BUBBLE_X sends up bubbles in uneven pulses. Real bubbles: small ones (< ~2 mm) stay
+// round and rise fairly straight with a slight zigzag; bigger ones are flattened, wobble in shape and rock side to
+// side as they rise in a zigzag. They speed up to their rise speed in a fraction of a second, swell a little as the
+// pressure drops, and pop at the surface. Drawn ADDITIVELY from a texture that is clear in the middle with a bright
+// rim and a highlight on top (light from above, in the room), so a bubble adds light to the water instead of being a
+// white ball; depth-dimmed and water-tinted like everything else, and dimmed with the night by the light quad.
+// Room frame (r along room right, d down from the centre, z depth), sized by the fish (_anem.L, adult fish length).
+const BUB_MAX = 140;
+const _bubs = [], _bubSprites = [];
+let _bubTex = null, _bubOrder = [], _bubNext = 0, _bubPulse = 0, _bubPulseT = 0, _bubT = 0, _bubSw = Math.random()*6.2832;
+function _bubbleStep(dt){
+  dt=Math.min(Math.max(dt||0,0),0.1);
+  const on = BUBBLES>0 && SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank();
+  const F=_roomFrame(), L=_anem.L>0 ? _anem.L : 4*RADIUS, top=-F.extD;
+  if(on){
+    // the airstone pulses: a few seconds of strong flow, then weaker; a burst of big ones now and then
+    if((_bubPulseT-=dt)<=0){ _bubPulse=0.4+Math.random()*1.0; _bubPulseT=0.8+Math.random()*2.5; }
+    let n=(4+22*BUBBLES)*_bubPulse*dt;                              // bubbles this frame (expected)
+    while(n>0 && _bubs.length<BUB_MAX){
+      if(n<1 && Math.random()>n) break; n-=1;
+      const big=Math.random()<0.22, r0=L*(big ? 0.035+0.035*Math.random() : 0.010+0.016*Math.random());
+      const ar=(BUBBLE_X*2-1)*Math.max(0, F.extR-0.5*L);
+      _bubs.push({ r:ar+(Math.random()-0.5)*0.08*L, d:F.extD+r0, z:DEPTH>0 ? DEPTH*(0.68+0.06*(Math.random()-0.5)) : 0,
+                   r0, big, v:0, vt:(big ? 0.80 : 0.52+0.12*Math.random())*F.extD*(0.9+0.2*Math.random()),   // px/s: up the tank in ~2.5 s (big) to ~3.5 s (small) — bubbles are quick
+                   ph:Math.random()*6.2832, f:big ? 2.2+Math.random()*1.0 : 1.2+Math.random()*1.2, sw:Math.random()*6.2832, pop:-1,
+                   zp:Math.random()*6.2832, zf:big ? 0.8+0.4*Math.random() : 0.7+0.6*Math.random(),
+                   x:0, y:0, sx:1, sy:1, rot:0, rad:r0 });
+    }
+  }
+  // the stream swirls: a slow meander travels up the column and widens with height, so the whole plume sways like a
+  // real one stirred by the water; the bubbles ride it (tilt ≤ ~0.35 of the rise, slow in time)
+  _bubT+=dt; const swA=0.16*F.extD, swK=2.4/Math.max(1,F.extD), swW=0.45, swT=_bubT*swW+_bubSw;
+  const swAmp=1+0.35*Math.sin(0.13*_bubT+2*_bubSw);                               // the meander grows and fades over minutes
+  for(let i=_bubs.length-1; i>=0; i--){
+    const b=_bubs[i];
+    if(b.pop>=0){ b.pop+=dt; if(b.pop>0.14){ _bubs.splice(i,1); } continue; }   // popping at the surface
+    b.v+=(b.vt-b.v)*(1-Math.exp(-dt/0.25));                                         // up to rise speed in a fraction of a second
+    b.d-=b.v*dt; b.ph+=6.2832*b.f*dt; b.zp+=6.2832*b.zf*dt;
+    const up=Math.max(0,Math.min(1,(F.extD-b.d)/(2*F.extD)));                    // 0 at the floor → 1 at the surface
+    b.rad=b.r0*(1+0.18*up);                                                        // swells as the pressure drops
+    const zig=(b.big ? 0.55 : 0.3)*b.rad*Math.sin(b.zp);                          // zigzag, slow and gentle (~1 Hz) so the
+                                                                                    // sideways speed stays well below the rise
+    const sway=swA*swAmp*Math.pow(up,1.3)*Math.sin(swK*b.d+swT);                  // riding the swirling plume
+    b.r+=0.02*L*Math.sin(b.sw+0.7*b.ph/b.f)*dt;                                   // and a slow drift
+    if(b.big){ const w=0.16*Math.sin(2*b.ph+1.0); b.sx=1.22+w; b.sy=0.82-w; b.rot=0.25*Math.cos(b.zp); }   // flattened, wobbling, rocking with the zigzag
+    else { b.sx=b.sy=1; b.rot=0; }
+    if(b.d<=top+b.rad){ b.d=top+b.rad; b.pop=0; }                                  // reached the surface
+    const rr=b.r+zig+sway;
+    b.x=F.cx+F.rx*rr+F.dx*b.d; b.y=F.cy+F.ry*rr+F.dy*b.d;
+  }
+  if(!on && !_bubs.length){ _bubPulseT=0; }
+}
+function _bubbleFrame(){
+  for(const s of _bubSprites) s.visible=false;
+  _bubOrder.length=0; _bubNext=0;
+  if(!_bubs.length) return;
+  if(!_bubTex){
+    // 64 px: a faint clear body, a bright rim (light caught at the edge), a highlight up-left, a faint one low-right
+    const N=64, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d'), R=N/2-1;
+    const rim=g.createRadialGradient(N/2,N/2,0,N/2,N/2,R);
+    rim.addColorStop(0,'rgba(255,255,255,0.06)'); rim.addColorStop(0.62,'rgba(255,255,255,0.10)'); rim.addColorStop(0.84,'rgba(255,255,255,0.55)');
+    rim.addColorStop(0.94,'rgba(255,255,255,0.95)'); rim.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=rim; g.beginPath(); g.arc(N/2,N/2,R,0,6.2832); g.fill();
+    const hl=g.createRadialGradient(N*0.36,N*0.32,0,N*0.36,N*0.32,R*0.30);
+    hl.addColorStop(0,'rgba(255,255,255,1)'); hl.addColorStop(0.5,'rgba(255,255,255,0.7)'); hl.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=hl; g.beginPath(); g.arc(N*0.36,N*0.32,R*0.30,0,6.2832); g.fill();
+    const h2=g.createRadialGradient(N*0.64,N*0.70,0,N*0.64,N*0.70,R*0.22);
+    h2.addColorStop(0,'rgba(255,255,255,0.35)'); h2.addColorStop(1,'rgba(255,255,255,0)');
+    g.fillStyle=h2; g.beginPath(); g.arc(N*0.64,N*0.70,R*0.22,0,6.2832); g.fill();
+    _bubTex=PIXI.Texture.from(c);
+  }
+  for(const b of _bubs) _bubOrder.push(b);
+  _bubOrder.sort((a,b)=>b.z-a.z);
+}
+function _bubblePlace(z){
+  while(_bubNext<_bubOrder.length && !(_bubOrder[_bubNext].z<z)){
+    const b=_bubOrder[_bubNext], i=_bubNext++;
+    if(i>=_bubSprites.length){ const s=new PIXI.Sprite(_bubTex); s.anchor.set(0.5,0.5); s.blendMode=PIXI.BLEND_MODES.ADD; _gfx.bodySprites.addChild(s); _bubSprites.push(s); }
+    const s=_bubSprites[i], zs=zScaleOf(b), dia=Math.max(1.2, 2*b.rad*zs);
+    const pk = b.pop>=0 ? b.pop/0.14 : 0;                                          // pop: a quick swell and flash, then gone
+    s.visible=true; s.x=b.x; s.y=b.y; s.rotation=PANEL_TILT+b.rot;                 // the highlight stays on the room's top
+    s.scale.set(dia/64*b.sx*(1+0.6*pk), dia/64*b.sy*(1+0.6*pk));
+    const g=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(b))))&255)/255, wf=_waterF(b);
+    const k=g*(1-0.5*wf)*(b.big ? 0.95 : 0.8);                                     // small ones a little fainter
+    const cr=k*(1+(_WATER_RGB[0]-1)*wf), cg=k*(1+(_WATER_RGB[1]-1)*wf), cb=k*(1+(_WATER_RGB[2]-1)*wf);
+    s.tint=(Math.round(255*Math.min(1,cr))<<16)|(Math.round(255*Math.min(1,cg))<<8)|Math.round(255*Math.min(1,cb));
+    s.alpha = pk>0 ? (pk<0.4 ? 1 : 1-(pk-0.4)/0.6) : Math.min(1, b.v/(0.3*b.vt)+0.3);   // fades in as it leaves the stone
+    s.zIndex=_zOrder-0.5;
   }
 }
 function _dayHint(){ return DAY_CYCLE>0 && _day.name ? ' · '+_day.name+(_day.name==='day'?'':' '+Math.round(100*_day.s)+'%') : ''; }
@@ -7743,6 +7851,7 @@ updatePredators(dt);
 if(_mic.clap){ _mic.clap=false; if(FEED_N>0) _feedDrop(FEED_N); else _fishStartleAll(); }   // a clap on the microphone: feeding time, or every fish startles
 _foodStep(dt);
 _dayStep(dt);
+_bubbleStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
@@ -7856,10 +7965,10 @@ _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order a
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 _anemFrame();
-_foodFrame();
-for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
+_foodFrame(); _bubbleFrame();
+for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); _bubblePlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
-_foodPlace(-Infinity);
+_foodPlace(-Infinity); _bubblePlace(-Infinity);
 // overlay image sits at a mid-depth (BG_OVERLAY_DEPTH·DEPTH). _drawList is far→first, and each drawn
 // body took zIndex = its position in that order, so count the bodies farther than the overlay and
 // slot it in between. DEPTH<=0 → no meaningful z, put it behind every body.
@@ -7874,7 +7983,7 @@ if(_bgOverlayMesh && _bgOverlayMesh.visible){
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _anem.on || _foodOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
