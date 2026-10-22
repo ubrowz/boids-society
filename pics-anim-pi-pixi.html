@@ -2133,6 +2133,18 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 <input type="range" id="cudaFearSlider" min="0" max="100" value="60" step="5">
 <span class="ctrl-val" id="cudaFearVal">60%</span>
 </div>
+<div class="mini-note" style="margin-bottom:2px;">— <b>eagle ray</b> (fish tanks, 3D on) —</div>
+<div class="ctrl-row">
+<label title="Now and then a spotted eagle ray flies by behind the reef: a dark diamond covered in white spots, with a white belly, a duck-bill snout and a long thin tail. It beats its wings slowly in a wave from body to tip, glides between bursts of beats and banks a little toward you, so you see its back. It is a visitor, not one of the tank's fish, and harmless: the fish don't mind it. The slider sets roughly how many minutes between passes (each wait is random, from half to one and a half times this); 0 = never. Load reef sets 8 min, Load koi off. Needs side view and 3D.">eagle ray</label>
+<input type="range" id="raySlider" min="0" max="30" value="0" step="1">
+<span class="ctrl-val" id="rayVal">off</span>
+<button id="rayBtn" class="mini-btn" title="Send the eagle ray past now">pass</button>
+</div>
+<div class="ctrl-row">
+<label title="The eagle ray's wingspan, as a share of an adult fish in the tank (it swims at the back, so it looks a little smaller than this).">eagle ray size</label>
+<input type="range" id="raySizeSlider" min="100" max="1000" value="350" step="25">
+<span class="ctrl-val" id="raySizeVal">350%</span>
+</div>
 <div class="mini-note" style="margin-bottom:2px;">— <b>day and night</b> (fish tanks) —</div>
 <div class="ctrl-row">
 <label title="A day-and-night cycle in the tank: daylight with the shifting water light, a warm dusk, a dim blue moonlit night, a warm dawn. At night the fish rest: they slow down, hover a lot, sink toward the lower part of the tank, and clownfish sleep in their anemone; at dawn they wake up. The slider sets how long one whole day lasts (in minutes; about 55% day, 10% dusk, 25% night, 10% dawn). All the way right = follow the real clock (dawn 6:30–7:30, dusk 20:30–21:30). 0 = always day.">day cycle</label>
@@ -2490,6 +2502,9 @@ let CUDA_SIZE = parseInt(document.getElementById('cudaSizeSlider').value)/100;  
 let CUDA_FEAR = parseInt(document.getElementById('cudaFearSlider').value)/100;                // how strongly the fish react to it
 // the barracuda (see _cudaStep): wait = s until the next pass · on = passing · r,d = body centre in the room frame · dir ±1 ·
 // v = px/s · ph = tail-beat phase · pass = count, so each fish reacts once per pass · vis = drawn this frame
+let RAY_MIN  = parseInt(document.getElementById('raySlider').value);                          // minutes between eagle ray passes (about); 0 = never
+let RAY_SIZE = parseInt(document.getElementById('raySizeSlider').value)/100;                  // eagle ray wingspan ÷ an adult tank fish
+const _ray = { wait:-1, on:false, r:0, d:0, d0:0, z:0, dir:1, v:0, t:0, T:1, ph:0, flap:1, flapT:0, wob:0, vis:false, tex:null, mesh:null, g:null };
 const _cuda = { wait:-1, on:false, r:0, d:0, d0:0, z:0, dir:1, v:0, t:0, T:1, ph:0, wob:0, pass:0, vis:false, tex:null };
 // day and night (see _dayStep): s = sunlight 1 day … 0 night · sleep = how much the fish rest · rgb = the light's colour (multiplies the scene)
 const _day = { s:1, sleep:0, warm:0, rgb:[1,1,1], name:'' };
@@ -2736,7 +2751,7 @@ document.getElementById('koiBtn').addEventListener('click', () => {
   _presetSlider('waterColorInput', '#008080');                                                        // teal water
   _setSlider('anemoneSlider', 0);                                                                  // no anemone in a koi pond
   _presetSlider('bubbleSlider', 50); _presetSlider('bubbleXSlider', 80);                                 // an airstone at the right end
-  _setSlider('cudaSlider', 0);                                                                     // no barracuda in a koi pond
+  _setSlider('cudaSlider', 0); _setSlider('raySlider', 0);                                         // no barracuda or eagle ray in a koi pond
   _fishTankSettings();
   document.getElementById('koiName').textContent=urls.length+' koi'; document.getElementById('reefName').textContent='';
 });
@@ -2758,6 +2773,7 @@ document.getElementById('reefBtn').addEventListener('click', () => {
   _presetSlider('anemoneHomeSlider', 50);                                                             // about half the clownfish at home at a time
   _presetSlider('anemoneYSlider', 20);                                                                // a little above the floor
   _presetSlider('bubbleSlider', 50); _presetSlider('bubbleXSlider', 85);                                 // an airstone away from the anemone
+  _presetSlider('raySlider', 8);                                                                   // and an eagle ray every eight or so
   _presetSlider('cudaSlider', 5);                                                                     // a barracuda goes by every five minutes or so
   _presetSlider('depthLightSlider', 10); _presetSlider('depthHazeSlider', 30);                         // gentle depth cues (tuned on the panel)
   _presetSlider('shadeSlider', 60); _presetSlider('waveSlider', 2.7);                                  // water light on the fish: stronger, finer pattern
@@ -2959,6 +2975,9 @@ wire('bubbleXSlider','bubbleXVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ BUBBLE
 wire('cudaSlider','cudaVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v+' min', v=>{ CUDA_MIN=v; _cuda.wait=-1; });   // new timing: pick a fresh wait
 wire('cudaSizeSlider','cudaSizeVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ CUDA_SIZE=v; });
 wire('cudaFearSlider','cudaFearVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ CUDA_FEAR=v; });
+wire('raySlider','rayVal',             v=>parseInt(v), v=>parseInt(v)===0?'off':v+' min', v=>{ RAY_MIN=v; _ray.wait=-1; });
+wire('raySizeSlider','raySizeVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ RAY_SIZE=v; });
+document.getElementById('rayBtn').addEventListener('click', () => { if(!_ray.on) _ray.wait=0; });     // a pass right away
 document.getElementById('cudaBtn').addEventListener('click', () => { if(!_cuda.on) _cuda.wait=0; });   // a pass right away
 wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
 document.getElementById('feedBtn').addEventListener('click', () => _feedDrop(FEED_N>0 ? FEED_N : 8));   // the slider's pinch (8 when it is off)
@@ -4435,6 +4454,143 @@ function _bubblePlace(z){
     s.zIndex=_zOrder-0.5;
   }
 }
+// ── the eagle ray ────────────────────────────────────────────────────────────
+// A spotted eagle ray flies past behind the reef now and then (RAY_MIN minutes, randomised ×0.5–1.5), like the
+// barracuda but harmless: the fish ignore it. Its own model on the tank fish's program — model x forward, y up, z
+// across the wings: a thin diamond disc (top and belly surfaces), a duck-bill snout and a long whip tail. The wings
+// beat on the CPU (a wave running out to the tips, a few beats then a glide), rewriting ~1.5k vertices a frame. It
+// banks toward the viewer (uRoll) so the spotted back shows; seen edge-on a ray is only a line.
+const _RAY_S=0.85, _RAY_NS=16, _RAY_NC=10, _RAY_NT=18;           // half-span; grid stations per wing, along the chord; tail segments
+function _rayLE(s){ return 0.28-0.53*Math.pow(s,1.25)+0.14*Math.exp(-Math.pow(s/0.08,2)); }   // leading edge (with the snout), s = |z|/half-span
+function _rayTE(s){ return -0.33+0.08*s+0.12*Math.sin(Math.PI*s); }                             // trailing edge, curving forward mid-wing
+function _rayBuild(){
+  // rest shape + the per-vertex wing weight; positions and normals are rewritten every frame by _rayPose
+  const pos=[], uv=[], col=[], idx=[], fid=[], base=[], sArr=[], top=[];
+  const V=(x,y,z,u,v,s,tp)=>{ pos.push(x,y,z); uv.push(u,v); col.push(1,1,1,1); fid.push(0); base.push(0,0,0); sArr.push(s); top.push(tp); return pos.length/3-1; };
+  const NZ=2*_RAY_NS+1;
+  for(const tp of [1,-1]){
+    const g=[];
+    for(let i=0;i<NZ;i++){ const zf=i/(NZ-1)*2-1, z=zf*_RAY_S, s=Math.abs(zf), row=[];
+      for(let j=0;j<=_RAY_NC;j++){ const c=j/_RAY_NC, le=_rayLE(s), te=_rayTE(s), x=le+(te-le)*c;
+        const th=(0.075*Math.pow(1-s,1.6)+0.004)*Math.pow(Math.sin(Math.PI*Math.min(1,0.04+0.96*c)),0.6);
+        row.push(V(x, tp>0 ? th : -0.55*th, z, (zf+1)/2, tp>0 ? 0.02+0.46*c : 0.52+0.46*c, s, tp)); }
+      g.push(row); }
+    for(let i=0;i<NZ-1;i++) for(let j=0;j<_RAY_NC;j++){ const a=g[i][j], b=g[i+1][j], c=g[i][j+1], d=g[i+1][j+1];
+      if(tp>0){ idx.push(a,c,b, b,c,d); } else { idx.push(a,b,c, b,d,c); } }
+  }
+  // tail: a thin whip from the back of the body, two crossed ribbons (dark, the texture's plain corner)
+  const t0=_rayTE(0), TL=1.30;
+  for(const k of [0,1]){
+    const g=[];
+    for(let i=0;i<=_RAY_NT;i++){ const f=i/_RAY_NT, x=t0+0.02-TL*f, w=0.016*(1-0.85*f);
+      g.push([V(x, k?w:0, k?0:w, 0.005, 0.03, -f, 1), V(x, k?-w:0, k?0:-w, 0.005, 0.03, -f, 1)]); }
+    for(let i=0;i<_RAY_NT;i++){ const [a,b]=g[i], [c,d]=g[i+1]; idx.push(a,c,b, b,c,d); }
+  }
+  return { pos:new Float32Array(pos), rest:new Float32Array(pos), nrm:new Float32Array(pos.length), uv:new Float32Array(uv), col:new Float32Array(col),
+           fid:new Float32Array(fid), base:new Float32Array(base), idx:new Uint16Array(idx), s:new Float32Array(sArr), top:new Int8Array(top) };
+}
+function _rayTexture(){
+  // top half (v < 0.5): the back, u across the span, v along the chord — near-black navy with white spots that are
+  // round in the model (computed in planform x,z); a paler rim. Bottom half: the white belly with a grey margin.
+  const W=256, H=128, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'), im=g.createImageData(W,H);
+  const sm=(a,b,x)=>{ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); };
+  const SP=0.12, hash=(a,b)=>{ const n=Math.sin(a*127.1+b*311.7)*43758.5453; return n-Math.floor(n); };
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const u=(x+0.5)/W, v=(y+0.5)/H, topSide=v<0.5, cc=Math.max(0,Math.min(1,topSide ? (v-0.02)/0.46 : (v-0.52)/0.46));
+    const zf=u*2-1, s=Math.abs(zf), z=zf*_RAY_S, le=_rayLE(s), te=_rayTE(s), px=le+(te-le)*cc;
+    const edge=Math.min(cc,1-cc)*Math.max(0.02,le-te), rim=1-sm(0.0,0.035,edge)*sm(0.98,0.90,s);
+    let r,gg,b;
+    if(topSide){
+      r=0.07; gg=0.09; b=0.15;
+      const gx=Math.floor(px/SP), gz=Math.floor(z/SP);                   // a jittered grid of spots, each cell one spot
+      for(let ax=gx-1;ax<=gx+1;ax++) for(let az=gz-1;az<=gz+1;az++){
+        const sx=(ax+0.2+0.6*hash(ax,az))*SP, sz=(az+0.2+0.6*hash(az,ax+7))*SP, rr=0.022+0.014*hash(ax+3,az+5);
+        const d=Math.hypot(px-sx, z-sz); if(d<rr){ const k=1-sm(rr*0.6,rr,d); r+=k*(0.90-r); gg+=k*(0.92-gg); b+=k*(0.94-b); }
+      }
+      if(u<0.02 && v<0.06){ r=0.06; gg=0.07; b=0.10; }                   // the plain corner the tail samples
+      r+=0.12*rim; gg+=0.12*rim; b+=0.14*rim;
+    } else { r=0.88-0.35*rim; gg=0.90-0.35*rim; b=0.90-0.30*rim; }
+    const i=4*(y*W+x); im.data[i]=255*Math.min(1,r); im.data[i+1]=255*Math.min(1,gg); im.data[i+2]=255*Math.min(1,b); im.data[i+3]=255;
+  }
+  g.putImageData(im,0,0); return PIXI.Texture.from(c);
+}
+// the wings at phase ph and stroke amplitude amp (model units at the tip): a bending wave that runs out to the tips
+// and back along the chord; the tail trails with a slow wave. Normals from the triangles, oriented outward.
+function _rayPose(G, ph, amp, tt){
+  const P=G.pos, R=G.rest, N=G.nrm, n=P.length/3;
+  for(let i=0;i<n;i++){
+    const s=G.s[i], x=R[3*i], y=R[3*i+1], z=R[3*i+2];
+    let dy=0, dx=0;
+    if(s>=0){ const w=Math.pow(s,1.5); dy=amp*w*Math.sin(ph-2.0*s-1.5*(0.2-x)); dx=-0.05*amp*w*Math.abs(Math.sin(ph-2.0*s)); }
+    else { const f=-s; dy=0.06*f*f*Math.sin(tt*2.2-5*f); }
+    P[3*i]=x+dx; P[3*i+1]=y+dy; P[3*i+2]=z*(1-0.10*Math.abs(dy)/Math.max(0.2,_RAY_S));   // a raised tip comes in a little
+  }
+  N.fill(0);
+  const I=G.idx;
+  for(let k=0;k<I.length;k+=3){
+    const a=3*I[k], b=3*I[k+1], c=3*I[k+2];
+    const ux=P[b]-P[a], uy=P[b+1]-P[a+1], uz=P[b+2]-P[a+2], vx=P[c]-P[a], vy=P[c+1]-P[a+1], vz=P[c+2]-P[a+2];
+    const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    for(const q of [a,b,c]){ N[q]+=nx; N[q+1]+=ny; N[q+2]+=nz; }
+  }
+  for(let i=0;i<n;i++){ const tp=G.top[i]; let nx=N[3*i], ny=N[3*i+1], nz=N[3*i+2];
+    if(ny*tp<0){ nx=-nx; ny=-ny; nz=-nz; }                              // the back faces up, the belly down
+    const l=Math.hypot(nx,ny,nz)||1; N[3*i]=nx/l; N[3*i+1]=ny/l; N[3*i+2]=nz/l; }
+}
+function _raySpan(F){ return Math.min((_anem.L>0 ? _anem.L : 4*RADIUS)*RAY_SIZE, 2.2*F.extR); }   // wingspan, px at scale 1
+function _rayStep(dt){
+  dt=Math.min(Math.max(dt||0,0),0.1);
+  const can = KOI3D && SIDE_VIEW && !UPRIGHT_SPRITE && _photoTank();
+  if(!can || (RAY_MIN<=0 && !_ray.on && _ray.wait!==0)){ _ray.on=false; if(RAY_MIN<=0 && _ray.wait!==0) _ray.wait=-1; return; }
+  const F=_roomFrame(), L=_raySpan(F), reach=0.9*L;                      // the tail's tip is ~0.9 wingspans behind the centre
+  if(!_ray.on){
+    if(_ray.wait<0) _ray.wait=Math.max(1,RAY_MIN)*60*(0.5+Math.random());
+    if((_ray.wait-=dt)>0) return;
+    _ray.on=true; _ray.wait=-1;
+    _ray.dir=Math.random()<0.5 ? 1 : -1; _ray.z=DEPTH>0 ? 0.80*DEPTH : 0;
+    _ray.d0=(-0.45+0.55*Math.random())*F.extD; _ray.d=_ray.d0;
+    _ray.T=14+6*Math.random(); _ray.t=0; _ray.wob=Math.random()*6.2832; _ray.ph=0; _ray.flap=1; _ray.flapT=2+2*Math.random();
+    _ray.r=-_ray.dir*(F.extR+reach);
+  }
+  _ray.t+=dt; _ray.v=2*(F.extR+reach)/_ray.T; _ray.r+=_ray.dir*_ray.v*dt;
+  _ray.d=_ray.d0+0.10*F.extD*Math.sin(2*Math.PI*_ray.t/_ray.T*0.7+_ray.wob);
+  // a few slow beats, then a glide with the wings held level, then beats again
+  if((_ray.flapT-=dt)<=0){ _ray.flap=_ray.flap>0.5 ? 0 : 1; _ray.flapT=_ray.flap ? 2.5+2.5*Math.random() : 1.5+2*Math.random(); }
+  _ray.amp=(_ray.amp||0)+((_ray.flap ? 0.26 : 0.02)-(_ray.amp||0))*(1-Math.exp(-dt/0.6));
+  _ray.ph+=2*Math.PI*0.55*dt*(0.3+0.7*_ray.amp/0.26);
+  if(_ray.dir*_ray.r > F.extR+reach) _ray.on=false;
+}
+function _rayDraw(){
+  _ray.vis=false;
+  if(!_ray.on) return;
+  if(!_koi3dProg) _koi3dProg=PIXI.Program.from(_KOI3D_VERT,_KOI3D_FRAG);
+  if(!_ray.mesh){
+    const G=_ray.g=_rayBuild(); _rayPose(G,0,0,0);
+    const geom=new PIXI.Geometry().addAttribute('aPos',G.pos,3).addAttribute('aNorm',G.nrm,3).addAttribute('aUV',G.uv,2).addAttribute('aCol',G.col,4)
+                                  .addAttribute('aFin',G.fid,1).addAttribute('aBase',G.base,3).addIndex(G.idx);
+    _ray.tex=_rayTexture();
+    const sh=new PIXI.Shader(_koi3dProg,{ uTex:_ray.tex, uCenter:new Float32Array(2), uScale:100, uYaw:0, uPitch:0, uRoll:0, uTilt:0,
+      uDepth:new Float32Array([0.9935,0.0045]), uTint:new Float32Array([1,1,1]), uFinCol:_KOI3D_WHITE, uAlpha:1,
+      uAmp:0, uPh:0, uK:1, uLobe:0, uBendZ:0, uBendY:0, uPecB:0, uFin:0, uMouth:0, uGill:0, uGillX:0.29, uTex2:PIXI.Texture.WHITE, uMature:-1, uFW:0, uFWPh:0,
+      uCaus:0, uCausT:0, uCausScale:0.06, uCausO:new Float32Array(2), uWater:new Float32Array(3), uWaterF:0 });
+    const m=_ray.mesh=new PIXI.Mesh(geom, sh); m.state.depthTest=true; m.state.culling=false; m.state.blend=true;
+    _gfx.bodySprites.addChild(m); _koi3dMeshes.push(m);                   // hidden with the fish at the start of every frame
+  }
+  const G=_ray.g; _rayPose(G, _ray.ph, _ray.amp||0, _ray.t);
+  const geom=_ray.mesh.geometry; geom.getBuffer('aPos').update(G.pos); geom.getBuffer('aNorm').update(G.nrm);
+  const F=_roomFrame(), zs=zScaleOf(_ray), u=_ray.mesh.shader.uniforms;
+  const x=F.cx+F.rx*_ray.r+F.dx*_ray.d, y=F.cy+F.ry*_ray.r+F.dy*_ray.d;
+  const ddr=0.10*F.extD*Math.cos(2*Math.PI*_ray.t/_ray.T*0.7+_ray.wob)*2*Math.PI*0.7/_ray.T/Math.max(1,_ray.v);
+  u.uCenter[0]=x; u.uCenter[1]=y; u.uScale=_raySpan(F)*zs/(2*_RAY_S);    // model units → px: the wingspan is 2·half-span
+  u.uYaw=_ray.dir>0 ? 0 : Math.PI;
+  u.uRoll=-_ray.dir*(0.55+0.12*Math.sin(0.5*_ray.t+_ray.wob));           // banked toward the viewer: the spotted back shows
+  u.uPitch=Math.atan(ddr)-0.08; u.uTilt=PANEL_TILT;
+  const gr=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(_ray))))&255)/255;
+  u.uTint[0]=u.uTint[1]=u.uTint[2]=gr; u.uWater=_WATER_RGB; u.uWaterF=_waterF(_ray);
+  u.uCaus=(!_pondActive && RIPPLE_SHADE>0) ? RIPPLE_SHADE*_day.s : 0; u.uCausT=_causT; u.uCausScale=_causScale;
+  u.uCausO[0]=_wrap20pi(x*_causScale); u.uCausO[1]=_wrap20pi(y*_causScale);
+  _ray.mesh.visible=true; _ray.mesh.zIndex=-2; _ray.vis=true;              // behind the barracuda and every fish
+}
 // ── the barracuda ────────────────────────────────────────────────────────────
 // Now and then (CUDA_MIN minutes, randomised ×0.5–1.5) a great barracuda glides past in the open water behind the
 // reef: a 3D fish on the same program as the tank fish, but not a boid — it enters past one side, crosses at the back
@@ -4512,7 +4668,7 @@ function _cudaDraw(){
   u.uTex=_cuda.tex; u.uFinCol=_KOI3D_WHITE; u.uMature=-1; u.uFW=0;
   u.uCenter[0]=x; u.uCenter[1]=y; u.uScale=L;
   u.uYaw=(_cuda.dir>0 ? 0 : Math.PI)+0.10*Math.sin(0.7*_cuda.t+_cuda.wob); u.uPitch=Math.atan(ddr); u.uRoll=0; u.uTilt=PANEL_TILT;
-  u.uDepth[0]=0.983; u.uDepth[1]=0.011;                                              // beyond every fish's slice (those run from 0.97 down)
+  u.uDepth[0]=0.980; u.uDepth[1]=0.008;                                              // beyond every fish's slice (those run from 0.97 down); the eagle ray's is farther still
   const gr=(hslToHex(0,0,Math.max(0,Math.min(100,100-DEPTH_LIGHT+_depthL(_cuda))))&255)/255;
   u.uTint[0]=u.uTint[1]=u.uTint[2]=gr; u.uWater=_WATER_RGB; u.uWaterF=_waterF(_cuda); u.uAlpha=1;
   u.uAmp=0.035; u.uPh=_cuda.ph; u.uK=1.0; u.uLobe=0.6; u.uBendZ=0.15*Math.cos(0.7*_cuda.t+_cuda.wob)*0.7; u.uBendY=0;
@@ -8291,6 +8447,7 @@ _foodStep(dt);
 _dayStep(dt);
 _bubbleStep(dt);
 _cudaStep(dt);
+_rayStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
@@ -8404,7 +8561,7 @@ _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order a
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 _anemFrame();
-_foodFrame(); _bubbleFrame(); _cudaDraw();
+_foodFrame(); _bubbleFrame(); _cudaDraw(); _rayDraw();
 for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); _bubblePlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
 _foodPlace(-Infinity); _bubblePlace(-Infinity);
@@ -8422,7 +8579,7 @@ if(_bgOverlayMesh && _bgOverlayMesh.visible){
 // Pooled sprites are assigned in depth order, so their child order already IS the draw order and
 // no sorting is needed. Ripple meshes / the overlay are appended wherever they were created, so
 // zIndex sorting has to be on while one is visible — it costs a sort of every child, every frame.
-_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _cuda.vis || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
+_gfx.bodySprites.sortableChildren = _rippleUsed>0 || _koi3dUsed>0 || _cuda.vis || _ray.vis || _anem.on || _foodOrder.length>0 || _bubOrder.length>0 || (_bgOverlayMesh && _bgOverlayMesh.visible);
 drawDeathSplashes();
 if(_PYRAMID_SEEN && simClock - lastPyramidUpdate >= pyramidRefreshInterval){
 lastPyramidUpdate = simClock;
@@ -8833,7 +8990,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn','rayBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
