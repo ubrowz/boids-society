@@ -2216,6 +2216,55 @@ background:#fff;transition:left 0.2s;display:block;"></span>
 </div>
 </section>
 
+<section class="panel">
+<h2>Starling murmuration</h2>
+<div class="ctrl-row">
+<button id="murLoadBtn" class="mini-btn" title="Make a starling murmuration: a flock of starlings over a reed bed at sunset, with a falcon now and then. Sliders you have tuned yourself are kept.">load murmuration</button>
+<button id="murBtn" class="mini-btn" title="Starling murmuration on/off. On: the scene is the murmuration (the society's own boids are hidden).">off</button>
+</div>
+<div class="ctrl-row">
+<label title="How many starlings are in the flock. More = a denser, darker cloud with sharper waves, and more work for the Pi (watch the fps in the overlay).">starlings</label>
+<input type="range" id="murNSlider" min="200" max="3000" value="1200" step="100">
+<span class="ctrl-val" id="murNVal">1200</span>
+</div>
+<div class="ctrl-row">
+<label title="How big the flock is, as a share of the panel (100% = about a quarter of the width and most of the height, landscape). The flock still breathes: it stretches and squeezes all the time.">flock size</label>
+<input type="range" id="murSizeSlider" min="40" max="160" value="100" step="5">
+<span class="ctrl-val" id="murSizeVal">100%</span>
+</div>
+<div class="ctrl-row">
+<label title="How fast the starlings fly (100% = crossing the flock in about five seconds).">speed</label>
+<input type="range" id="murSpeedSlider" min="40" max="200" value="100" step="5">
+<span class="ctrl-val" id="murSpeedVal">100%</span>
+</div>
+<div class="ctrl-row">
+<label title="How many turning waves a minute start by themselves: one starling turns sharply, its neighbours copy it a moment later, and a dark band rolls through the flock (birds banking in the turn show their wings). 0 = only the falcon starts them.">waves</label>
+<input type="range" id="murWavesSlider" min="0" max="20" value="4" step="1">
+<span class="ctrl-val" id="murWavesVal">4/min</span>
+</div>
+<div class="ctrl-row">
+<label title="A peregrine falcon dives through the flock about every this many minutes; the starlings near it scatter and a wave runs through the flock. A clap on the microphone (mic clap) sends one too. 0 = no falcon (the button still sends one).">falcon</label>
+<input type="range" id="murFalconSlider" min="0" max="10" value="2" step="1">
+<span class="ctrl-val" id="murFalconVal">2 min</span>
+<button id="murFalconBtn" class="mini-btn" title="Send the falcon now">falcon</button>
+</div>
+<div class="ctrl-row">
+<label title="How big one starling is drawn (100% = about one LED, a little more up close).">bird size</label>
+<input type="range" id="murDotSlider" min="50" max="250" value="100" step="10">
+<span class="ctrl-val" id="murDotVal">100%</span>
+</div>
+<div class="ctrl-row">
+<label title="How dark one starling is. Lower = only the dense parts and the waves read dark; higher = the whole flock is a black cloud.">darkness</label>
+<input type="range" id="murDarkSlider" min="20" max="100" value="70" step="5">
+<span class="ctrl-val" id="murDarkVal">70%</span>
+</div>
+<div class="ctrl-row">
+<label title="How bright the sunset sky is (100% = a deep blue overhead to a gold horizon). The flock needs a bright sky to stand against on the LED panel.">sky</label>
+<input type="range" id="murSkySlider" min="20" max="150" value="100" step="5">
+<span class="ctrl-val" id="murSkyVal">100%</span>
+</div>
+</section>
+
 <section class="panel" id="pyramidPanel">
 <h2>Demographics</h2>
 <canvas id="popPyramid" width="260" height="200"></canvas>
@@ -2492,6 +2541,11 @@ let SIZE_VAR   = parseInt(document.getElementById('sizeVarSlider').value)/100;  
 const _WATER_RGB = new Float32Array([((WATER_HEX>>16)&255)/255, ((WATER_HEX>>8)&255)/255, (WATER_HEX&255)/255]);
 let DEPTH_HAZE = parseInt(document.getElementById('depthHazeSlider').value)/100; // fraction of saturation lost by the furthest rank
 let SWIM_AMT  = Math.pow(parseInt(document.getElementById('swimSlider').value)/100, 2)*0.16; // lateral tail swing, fraction of body length (0 = off). Quadratic: the low end is where 'a minimal wave' lives
+let MURMUR = false;                                                                     // the starling murmuration scene (see _murStep / _murDraw)
+let MUR_N = parseInt(document.getElementById('murNSlider').value), MUR_SIZE = parseInt(document.getElementById('murSizeSlider').value)/100;
+let MUR_SPEED = parseInt(document.getElementById('murSpeedSlider').value)/100, MUR_WAVES = parseInt(document.getElementById('murWavesSlider').value);
+let MUR_FALCON = parseInt(document.getElementById('murFalconSlider').value), MUR_DOT = parseInt(document.getElementById('murDotSlider').value)/100;
+let MUR_DARK = parseInt(document.getElementById('murDarkSlider').value)/100, MUR_SKY = parseInt(document.getElementById('murSkySlider').value)/100;
 let SWIM_BEAT = parseInt(document.getElementById('swimBeatSlider').value)/10;          // tail beats per second at cruising speed
 let SWIM_WAVE = parseInt(document.getElementById('swimWaveSlider').value)/10;          // wavelengths along the body
 const SIDE_TURN_SECS = 0.8, SIDE_TURN_HOLD = 1.0;                                      // a turn-round takes this long (real seconds), then the boid may not reverse again for the hold
@@ -2739,6 +2793,7 @@ function _presetSlider(id,val){
 // (no drawn decorations or event effects over the fish, panel hung landscape, no trails), immigration on and a
 // population of about 10, every one of them 3D.
 function _fishTankSettings(){
+  if(MURMUR) document.getElementById('murBtn').click();             // a fish tank, not the murmuration
   if(parseInt(document.getElementById('swimSlider').value)===0) _setSlider('swimSlider', 50);
   if(!SIDE_VIEW) document.getElementById('sideViewBtn').click();
   if(SHOW_DETAILS) document.getElementById('detailsBtn').click();
@@ -2996,6 +3051,30 @@ wire('raySizeSlider','raySizeVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ RAY_SI
 wire('turtleSlider','turtleVal',       v=>parseInt(v), v=>parseInt(v)===0?'off':v+' min', v=>{ TURTLE_MIN=v; _turtle.wait=-1; });
 wire('turtleSizeSlider','turtleSizeVal', v=>parseInt(v)/100, v=>v+'%', v=>{ TURTLE_SIZE=v; });
 document.getElementById('turtleBtn').addEventListener('click', () => { if(!_turtle.on) _turtle.wait=0; });   // a pass right away
+wire('murNSlider','murNVal',           v=>parseInt(v), v=>String(v), v=>{ MUR_N=v; });
+wire('murSizeSlider','murSizeVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ MUR_SIZE=v; });
+wire('murSpeedSlider','murSpeedVal',   v=>parseInt(v)/100, v=>v+'%', v=>{ MUR_SPEED=v; });
+wire('murWavesSlider','murWavesVal',   v=>parseInt(v), v=>+v ? v+'/min' : 'off', v=>{ MUR_WAVES=v; });
+wire('murFalconSlider','murFalconVal', v=>parseInt(v), v=>+v ? v+' min' : 'off', v=>{ MUR_FALCON=v; _mur.fal.wait=-1; });
+wire('murDotSlider','murDotVal',       v=>parseInt(v)/100, v=>v+'%', v=>{ MUR_DOT=v; });
+wire('murDarkSlider','murDarkVal',     v=>parseInt(v)/100, v=>v+'%', v=>{ MUR_DARK=v; });
+wire('murSkySlider','murSkyVal',       v=>parseInt(v)/100, v=>v+'%', v=>{ MUR_SKY=v; });
+function _murUI(){ const b=document.getElementById('murBtn'); b.textContent=MURMUR?'on':'off'; b.style.color=MURMUR?'#ffb060':''; b.style.borderColor=MURMUR?'#ffb060':''; }
+document.getElementById('murBtn').addEventListener('click', function(){ MURMUR=!MURMUR; _murUI(); });
+document.getElementById('murFalconBtn').addEventListener('click', () => _murFalconSend());
+// Load murmuration: the scene on, no fish tank (no side-view fish, bubbles, anemone or visitors), nothing drawn over
+// the sky, and the society's own boids (hidden) kept to a handful so the Pi spends its time on the starlings
+document.getElementById('murLoadBtn').addEventListener('click', () => {
+  if(!MURMUR) document.getElementById('murBtn').click();          // the click also reaches the tank
+  if(SIDE_VIEW) document.getElementById('sideViewBtn').click();
+  if(SHOW_DETAILS) document.getElementById('detailsBtn').click();
+  for(let i=((EVENT_FX%3)+3)%3; i>0; i--) document.getElementById('bondLinesBtn').click();
+  _presetSlider('tiltSlider', 90);
+  _presetSlider('trailLengthSlider', 0);
+  _setSlider('predatorSlider', 0);
+  _presetSlider('popCeilSlider', 4); _presetSlider('targetSlider', 2); _presetSlider('initPopSlider', 2);
+  _presetSlider('dayCycleSlider', 0);
+});
 document.getElementById('rayBtn').addEventListener('click', () => { if(!_ray.on) _ray.wait=0; });     // a pass right away
 document.getElementById('cudaBtn').addEventListener('click', () => { if(!_cuda.on) _cuda.wait=0; });   // a pass right away
 wire('feedSlider','feedVal',           v=>parseInt(v), v=>parseInt(v)===0?'off':v, v=>{ FEED_N=v; });
@@ -4473,6 +4552,194 @@ function _bubblePlace(z){
     s.zIndex=_zOrder-0.5;
   }
 }
+// ── the starling murmuration ─────────────────────────────────────────────────
+// MURMUR turns the scene into a murmuration: MUR_N starlings in 3D over a reed bed at sunset, dark against the sky.
+// They are a flock of their own (Reynolds' boids in 3D, in typed arrays; the engine's boids are hidden and kept few
+// by Load murmuration). Each starling keeps its distance from its neighbours, matches their heading and keeps with
+// them, at a steady cruising speed and mostly level; a pull towards a slowly wandering centre holds the flock over
+// the roost, and the centre's breathing shape stretches it into sheets and squeezes it into balls.
+// WAVES: now and then one starling makes a sudden turn and its neighbours copy it 0.1 s later, theirs a moment after
+// that: a turn that rolls through the whole flock in a second or two. Birds in the wave bank and show their wings —
+// they look darker — so a dark band sweeps across (the agitation waves of real murmurations). A peregrine (every
+// MUR_FALCON minutes, the falcon button, or a clap on the microphone) dives through; the birds near it scatter and
+// start such a wave.
+const _mur = { n:0, P:null, V:null, E:null, ST:null, SL:null, SW:null, head:null, next:null, grid:null,
+               cr:0, cd:0, cz:0, t:0, waveT:4, pc:null, tex:null, sprites:[], sky:null, skyTex:null, skyKey:'', fg:null,
+               fal:{ on:false, wait:-1, x:0, y:0, z:0, vx:0, vy:0, vz:0, tgt:0, through:false, t:0, flap:0 } };
+// the frame of the flock, from the panel (sizes follow its long side L and short side S, not the tilt)
+function _murDims(){
+  const F=_roomFrame(), L=Math.max(F.extR,F.extD), S=Math.min(F.extR,F.extD);
+  const Rr=MUR_SIZE*Math.min(0.55*F.extR,1.4*S), Rd=MUR_SIZE*Math.min(0.55*F.extD,0.8*S), Rz=Rr;
+  const a=Math.cbrt(4.19*Rr*Rd*Rz/Math.max(50,MUR_N));                    // the mean spacing between neighbours
+  return { F, L, S, Rr, Rd, Rz, a, s0:MUR_SPEED*0.35*S, dh:F.extD*(1-2*0.13), led:2*L/192 };
+}
+function _murInit(n){
+  const D=_murDims(), P=new Float32Array(3*n), V=new Float32Array(3*n), E=new Float32Array(3*n), ST=new Float32Array(n), SL=new Float32Array(n), SW=new Float32Array(n);
+  const k=Math.min(n,_mur.n);
+  if(k){ P.set(_mur.P.subarray(0,3*k)); V.set(_mur.V.subarray(0,3*k)); E.set(_mur.E.subarray(0,3*k)); ST.set(_mur.ST.subarray(0,k)); SL.set(_mur.SL.subarray(0,k)); SW.set(_mur.SW.subarray(0,k)); }
+  if(!_mur.n){ _mur.cr=0; _mur.cd=-0.3*D.F.extD; _mur.cz=0; }
+  const hd=Math.random()*6.2832;
+  for(let i=k;i<n;i++){
+    let x,y,z; do{ x=Math.random()*2-1; y=Math.random()*2-1; z=Math.random()*2-1; }while(x*x+y*y+z*z>1);
+    P[3*i]=_mur.cr+x*D.Rr*0.7; P[3*i+1]=_mur.cd+y*D.Rd*0.7; P[3*i+2]=_mur.cz+z*D.Rz*0.7;
+    V[3*i]=Math.cos(hd)*D.s0; V[3*i+1]=0; V[3*i+2]=Math.sin(hd)*D.s0; SL[i]=-9;
+  }
+  _mur.P=P; _mur.V=V; _mur.E=E; _mur.ST=ST; _mur.SL=SL; _mur.SW=SW; _mur.n=n; _mur.next=new Int32Array(n);
+}
+// a turn that starts at bird i (and spreads): its escape direction, level and across its heading (or away from a point)
+function _murStartle(i, ex, ey, ez){
+  const M=_mur;
+  if(ex===undefined){ const vx=M.V[3*i], vz=M.V[3*i+2], s=Math.random()<0.5?-1:1, h=Math.hypot(vx,vz)||1; ex=-vz/h*s; ez=vx/h*s; ey=(Math.random()-0.5)*0.6; }
+  const h=Math.hypot(ex,ey,ez)||1; M.E[3*i]=ex/h; M.E[3*i+1]=ey/h; M.E[3*i+2]=ez/h; M.ST[i]=1; M.SW[i]=1; M.SL[i]=M.t;
+}
+function _murFalconSend(){ const f=_mur.fal; if(MURMUR && !f.on) f.wait=0; }
+function _murStep(dt){
+  if(!MURMUR){ if(_mur.n){ _mur.n=0; _mur.P=null; } _mur.fal.on=false; return; }
+  dt=Math.min(Math.max(dt||0,0),0.05); if(!dt) return;
+  if(_mur.n!==MUR_N) _murInit(MUR_N);
+  const M=_mur, D=_murDims(), F=D.F, n=M.n, P=M.P, V=M.V, E=M.E, ST=M.ST, SL=M.SL, SW=M.SW, now=(M.t+=dt);
+  // the shape the flock is held to: an ellipsoid that sweeps over the roost (at about half the birds' speed, so the
+  // flock flies across and turns at the ends), breathes (long and thin ↔ round), tilts (rising and falling ribbons)
+  // and now and then pinches into two lobes that pull apart and merge again
+  const wr=Math.max(0,F.extR-D.Rr*1.35), top=Math.min(-F.extD+D.Rd*1.5, 0.5*(D.dh-F.extD)), bot=Math.max(top, D.dh-D.Rd*1.3);
+  M.cr=wr*(0.7*Math.sin(now*0.071)+0.3*Math.sin(now*0.17+1.3));
+  M.cd=(top+bot)/2+(bot-top)/2*Math.max(-1,Math.min(1,0.7*Math.sin(now*0.083+0.4)+0.3*Math.sin(now*0.21)));
+  M.cz=0.3*D.Rz*Math.sin(now*0.05+2);
+  const br=Math.sin(now*0.09)+0.5*Math.sin(now*0.23+1), Rz=D.Rz*(1-0.2*Math.sin(now*0.07+3));
+  const th=0.45*Math.sin(now*0.061+0.7)+0.2*Math.sin(now*0.15), ct=Math.cos(th), sn=Math.sin(th);
+  const split=Math.max(0,Math.sin(now*0.037-1)*1.6-0.6);                 // 0 most of the time, up to 1 for ~20 s
+  const Rr=D.Rr*(1+0.4*br)*(1-0.35*split), Rd=D.Rd*(1-0.3*Math.max(0,br)+0.1*Math.max(0,-br)), sep=split*D.Rr*1.1;
+  // the grid: cells one neighbour radius wide, rebuilt every frame (linked lists through next[])
+  const rn=1.6*D.a, rs=0.9*D.a, cs=rn, ox=-1.6*F.extR, oy=-1.6*F.extD, oz=-2.2*D.Rz;
+  const NX=Math.max(1,Math.ceil(3.2*F.extR/cs)), NY=Math.max(1,Math.ceil(3.2*F.extD/cs)), NZ=Math.max(1,Math.ceil(4.4*D.Rz/cs)), NC=NX*NY*NZ;
+  if(!M.head || M.head.length<NC) M.head=new Int32Array(NC);
+  const head=M.head, next=M.next; head.fill(-1,0,NC);
+  const cx=v=>Math.max(0,Math.min(NX-1,Math.floor((v-ox)/cs))), cy=v=>Math.max(0,Math.min(NY-1,Math.floor((v-oy)/cs))), cz=v=>Math.max(0,Math.min(NZ-1,Math.floor((v-oz)/cs)));
+  for(let i=0;i<n;i++){ const c=cx(P[3*i])+NX*(cy(P[3*i+1])+NY*cz(P[3*i+2])); next[i]=head[c]; head[c]=i; }
+  // the falcon
+  const f=M.fal, RF=1.1*D.Rd;
+  if(!f.on && f.wait<0 && MUR_FALCON>0) f.wait=60*MUR_FALCON*(0.6+0.8*Math.random());   // the next pass (wait < 0: none due)
+  if(!f.on && f.wait>=0 && (f.wait-=dt)<=0){
+    f.on=true; f.wait=-1; f.through=false; f.t=0; const s=Math.random()<0.5?-1:1;
+    f.x=-s*(F.extR+0.1*D.S); f.y=-F.extD-0.1*D.S; f.z=M.cz; f.vx=s*D.s0*2; f.vy=D.s0; f.vz=0; f.tgt=Math.floor(Math.random()*n);
+  }
+  if(f.on){
+    f.t+=dt; f.flap+=dt*(f.through?7:3);
+    const sp=D.s0*(f.through?2.6:3.2);
+    if(!f.through){
+      const ti=f.tgt, tx=P[3*ti]+V[3*ti]*0.3-f.x, ty=P[3*ti+1]+V[3*ti+1]*0.3-f.y, tz=P[3*ti+2]+V[3*ti+2]*0.3-f.z, q=Math.hypot(tx,ty,tz)||1;
+      const k=Math.min(1,dt*2.5); f.vx+=(tx/q*sp-f.vx)*k; f.vy+=(ty/q*sp-f.vy)*k; f.vz+=(tz/q*sp-f.vz)*k;
+      if(q<rs*2 || f.t>12) f.through=true;                                   // a strike (they always miss here) — then away
+    } else f.vy+=(-0.2*sp-f.vy)*Math.min(1,dt*0.8);                          // climbing away out of the picture
+    const v=Math.hypot(f.vx,f.vy,f.vz)||1; f.vx*=sp/v; f.vy*=sp/v; f.vz*=sp/v;
+    f.x+=f.vx*dt; f.y+=f.vy*dt; f.z+=f.vz*dt;
+    if(f.through && (Math.abs(f.x)>F.extR+0.2*D.S || f.y<-F.extD-0.2*D.S || f.t>25)) f.on=false;
+  }
+  // the starlings
+  const s0=D.s0, KS=4*s0, KA=2.5, KC=1.2, KR=3*s0, rn2=rn*rn;
+  const g=Math.exp(-dt/0.7);
+  for(let i=0;i<n;i++){
+    const i3=3*i, px=P[i3], py=P[i3+1], pz=P[i3+2]; let vx=V[i3], vy=V[i3+1], vz=V[i3+2];
+    let ax=0, ay=0, az=0, cnt=0, sx=0, sy=0, sz=0, mx=0, my=0, mz=0, best=0, bj=-1;
+    const gx=cx(px), gy=cy(py), gz=cz(pz);
+    for(let zz=Math.max(0,gz-1); zz<=Math.min(NZ-1,gz+1); zz++) for(let yy=Math.max(0,gy-1); yy<=Math.min(NY-1,gy+1); yy++){
+      const row=NX*(yy+NY*zz);
+      for(let xx=Math.max(0,gx-1); xx<=Math.min(NX-1,gx+1); xx++){
+        for(let j=head[row+xx]; j>=0; j=next[j]){
+          if(j===i) continue; const j3=3*j, dx=px-P[j3], dy=py-P[j3+1], dz=pz-P[j3+2], d2=dx*dx+dy*dy+dz*dz;
+          if(d2>rn2) continue;
+          cnt++; sx+=V[j3]; sy+=V[j3+1]; sz+=V[j3+2]; mx+=P[j3]; my+=P[j3+1]; mz+=P[j3+2];
+          if(d2<rs*rs){ const d=Math.sqrt(d2)||0.01, w=KS*(rs-d)/(rs*d); ax+=dx*w; ay+=dy*w; az+=dz*w; }
+          if(SW[j]>best && now-SL[j]>0.1 && now-SL[j]<0.6){ best=SW[j]; bj=j; }   // a neighbour turning: copy it a moment later
+        }
+      }
+    }
+    if(cnt){ ax+=KA*(sx/cnt-vx); ay+=KA*(sy/cnt-vy); az+=KA*(sz/cnt-vz); ax+=KC*(mx/cnt-px); ay+=KC*(my/cnt-py); az+=KC*(mz/cnt-pz); }
+    if(bj>=0 && best>0.3 && now-SL[i]>1.2){ ST[i]=SW[i]=best*0.985; SL[i]=now; const j3=3*bj; E[i3]=E[j3]; E[i3+1]=E[j3+1]; E[i3+2]=E[j3+2]; }
+    // held over the roost: beyond the flock's ellipsoid, a pull back that grows with the distance out
+    let qx=px-M.cr, qy=py-M.cd; if(sep>0){ const s=(qx*ct+qy*sn)>0 ? -sep : sep; qx+=s*ct; qy+=s*sn; }   // the nearer lobe
+    const ex=(qx*ct+qy*sn)/Rr, ey=(-qx*sn+qy*ct)/Rd, ez=(pz-M.cz)/Rz, e=Math.sqrt(ex*ex+ey*ey+ez*ez);
+    if(e>1){ const k=KR*(e-1)/e, fu=-k*ex, fw=-k*ey; ax+=fu*ct-fw*sn; ay+=fu*sn+fw*ct; az-=k*ez; }
+    // the falcon: scatter away from it, and the turn spreads
+    if(f.on){ const dx=px-f.x, dy=py-f.y, dz=pz-f.z, q=Math.hypot(dx,dy,dz);
+      if(q<RF){ const k=10*s0*(1-q/RF)/(q||1); ax+=dx*k; ay+=dy*k; az+=dz*k; if(now-SL[i]>1.2 && q<0.6*RF) _murStartle(i,dx,dy*0.5,dz); } }
+    if(ST[i]>0.02){ const k=4*s0*ST[i]; ax+=E[i3]*k; ay+=E[i3+1]*k; az+=E[i3+2]*k; ST[i]*=g; }
+    const sp=Math.hypot(vx,vy,vz)||1, k=2*(s0-sp)/sp; ax+=vx*k; ay+=vy*k; az+=vz*k;   // a steady cruising speed
+    ay-=1.2*vy;                                                            // mostly level flight
+    { const fl=D.dh-0.06*D.S, cl=-F.extD+0.18*D.S, sw=F.extR-0.18*D.S, kw=6*s0/(0.1*D.S);   // above the reeds, below the top, within the sides
+      if(py>fl) ay-=kw*(py-fl); else if(py<cl) ay+=kw*(cl-py);
+      if(px>sw) ax-=kw*(px-sw); else if(px<-sw) ax+=kw*(-sw-px); }
+    ax+=(Math.random()-0.5)*0.4*s0; ay+=(Math.random()-0.5)*0.2*s0; az+=(Math.random()-0.5)*0.4*s0;
+    vx+=ax*dt; vy+=ay*dt; vz+=az*dt;
+    const v2=Math.hypot(vx,vy,vz); if(v2>2.2*s0){ const c=2.2*s0/v2; vx*=c; vy*=c; vz*=c; }
+    V[i3]=vx; V[i3+1]=vy; V[i3+2]=vz;
+  }
+  for(let i=0;i<3*n;i++) P[i]+=V[i]*dt;
+  // a wave of its own now and then (and on a clap); it starts at a bird on the flock's edge
+  if(MUR_WAVES>0 && (M.waveT-=dt)<=0){ M.waveT=60/MUR_WAVES*(0.5+Math.random()); _murWave(); }
+}
+function _murWave(){
+  const M=_mur; if(!M.n) return; let bi=0, bd=-1;
+  for(let k=0;k<12;k++){ const i=Math.floor(Math.random()*M.n), d=Math.hypot(M.P[3*i]-M.cr,M.P[3*i+1]-M.cd); if(d>bd){ bd=d; bi=i; } }
+  _murStartle(bi);
+}
+// drawing: the sky (a texture in the room frame, redrawn only when the canvas, tilt or sky slider changes), the birds
+// as dark dots in one ParticleContainer (one draw call), the falcon as a small dark sickle
+function _murDraw(){
+  if(!MURMUR){ if(_mur.sky) _mur.sky.visible=false; if(_mur.pc) _mur.pc.visible=false; if(_mur.fg){ _mur.fg.clear(); } return; }
+  if(!_mur.n) return;
+  const M=_mur, D=_murDims(), F=D.F, RW=2*F.extR, RH=2*F.extD;
+  if(!M.sky){ M.sky=new PIXI.Sprite(PIXI.Texture.EMPTY); M.sky.anchor.set(0.5,0.5); app.stage.addChildAt(M.sky, app.stage.getChildIndex(_gfx.trails)); }
+  const key=Math.round(RW)+'x'+Math.round(RH)+':'+MUR_SKY;
+  if(key!==M.skyKey){ M.skyKey=key; if(M.skyTex) M.skyTex.destroy(true); M.skyTex=_murSkyTexture(RW,RH,D); M.sky.texture=M.skyTex; }
+  M.sky.visible=true; M.sky.position.set(F.cx,F.cy); M.sky.rotation=PANEL_TILT; M.sky.scale.set(RW/M.sky.texture.width*1.01, RH/M.sky.texture.height*1.01);
+  if(!M.pc){
+    const N=32, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d'), gr=g.createRadialGradient(N/2,N/2,0,N/2,N/2,N/2);
+    gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.45,'rgba(255,255,255,0.9)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,N,N);
+    M.tex=PIXI.Texture.from(c);
+    M.pc=new PIXI.ParticleContainer(6000,{ vertices:true, position:true, tint:true }); app.stage.addChildAt(M.pc, app.stage.getChildIndex(M.sky)+1);
+    M.fg=new PIXI.Graphics(); app.stage.addChildAt(M.fg, app.stage.getChildIndex(M.pc)+1);
+  }
+  M.pc.visible=true;
+  while(M.sprites.length<M.n){ const s=new PIXI.Sprite(M.tex); s.anchor.set(0.5,0.5); s.tint=0x050304; M.pc.addChild(s); M.sprites.push(s); }
+  const ZF=10*D.Rz, base=MUR_DOT*0.8*D.led/32;
+  for(let i=0;i<M.sprites.length;i++){
+    const s=M.sprites[i]; if(i>=M.n){ s.visible=false; continue; }
+    const z=M.P[3*i+2], ps=ZF/Math.max(0.3*ZF,ZF+z), r=M.P[3*i]*ps, d=D.dh+(M.P[3*i+1]-D.dh)*ps, st=Math.min(1,M.ST[i]*1.6);
+    s.visible=true; s.x=F.cx+F.rx*r+F.dx*d; s.y=F.cy+F.ry*r+F.dy*d;
+    s.scale.set(base*ps*(1+0.45*st)); s.alpha=Math.min(1,MUR_DARK*(0.55+0.45*st)*(1.15-0.3*Math.max(0,Math.min(1,(z+D.Rz)/(2*D.Rz)))));
+  }
+  // the falcon: a swept-wing sickle, flapping on the way in, wings tucked back on the stoop
+  const g=M.fg; g.clear(); const f=M.fal; if(!f.on) return;
+  const ZFf=ZF/Math.max(0.3*ZF,ZF+f.z), fr=f.x*ZFf, fd=D.dh+(f.y-D.dh)*ZFf, ux0=f.vx, uy0=f.vy, uh=Math.hypot(ux0,uy0)||1, ux=ux0/uh, uy=uy0/uh;
+  const len=2*D.led*Math.max(1,MUR_DOT)*ZFf, fl=Math.sin(f.flap*6.2832)*0.5, sw=f.through?0.9:0.5;
+  const Q=(a,b)=>{ const rr=fr+ux*a-uy*b, dd=fd+uy*a+ux*b; return [F.cx+F.rx*rr+F.dx*dd, F.cy+F.ry*rr+F.dy*dd]; };
+  const pts=[Q(1.1*len,0), Q(-0.1*len,0.35*len), Q(-sw*len,(1.6+fl*0.4)*len), Q(-0.35*len,0.25*len), Q(-1.1*len,0.15*len), Q(-1.1*len,-0.15*len), Q(-0.35*len,-0.25*len), Q(-sw*len,-(1.6+fl*0.4)*len), Q(-0.1*len,-0.35*len)];
+  g.beginFill(0x040202, Math.min(1,MUR_DARK+0.2)); g.drawPolygon(pts.flat()); g.endFill();
+}
+function _murSkyTexture(RW,RH,D){
+  const W=Math.max(8,Math.round(RW/2)), H=Math.max(8,Math.round(RH/2)), c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
+  const S=Math.min(W,H), hz=H*(1-0.13), k=MUR_SKY;                       // the horizon low down; k = how bright
+  const col=(r,gg,b)=>`rgb(${Math.round(Math.min(255,r*k))},${Math.round(Math.min(255,gg*k))},${Math.round(Math.min(255,b*k))})`;
+  const gr=g.createLinearGradient(0,0,0,hz);                              // a sunset: dusky blue overhead (bright enough on the LEDs for the flock to stand out against), mauve, then orange to a gold horizon
+  gr.addColorStop(0,col(78,92,165)); gr.addColorStop(0.4,col(132,96,155)); gr.addColorStop(0.72,col(200,96,78)); gr.addColorStop(1,col(250,168,84));
+  g.fillStyle=gr; g.fillRect(0,0,W,hz+1);
+  let sd=7; const rnd=()=>{ sd=(sd*16807)%2147483647; return sd/2147483647; };
+  const sx=W*0.7;                                                         // the sun's glow just above the horizon
+  const sg=g.createRadialGradient(sx,hz,0,sx,hz,S*0.9); sg.addColorStop(0,col(255,220,140)); sg.addColorStop(0.12,`rgba(255,200,120,${0.7*Math.min(1,k)})`); sg.addColorStop(1,'rgba(255,160,90,0)');
+  g.fillStyle=sg; g.fillRect(0,0,W,hz);
+  for(let i=0;i<5;i++){ const y=hz*(0.35+0.5*rnd()), x=W*rnd(), w=W*(0.15+0.3*rnd()), h=Math.max(1,S*(0.015+0.02*rnd()));   // a few thin streaks of cloud
+    g.fillStyle=`rgba(${Math.round(120*k)},${Math.round(60*k)},${Math.round(80*k)},0.45)`; g.beginPath(); g.ellipse(x,y,w/2,h,0,0,6.2832); g.fill(); }
+  g.fillStyle='rgb(10,7,6)';                                              // the ground: a reed bed with a few trees, near black
+  g.fillRect(0,hz,W,H-hz);
+  for(let x=0;x<W;x+=1){ const h=S*(0.01+0.03*rnd()*rnd()); g.fillRect(x,hz-h,1,h+1); }
+  for(let t=0;t<3;t++){ const x=W*(0.08+0.35*t+0.15*rnd()); for(let m=0;m<4;m++){ const rr=S*(0.04+0.04*rnd()); g.beginPath(); g.arc(x+(m-1.5)*rr*0.9, hz-S*0.02-rr*(0.6+0.8*rnd()), rr, 0, 6.2832); g.fill(); }
+    g.fillRect(x-S*0.06, hz-S*0.05, S*0.12, S*0.05+1); }
+  return PIXI.Texture.from(c);
+}
+// overlay: the number of birds, and the falcon when it is about
+function _murHint(){ return MURMUR && _mur.n ? ' · '+_mur.n+' starlings'+(_mur.fal.on?' · falcon!':'') : ''; }
+
 // ── the sea turtle ───────────────────────────────────────────────────────────
 // A green sea turtle swims past behind the reef now and then (TURTLE_MIN minutes, ×0.5–1.5), harmless like the ray.
 // Its own model on the tank fish's program, posed on the CPU like the ray: a domed shell (carapace + plastron, the
@@ -7084,6 +7351,7 @@ ctx.lineWidth=4; ctx.stroke();
 function drawBoid(boid){
 // NOTE: caller must do _gfx.boids.clear() once before the per-boid loop
 const g=_gfx.boids;
+if(MURMUR){ boid._fish=false; return; }   // the murmuration: the society's own boids are not seen (_murDraw draws the starlings)
 // Resolve this boid's image FIRST, because a boid with nothing to wear may not be drawn at all —
 // and that decision has to be made before the aura, which is painted further down but sits behind
 // the body. Per-sex image pool: each boid picks one at birth (lazily on first draw, the same frame
@@ -8336,7 +8604,7 @@ function _gatherSettings(){
 const inputs={};
 document.querySelectorAll('input[type="range"],input[type="number"],input[type="color"]').forEach(el=>{ if(el.id) inputs[el.id]=el.value; });
 const out={ app:'boid-world', v:1, inputs,
-  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, SIDE_VIEW, KOI3D, immigrationEnabled, HUNT_MODE, HUE_LOCK, RIPPLE_STYLE } };
+  toggles:{ EVENT_FX, AURA_MODE, DIFF_MODE, SHOW_COLOR, SHOW_DETAILS, NO_OVERLAP, DIM_INFERTILE, UPRIGHT_SPRITE, SIDE_VIEW, KOI3D, MURMUR, immigrationEnabled, HUNT_MODE, HUE_LOCK, RIPPLE_STYLE } };
 const fish=_fishPoolRefs(); if(fish) out.fish=fish;
 out.reefSpecies=_reefSpecies(); out.presetVals=_presetVals; out.tuned=[..._userTuned];
 return out;
@@ -8362,6 +8630,7 @@ if(t.SHOW_COLOR!==undefined)        clickTo(!!SHOW_COLOR       !== !!t.SHOW_COLO
 if(t.SHOW_DETAILS!==undefined)      clickTo(!!SHOW_DETAILS     !== !!t.SHOW_DETAILS,      'detailsBtn');
 if(t.NO_OVERLAP!==undefined)        clickTo(!!NO_OVERLAP       !== !!t.NO_OVERLAP,        'noOverlapBtn');
 if(t.DIM_INFERTILE!==undefined)     clickTo(!!DIM_INFERTILE    !== !!t.DIM_INFERTILE,     'dimBtn');
+if(t.MURMUR!==undefined)            clickTo(!!MURMUR           !== !!t.MURMUR,            'murBtn');
 if(t.UPRIGHT_SPRITE!==undefined)    clickTo(!!UPRIGHT_SPRITE   !== !!t.UPRIGHT_SPRITE,    'uprightBtn');
 if(t.SIDE_VIEW!==undefined)         clickTo(!!SIDE_VIEW        !== !!t.SIDE_VIEW,         'sideViewBtn');
 if(t.KOI3D!==undefined)             clickTo(!!KOI3D            !== !!t.KOI3D,             'koi3dBtn');
@@ -8597,7 +8866,7 @@ if(_fpsEl && ++_fpsThrottle>=5){
   let _living=0; for(const b of boids) if(b.alive&&!b.dying) _living++;
   const col=FAMILY_CSS[preferredFamily]||'#ffffff';
   const html=_living+' boids · <span style="color:'+col+'">'+preferredFamily+'</span>'+(_tcOn?' · ▶ '+_fmtSecs((performance.now()-_tcT0)/1000):'')
-            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_anemHint()+_dayHint()+_micHint()+_sndHint();
+            +(_fpsNow?' · '+_fpsNow+' fps':'')+(_k3Shown?' · 3D ×'+_k3Shown:'')+_anemHint()+_murHint()+_dayHint()+_micHint()+_sndHint();
   if(html!==_fpsLastHTML){ _fpsLastHTML=html; _fpsEl.innerHTML=html; }
 }
 for(const [k,t] of spawnFlashPairs){ if(t-dt<=0) spawnFlashPairs.delete(k); else spawnFlashPairs.set(k,t-dt); }
@@ -8625,13 +8894,14 @@ drawBirthRings();
 updateCollisions();
 updatePredators(dt);
 
-if(_mic.clap){ _mic.clap=false; if(FEED_N>0) _feedDrop(FEED_N); else _fishStartleAll(); }   // a clap on the microphone: feeding time, or every fish startles
+if(_mic.clap){ _mic.clap=false; if(MURMUR) _murFalconSend(); else if(FEED_N>0) _feedDrop(FEED_N); else _fishStartleAll(); }   // a clap on the microphone: feeding time, or every fish startles
 _foodStep(dt);
 _dayStep(dt);
 _bubbleStep(dt);
 _cudaStep(dt);
 _rayStep(dt);
 _turtleStep(dt);
+_murStep(dt);
 for(const boid of boids){
 if(!boid.alive) continue;
 updateLifespan(boid,dt);
@@ -8745,7 +9015,7 @@ _drawList.sort((a,b)=>(b.z-a.z)||(b.id-a.id)); // continuous depth: draw order a
 _causT=(simClock*0.9)%62.8318; _causScale=0.048*RIPPLE_WAVES;   // water light: one clock for every koi (a multiple-of-0.1 shader → seamless wrap at 20π)
 _swimFrom=Math.max(0,_drawList.length-_RIPPLE_MAX); _k3From=Math.max(0,_drawList.length-KOI3D_MAX); _drawIdx=0;   // the NEAREST bodies (end of the far→near list) get the swim meshes
 _anemFrame();
-_foodFrame(); _bubbleFrame(); _cudaDraw(); _rayDraw(); _turtleDraw();
+_foodFrame(); _bubbleFrame(); _cudaDraw(); _rayDraw(); _turtleDraw(); _murDraw();
 for(const it of _drawList){ if(_anem.on) _anemPlace(it.z); _foodPlace(it.z); _bubblePlace(it.z); if(it._pred) drawPredator(it); else drawBoid(it); _drawIdx++; }
 if(_anem.on) _anemPlace(-Infinity);   // a half no body is nearer than goes in front of them all
 _foodPlace(-Infinity); _bubblePlace(-Infinity);
@@ -8869,6 +9139,7 @@ if(!DIM_INFERTILE){
 }
 UPRIGHT_SPRITE    = ${UPRIGHT_SPRITE};
 SIDE_VIEW         = ${SIDE_VIEW};
+MURMUR            = ${MURMUR};
 KOI3D             = ${KOI3D};
 // Sync the upright button visual to match the exported UPRIGHT_SPRITE state
 if(UPRIGHT_SPRITE){
@@ -9174,7 +9445,7 @@ document.addEventListener('input', e => {
     _tankSend({boid:1,t:'ctl',kind:'input',id:el.id,value:el.value});
 });
 // forward toggle/action button clicks (local handlers keep the dashboard visuals in sync)
-const _FWD_CLICKS = new Set(['noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn','rayBtn','turtleBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
+const _FWD_CLICKS = new Set(['murBtn','murFalconBtn','noOverlapBtn','bondLinesBtn','colorBtn','detailsBtn','dimBtn','uprightBtn','sideViewBtn','koi3dBtn','auraGradBtn','diffBtn','immigrationBtn','huntModeBtn','infectBtn','soundBtn','hueLockBtn','rippleStyleBtn','feedBtn','cudaBtn','rayBtn','turtleBtn']); // recBtn is now the composition record button (dashboard-only, not forwarded).
 document.addEventListener('click', e => {
   const b = e.target.closest('button');
   if(!b || !_FWD_CLICKS.has(b.id) || !_tankAlive()) return;
